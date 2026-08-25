@@ -1,0 +1,40 @@
+# ============================================================
+# 示例配置（复制为 config.yaml 后按需修改）
+# 多环境机制：
+#   config.yaml         公共基础配置
+#   config.dev.yaml     开发环境覆盖（默认）
+#   config.test.yaml    测试环境覆盖
+#   config.prod.yaml    生产环境覆盖
+# 环境选择：-p dev|test|prod 或环境变量 APP_PROFILE
+# 优先级：APP_* 环境变量 > 环境配置文件 > config.yaml
+# 支持 ${VAR} 占位符（自动用同名环境变量展开）
+# ============================================================
+
+app:
+  name: photography-server
+  mode: debug
+  port: 8080
+  timezone: Asia/Shanghai
+
+jwt:
+  secret: please-set-a-strong-secret
+  issuer: photography-server
+  expire_hours: 168
+
+db:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: root
+  name: photography
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  log_mode: false
+
+log:
+  level: info
+
+upload:
+  dir: ./uploads
+  max_size_mb: 20

@@ -1,0 +1,62 @@
+package controller
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"photography-server/internal/middleware"
+	"photography-server/internal/response"
+)
+
+func (h *Controller) DashboardOverview(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	ov, err := h.Svc.Overview(op)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, ov)
+}
+
+func (h *Controller) NotificationList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ListNotifications(op, page, pageSize, queryStr(c, "unread") == "1")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.PageOK(c, list, total, page, pageSize)
+}
+
+func (h *Controller) NotificationUnreadCount(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	count, err := h.Svc.UnreadNotificationCount(op)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, map[string]int64{"unread": count})
+}
+
+func (h *Controller) NotificationRead(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.MarkNotificationRead(op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+func (h *Controller) NotificationReadAll(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	if err := h.Svc.MarkAllNotificationsRead(op); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}

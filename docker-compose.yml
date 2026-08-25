@@ -1,0 +1,61 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: photography-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: photography
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8
+      - --collation-server=utf8_general_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docs/sql/ddl.sql:/docker-entrypoint-initdb.d/01-ddl.sql:ro
+      - ./docs/sql/dml.sql:/docker-entrypoint-initdb.d/02-dml.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  backend:
+    build: .
+    container_name: photography-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_MODE: release
+      APP_PROFILE: prod
+      APP_DB_HOST: mysql
+      APP_DB_PORT: "3306"
+      APP_DB_USER: root
+      APP_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      APP_DB_NAME: photography
+      APP_JWT_SECRET: ${JWT_SECRET:-photography-server-jwt-secret-change-me}
+      APP_UPLOAD_DIR: /app/uploads
+      APP_LOG_LEVEL: warn
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: photography-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  uploads_data:

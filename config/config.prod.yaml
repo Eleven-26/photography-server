@@ -1,0 +1,33 @@
+# ============================================================
+# 生产环境配置（安全基线）
+# 启动：go run ./cmd/server -c config/config.yaml -p prod
+# 注意：生产密钥/数据库密码请通过环境变量注入（APP_JWT_SECRET 等），
+#       勿将真实密钥提交到仓库。
+# ============================================================
+
+app:
+  mode: release
+  port: 8080
+
+jwt:
+  secret: ${APP_JWT_SECRET}
+  issuer: photography-server
+  expire_hours: 168
+
+db:
+  host: ${APP_DB_HOST}
+  port: 3306
+  user: ${APP_DB_USER}
+  password: ${APP_DB_PASSWORD}
+  name: photography
+  charset: utf8mb4
+  max_idle_conns: 20
+  max_open_conns: 200
+  log_mode: false
+
+log:
+  level: warn
+
+upload:
+  dir: /data/uploads
+  max_size_mb: 100

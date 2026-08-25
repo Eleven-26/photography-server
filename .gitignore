@@ -1,0 +1,26 @@
+# binaries
+photography-server
+server
+*.exe
+
+# env
+.env
+
+# config local
+config/config.local.yaml
+
+# uploads
+uploads/
+
+# logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# os
+.DS_Store
+Thumbs.db

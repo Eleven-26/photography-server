@@ -1,0 +1,26 @@
+# ============================================================
+# 测试环境配置
+# 启动：go run ./cmd/server -c config/config.yaml -p test
+# ============================================================
+
+app:
+  mode: debug
+  port: 8080
+
+jwt:
+  secret: test-secret-abcdef-9876543210
+
+db:
+  host: test-db
+  port: 3306
+  user: root
+  password: test123456
+  name: photography
+  log_mode: true
+
+log:
+  level: info
+
+upload:
+  dir: /data/uploads
+  max_size_mb: 50

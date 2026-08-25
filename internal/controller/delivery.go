@@ -1,0 +1,119 @@
+package controller
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"photography-server/internal/middleware"
+	"photography-server/internal/response"
+	"photography-server/internal/service"
+)
+
+func (h *Controller) DeliveryDetail(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	d, err := h.Svc.GetDelivery(op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, d)
+}
+
+func (h *Controller) DeliveryItems(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ListDeliveryItems(op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// DeliveryUploadSamples 上传样片 body: {items:[{url,...}]}
+func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req struct {
+		Items []service.DeliveryItemReq `json:"items"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.UploadSamples(op, id, req.Items); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// DeliverySelect 客户选片 body: {item_ids:[...]}
+func (h *Controller) DeliverySelect(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req struct {
+		ItemIDs []int64 `json:"item_ids"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.SelectPhotos(op, id, req.ItemIDs); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// DeliveryUploadRetouched 上传精修成品 body: {items:[...]}
+func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req struct {
+		Items []service.DeliveryItemReq `json:"items"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.UploadRetouched(op, id, req.Items); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+func (h *Controller) DeliveryConfirm(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ConfirmDelivered(op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}

@@ -1,0 +1,26 @@
+# ============================================================
+# 开发环境配置（默认）
+# 启动：go run ./cmd/server -c config/config.yaml -p dev
+# ============================================================
+
+app:
+  mode: debug
+  port: 8080
+
+jwt:
+  secret: dev-secret-1234567890
+
+db:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: root
+  name: photography
+  log_mode: true
+
+log:
+  level: debug
+
+upload:
+  dir: ./uploads
+  max_size_mb: 20

@@ -1,0 +1,14 @@
+.git
+.gitignore
+*.exe
+photography-server
+bin
+uploads
+docs
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+Makefile
+.env
+.env.example
