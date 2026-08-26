@@ -1,6 +1,6 @@
 # binaries
-photography-server
-server
+/photography-server
+/server
 *.exe
 
 # env
