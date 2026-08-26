@@ -27,7 +27,8 @@ func New(cfg *config.Config, db *gorm.DB, svc *service.Service) *gin.Engine {
 	// 静态资源：上传文件
 	engine.Static("/uploads", svc.UploadDir)
 
-	api := engine.Group("/api")
+	//api := engine.Group("/api")
+	api := engine.Group("")
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"code": 0, "msg": "ok", "data": "photography-server running"})
 	})
@@ -36,7 +37,7 @@ func New(cfg *config.Config, db *gorm.DB, svc *service.Service) *gin.Engine {
 	api.POST("/auth/login", ctl.Login)
 
 	// 各客户端业务路由分组（RPC 风格：/client/module/action/:id）
-	pc := api.Group("/pc", mw.Auth(), mw.OperationLog())
+	pc := api.Group("", mw.Auth(), mw.OperationLog())
 	miniapp := api.Group("/miniapp", mw.Auth(), mw.OperationLog())
 	app := api.Group("/app", mw.Auth(), mw.OperationLog())
 	h5 := api.Group("/h5", mw.Auth(), mw.OperationLog())
