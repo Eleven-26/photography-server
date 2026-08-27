@@ -83,17 +83,11 @@ func Load(basePath, profile string) (*Config, error) {
 	}
 
 	// 环境变量（APP_ 前缀）优先于配置文件
+	// AutomaticEnv 会在 Get 时自动查找 APP_ 前缀的环境变量
+	// 例如 v.GetString("db.host") → 查找 APP_DB_HOST
 	v.SetEnvPrefix("APP")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-	for _, pair := range os.Environ() {
-		key, value, found := strings.Cut(pair, "=")
-		if !found || !strings.HasPrefix(key, "APP_") {
-			continue
-		}
-		k := strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(key, "APP_"), "_", "."))
-		v.Set(k, envValue(value))
-	}
 
 	v.Set("app.profile", profile)
 
@@ -133,18 +127,4 @@ func profilePath(base, profile string) string {
 	ext := filepath.Ext(name)
 	stem := strings.TrimSuffix(name, ext)
 	return filepath.Join(dir, stem+"."+profile+ext)
-}
-
-// envValue 将环境变量字符串做基础类型转换，便于 viper 反序列化
-func envValue(s string) interface{} {
-	if s == "" {
-		return s
-	}
-	if i, err := strconv.Atoi(s); err == nil {
-		return i
-	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		return f
-	}
-	return s
 }
