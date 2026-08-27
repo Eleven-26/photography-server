@@ -1,68 +1,67 @@
 services:
- # 数据库
+  # 数据库
   mysql:
     image: mysql:8.0
     container_name: photography-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
-      MYSQL_DATABASE: photography
-      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # 从 .env 读取
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-photography}
+      TZ: ${TZ:-Asia/Shanghai}
     command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
+      - --character-set-server=${MYSQL_CHARSET:-utf8mb4}
+      - --collation-server=${MYSQL_COLLATION:-utf8mb4_unicode_ci}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - ./mysql/data:/var/lib/mysql
-      - ./mysql/conf:/etc/mysql/conf.d
+      - ${MYSQL_DATA_DIR:-./mysql/data}:/var/lib/mysql
+      - ${MYSQL_CONF_DIR:-./mysql/conf}:/etc/mysql/conf.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: ${MYSQL_HEALTH_INTERVAL:-5s}
+      timeout: ${MYSQL_HEALTH_TIMEOUT:-5s}
+      retries: ${MYSQL_HEALTH_RETRIES:-10}
     restart: unless-stopped
     networks:
       - backend-net
 
   # 缓存
   redis:
-    image: redis:7-alpine
+    image: redis:${REDIS_VERSION:-7-alpine}
     container_name: photography-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - ./redis/data:/data
-    command: redis-server --appendonly yes
+      - ${REDIS_DATA_DIR:-./redis/data}:/data
+    command: redis-server --appendonly ${REDIS_AOF:-yes}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      interval: ${REDIS_HEALTH_INTERVAL:-5s}
+      timeout: ${REDIS_HEALTH_TIMEOUT:-5s}
+      retries: ${REDIS_HEALTH_RETRIES:-10}
     networks:
       - backend-net
 
   # 队列
   nats:
-    image: nats:2.10-alpine
+    image: nats:${NATS_VERSION:-2.10-alpine}
     container_name: photography-nats
     ports:
-      - "4222:4222"   # 客户端连接端口
-      - "8222:8222"   # HTTP 监控端口（可选）
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
     command: -c /etc/nats/nats.conf
     volumes:
-      - ./nats/conf/nats.conf:/etc/nats/nats.conf:ro
-      - ./nats/data:/data
+      - ${NATS_CONF_DIR:-./nats/conf}/nats.conf:/etc/nats/nats.conf:ro
+      - ${NATS_DATA_DIR:-./nats/data}:/data
     restart: unless-stopped
     networks:
       - backend-net
-    # 若没有自定义配置文件，可以移除 volumes 和 command，使用默认配置
 
   # 后端服务
   backend:
     build:
-      context: ./photography-server   # 指向后端子目录
-      dockerfile: Dockerfile
+      context: ${BACKEND_CONTEXT:-./photography-server}
+      dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
     container_name: photography-backend
     depends_on:
       mysql:
@@ -70,51 +69,47 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_started   # NATS 没有 healthcheck 时用 service_started
+        condition: service_started
     environment:
-      APP_MODE: release
-      APP_PROFILE: prod
-      APP_DB_HOST: mysql
-      APP_DB_PORT: "3306"
-      APP_DB_USER: root
-      APP_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
-      APP_DB_NAME: photography
-      APP_REDIS_HOST: redis
-      APP_REDIS_PORT: "6379"
-      APP_NATS_URL: nats://nats:4222
-      APP_JWT_SECRET: ${JWT_SECRET:-photography-server-jwt-secret-change-me}
-      APP_UPLOAD_DIR: /app/uploads
-      APP_LOG_LEVEL: warn
+      APP_MODE: ${APP_MODE:-release}
+      APP_PROFILE: ${APP_PROFILE:-prod}
+      APP_DB_HOST: ${APP_DB_HOST:-mysql}
+      APP_DB_PORT: ${APP_DB_PORT:-3306}
+      APP_DB_USER: ${APP_DB_USER:-root}
+      APP_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # 复用 MySQL 密码
+      APP_DB_NAME: ${APP_DB_NAME:-photography}
+      APP_REDIS_HOST: ${APP_REDIS_HOST:-redis}
+      APP_REDIS_PORT: ${APP_REDIS_PORT:-6379}
+      APP_NATS_URL: ${APP_NATS_URL:-nats://nats:4222}
+      APP_JWT_SECRET: ${JWT_SECRET}   # 必须从 .env 读取
+      APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-warn}
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     volumes:
-      - ./uploads:/app/uploads
+      - ${BACKEND_CONFIG_FILE:-./photography-server/config/config.prod.yaml}:/app/config/config.yaml:ro
+      - ${UPLOADS_DIR:-./uploads}:/app/uploads
     restart: unless-stopped
     networks:
       - backend-net
-      - frontend-net   # 同时加入前端网络，以便前端访问
+      - frontend-net
 
   # 前端服务
   frontend:
     build:
-      context: ./photography-frontend   # 指向前端子目录
-      dockerfile: Dockerfile
+      context: ${FRONTEND_CONTEXT:-./photography-frontend}
+      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
     container_name: photography-frontend
     depends_on:
       - backend
     ports:
-      - "8081:80"
+      - "${FRONTEND_PORT:-8081}:80"
     restart: unless-stopped
     networks:
-      - frontend-net   # 只加入前端网络
+      - frontend-net
 
-# 网络配置，前端只需要访问后端网络即可
 networks:
-    backend-net:
-      driver: bridge
-    frontend-net:
-      driver: bridge
-
-#volumes:
-  # uploads_data:   # 保留后端上传目录
-  # mysql_data 已不再需要，因为 mysql 使用了本地挂载
+  backend-net:
+    driver: bridge
+  frontend-net:
+    driver: bridge
