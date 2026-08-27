@@ -51,7 +51,7 @@ services:
       - "${NATS_MONITOR_PORT:-8222}:8222"
     command: -c /etc/nats/nats.conf
     volumes:
-      - ${NATS_CONF_DIR:-./nats/conf}/nats.conf:/etc/nats/nats.conf:ro
+      - ${NATS_CONF_DIR:-./nats/conf}/conf:/etc/nats/nats.conf:ro
       - ${NATS_DATA_DIR:-./nats/data}:/data
     restart: unless-stopped
     networks:
@@ -62,6 +62,7 @@ services:
     build:
       context: ${BACKEND_CONTEXT:-./photography-server}
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
+    image: chenkangfu/photography-server:${VERSION:-latest}  # 通过环境变量传入版本
     container_name: photography-backend
     depends_on:
       mysql:
@@ -81,7 +82,7 @@ services:
       APP_REDIS_HOST: ${APP_REDIS_HOST:-redis}
       APP_REDIS_PORT: ${APP_REDIS_PORT:-6379}
       APP_NATS_URL: ${APP_NATS_URL:-nats://nats:4222}
-      APP_JWT_SECRET: ${JWT_SECRET}   # 必须从 .env 读取
+      APP_JWT_SECRET: ${APP_JWT_SECRET}   # 必须从 .env 读取
       APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-warn}
     ports:
@@ -99,6 +100,7 @@ services:
     build:
       context: ${FRONTEND_CONTEXT:-./photography-frontend}
       dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
+    image: chenkangfu/photography-frontend:${VERSION:-latest}  # 通过环境变量传入版本
     container_name: photography-frontend
     depends_on:
       - backend

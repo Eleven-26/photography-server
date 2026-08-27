@@ -5,14 +5,14 @@
 
 app:
   mode: debug
-  port: 8080
+  port: 8090
 
 jwt:
   secret: dev-secret-1234567890
 
 db:
   host: 127.0.0.1
-  port: 3306
+  port: 3307
   user: root
   password: root
   name: photography
