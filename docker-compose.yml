@@ -51,7 +51,7 @@ services:
       - "${NATS_MONITOR_PORT:-8222}:8222"
     command: -c /etc/nats/nats.conf
     volumes:
-      - ${NATS_CONF_DIR:-./nats/conf}/conf:/etc/nats/nats.conf:ro
+      - ${NATS_CONF_DIR:-./nats/conf}/nats.conf:/etc/nats/nats.conf:ro
       - ${NATS_DATA_DIR:-./nats/data}:/data
     restart: unless-stopped
     networks:
