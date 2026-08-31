@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"photography-server/internal/enum"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -165,4 +167,11 @@ func (h *Controller) NATSStatus(c *gin.Context) {
 		"server_id": nc.ConnectedServerId(),
 		"servers":   servers,
 	})
+}
+
+func (h *Controller) Test(c *gin.Context) {
+	status := enum.OrderStatusPendingDeposit
+	fmt.Println("当前状态:", status)
+	statusName := enum.OrderStatusName(status)
+	fmt.Println("当前状态名称：", statusName)
 }
