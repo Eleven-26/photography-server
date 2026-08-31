@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/config"
-	"photography-server/internal/controller"
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/controller"
 	"photography-server/internal/service"
 )
 
