@@ -18,6 +18,14 @@ db:
   name: photography
   log_mode: true
 
+redis:
+  addr: test-redis:6379
+  password: ""
+  db: 0
+
+nats:
+  url: nats://test-nats:4222
+
 log:
   level: info
 

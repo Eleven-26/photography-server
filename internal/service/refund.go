@@ -98,7 +98,7 @@ func (s *Service) AuditRefund(op Operator, refundID int64, approve bool, remark 
 		return errs.NotFound("订单不存在")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		if approve {
 			if err := tx.Model(&r).Updates(map[string]interface{}{
 				"status":       model.RefundStatusApproved,

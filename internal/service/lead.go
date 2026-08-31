@@ -139,7 +139,7 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 		}
 	}
 	var customer *model.Customer
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB().Transaction(func(tx *gorm.DB) error {
 		if l.Mobile != "" {
 			var exist model.Customer
 			if err := tx.Where("company_id = ? AND mobile = ?", op.CompanyID, l.Mobile).First(&exist).Error; err == nil {

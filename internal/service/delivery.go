@@ -61,7 +61,7 @@ func (s *Service) ensureDelivery(tx *gorm.DB, op Operator, orderID int64) (*mode
 
 // UploadSamples 上传样片：待上传样片 -> 客户选片中
 func (s *Service) UploadSamples(op Operator, orderID int64, items []DeliveryItemReq) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		d, err := s.ensureDelivery(tx, op, orderID)
 		if err != nil {
 			return err
@@ -100,7 +100,7 @@ func (s *Service) UploadSamples(op Operator, orderID int64, items []DeliveryItem
 
 // SelectPhotos 客户选片：标记已选，进入精修进行中
 func (s *Service) SelectPhotos(op Operator, deliveryID int64, itemIDs []int64) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		var d model.Delivery
 		if err := tx.Where("company_id = ? AND id = ?", op.CompanyID, deliveryID).First(&d).Error; err != nil {
 			return errs.NotFound("交付单不存在")
@@ -129,7 +129,7 @@ func (s *Service) SelectPhotos(op Operator, deliveryID int64, itemIDs []int64) e
 
 // UploadRetouched 上传精修成品：进入待确认交付
 func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []DeliveryItemReq) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		var d model.Delivery
 		if err := tx.Where("company_id = ? AND id = ?", op.CompanyID, deliveryID).First(&d).Error; err != nil {
 			return errs.NotFound("交付单不存在")
@@ -164,7 +164,7 @@ func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []Deliver
 
 // ConfirmDelivered 确认交付：交付单完成，订单同步完成
 func (s *Service) ConfirmDelivered(op Operator, deliveryID int64) error {
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		var d model.Delivery
 		if err := tx.Where("company_id = ? AND id = ?", op.CompanyID, deliveryID).First(&d).Error; err != nil {
 			return errs.NotFound("交付单不存在")

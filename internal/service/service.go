@@ -6,7 +6,11 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/nats-io/nats.go"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+
+	"photography-server/internal/infrastructure"
 )
 
 // Operator 当前操作人（由认证中间件注入）
@@ -21,17 +25,31 @@ type Operator struct {
 
 // Service 业务服务根结构，按领域拆分到不同文件
 type Service struct {
-	DB        *gorm.DB
 	UploadDir string
 }
 
-func New(db *gorm.DB, uploadDir string) *Service {
-	return &Service{DB: db, UploadDir: uploadDir}
+func New(uploadDir string) *Service {
+	return &Service{UploadDir: uploadDir}
+}
+
+// DB 获取 MySQL 单例
+func (s *Service) DB() *gorm.DB {
+	return infrastructure.MySQL()
+}
+
+// RDB 获取 Redis 单例
+func (s *Service) RDB() *redis.Client {
+	return infrastructure.Redis()
+}
+
+// NATS 获取 NATS 单例
+func (s *Service) NATS() *nats.Conn {
+	return infrastructure.NATS()
 }
 
 // tenant 返回按 company_id 过滤的查询会话，实现 SaaS 多租户隔离
 func (s *Service) tenant(op Operator) *gorm.DB {
-	return s.DB.Where("company_id = ?", op.CompanyID)
+	return s.DB().Where("company_id = ?", op.CompanyID)
 }
 
 func round2(f float64) float64 {

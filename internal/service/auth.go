@@ -22,7 +22,7 @@ type LoginResp struct {
 
 func (s *Service) Login(secret, issuer string, expireHours int, req LoginReq, ip string) (*LoginResp, error) {
 	var u model.SysUser
-	if err := s.DB.Where("username = ?", req.Username).First(&u).Error; err != nil {
+	if err := s.DB().Where("username = ?", req.Username).First(&u).Error; err != nil {
 		return nil, errs.BadRequest("账号或密码错误")
 	}
 	if u.Status != 1 {
@@ -44,7 +44,7 @@ func (s *Service) Login(secret, issuer string, expireHours int, req LoginReq, ip
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
-	s.DB.Model(&u).Updates(map[string]interface{}{
+	s.DB().Model(&u).Updates(map[string]interface{}{
 		"last_login_at": now,
 		"last_login_ip": ip,
 	})

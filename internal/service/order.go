@@ -102,7 +102,7 @@ func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, er
 		OwnerID:        orDefaultInt64(req.OwnerID, op.UserID),
 	}
 
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&order).Error; err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ func (s *Service) UpdateOrder(op Operator, id int64, req OrderUpdateReq) error {
 	if o.Status == model.OrderStatusCompleted || o.Status == model.OrderStatusCancelled {
 		return errs.BadRequest("已完成或已取消的订单不可修改")
 	}
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&o).Updates(map[string]interface{}{
 			"shoot_date": req.ShootDate, "shoot_time": req.ShootTime,
 			"shoot_address": req.ShootAddress, "photographer_id": req.PhotographerID,
@@ -249,7 +249,7 @@ func (s *Service) ChangeOrderStatus(op Operator, id int64, to string, content st
 		return errs.BadRequest("订单状态不允许从 " + o.Status + " 流转到 " + to)
 	}
 
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB().Transaction(func(tx *gorm.DB) error {
 		updates := map[string]interface{}{"status": to, "updated_by": op.UserID}
 		if to == model.OrderStatusCompleted {
 			now := time.Now().Format("2006-01-02 15:04:05")

@@ -13,6 +13,8 @@ type Config struct {
 	App    App    `mapstructure:"app"`
 	JWT    JWT    `mapstructure:"jwt"`
 	DB     DB     `mapstructure:"db"`
+	Redis  Redis  `mapstructure:"redis"`
+	NATS   NATS   `mapstructure:"nats"`
 	Log    Log    `mapstructure:"log"`
 	Upload Upload `mapstructure:"upload"`
 }
@@ -49,6 +51,16 @@ func (d DB) DSN() string {
 		"@tcp(" + d.Host + ":" + strconv.Itoa(d.Port) + ")/" + d.Name,
 		"?charset=" + d.Charset + "&parseTime=True&loc=Local",
 	}, "")
+}
+
+type Redis struct {
+	Addr     string `mapstructure:"addr"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+}
+
+type NATS struct {
+	URL string `mapstructure:"url"`
 }
 
 type Log struct {

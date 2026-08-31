@@ -5,15 +5,15 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/logger"
-
-	"gorm.io/gorm"
 )
 
 // bootstrap 首次启动时初始化默认租户数据（公司/门店/角色/超级管理员）
 // 默认账号 admin，密码 admin123456。若 docs/sql/dml.sql 已导入则自动跳过。
-func bootstrap(db *gorm.DB) {
+func bootstrap() {
+	db := infrastructure.MySQL()
 	var companyCount int64
 	if err := db.Model(&model.SysCompany{}).Count(&companyCount).Error; err == nil && companyCount > 0 {
 		logger.Infof("bootstrap skipped: company already exists")

@@ -88,7 +88,7 @@ func (s *Service) ConfirmPayment(op Operator, paymentID int64) error {
 		return errs.NotFound("订单不存在")
 	}
 
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := s.DB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&p).Updates(map[string]interface{}{
 			"status":     model.PaymentStatusConfirmed,
 			"paid_at":    time.Now().Format("2006-01-02 15:04:05"),
@@ -130,7 +130,7 @@ func (s *Service) DeletePayment(op Operator, paymentID int64) error {
 	if err := s.tenant(op).First(&p, paymentID).Error; err != nil {
 		return errs.NotFound("收款记录不存在")
 	}
-	return s.DB.Transaction(func(tx *gorm.DB) error {
+	return s.DB().Transaction(func(tx *gorm.DB) error {
 		if p.Status == model.PaymentStatusConfirmed {
 			if err := tx.Model(&model.Order{}).Where("id = ?", p.OrderID).
 				Update("paid_amt", gorm.Expr("paid_amt - ?", p.Amount)).Error; err != nil {

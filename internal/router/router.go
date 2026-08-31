@@ -7,13 +7,11 @@ import (
 	"photography-server/internal/controller"
 	"photography-server/internal/middleware"
 	"photography-server/internal/service"
-
-	"gorm.io/gorm"
 )
 
 // New 构建 gin 引擎并按客户端分组注册 RPC 风格路由
 // 客户端分组：pc-管理后台 miniapp-小程序管理后台 app-APP h5-移动端
-func New(cfg *config.Config, db *gorm.DB, svc *service.Service) *gin.Engine {
+func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	if cfg.App.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -22,7 +20,8 @@ func New(cfg *config.Config, db *gorm.DB, svc *service.Service) *gin.Engine {
 	engine.Use(middleware.CORS(), middleware.Recovery(), middleware.RequestLog())
 
 	ctl := controller.New(svc, cfg)
-	mw := &middleware.Middlewares{DB: db, Cfg: cfg}
+	middleware.Init(cfg)
+	mw := middleware.Get()
 
 	// 静态资源：上传文件
 	engine.Static("/uploads", svc.UploadDir)
@@ -186,4 +185,14 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	// 上传
 	up := g.Group("/upload")
 	up.POST("/file", ctl.UploadFile)
+
+	// 测试（Redis / NATS 示例，生产可去掉）
+	t := g.Group("/test")
+	t.POST("/redis/ping", ctl.RedisPing)
+	t.POST("/redis/set", ctl.RedisSet)
+	t.POST("/redis/get", ctl.RedisGet)
+	t.POST("/redis/del", ctl.RedisDel)
+	t.POST("/nats/status", ctl.NATSStatus)
+	t.POST("/nats/pub", ctl.NATSPub)
+	t.POST("/nats/request", ctl.NATSRequest)
 }

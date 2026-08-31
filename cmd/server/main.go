@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"photography-server/internal/config"
-	"photography-server/internal/database"
+	"photography-server/internal/infrastructure"
+	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/logger"
 	"photography-server/internal/router"
 	"photography-server/internal/service"
@@ -36,19 +37,27 @@ func main() {
 	logger.Init(cfg.Log.Level)
 	logger.Infof("running profile: %s", cfg.App.Profile)
 
-	db, err := database.New(cfg)
-	if err != nil {
+	if err := infrastructure.InitMySQL(cfg); err != nil {
 		panic(fmt.Sprintf("连接数据库失败: %v", err))
 	}
-	if err := database.Ping(db); err != nil {
+	if err := infrastructure.Ping(); err != nil {
 		panic(fmt.Sprintf("数据库不可用: %v", err))
 	}
 	logger.Infof("ping database ok")
 
-	bootstrap(db)
+	bootstrap()
 
-	svc := service.New(db, cfg.Upload.Dir)
-	engine := router.New(cfg, db, svc)
+	if err := infrastructure.InitRedis(&cfg.Redis); err != nil {
+		logger.Warnf("redis not available, skipping: %v", err)
+	}
+
+	if err := infrastructure.InitNATS(&cfg.NATS); err != nil {
+		logger.Warnf("nats not available, skipping: %v", err)
+	}
+
+	middleware.Init(cfg)
+	svc := service.New(cfg.Upload.Dir)
+	engine := router.New(cfg, svc)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.App.Port),
