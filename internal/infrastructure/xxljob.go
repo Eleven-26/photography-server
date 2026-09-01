@@ -40,3 +40,16 @@ func InitXxlJob(c *config.Config) error {
 func XxlExecutor() xxl.Executor {
 	return xxlExecutor
 }
+
+// RunXxlJob 启动 XXL-JOB 执行器（在 goroutine 中运行）
+func RunXxlJob() {
+	if xxlExecutor == nil {
+		return
+	}
+	go func() {
+		if err := xxlExecutor.Run(); err != nil {
+			logger.Errorf("xxl-job executor error: %v", err)
+		}
+	}()
+	logger.Infof("xxl-job executor started")
+}

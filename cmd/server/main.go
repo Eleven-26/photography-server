@@ -62,6 +62,7 @@ func main() {
 	}
 	if executor := infrastructure.XxlExecutor(); executor != nil {
 		job.Register(executor)
+		infrastructure.RunXxlJob()
 	}
 
 	// 启动 NATS 消费者
