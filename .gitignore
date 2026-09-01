@@ -2,6 +2,7 @@
 /photography-server
 /server
 *.exe
+bin
 
 # env
 .env
