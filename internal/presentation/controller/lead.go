@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) LeadList(c *gin.Context) {
@@ -40,7 +40,7 @@ func (h *Controller) LeadDetail(c *gin.Context) {
 
 func (h *Controller) LeadCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.LeadCreateReq
+	var req dto.LeadCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -60,7 +60,7 @@ func (h *Controller) LeadUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.LeadUpdateReq
+	var req dto.LeadUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -93,9 +93,7 @@ func (h *Controller) LeadFollow(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Remark string `json:"remark"`
-	}
+	var req dto.LeadFollowReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -131,7 +129,7 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.QuoteCreateReq
+	var req dto.QuoteCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

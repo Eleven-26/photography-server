@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) DeliveryDetail(c *gin.Context) {
@@ -47,7 +47,7 @@ func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Items []service.DeliveryItemReq `json:"items"`
+		Items []dto.DeliveryItemReq `json:"items"`
 	}
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
@@ -68,9 +68,7 @@ func (h *Controller) DeliverySelect(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		ItemIDs []int64 `json:"item_ids"`
-	}
+	var req dto.DeliverySelectReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -91,7 +89,7 @@ func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Items []service.DeliveryItemReq `json:"items"`
+		Items []dto.DeliveryItemReq `json:"items"`
 	}
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)

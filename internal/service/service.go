@@ -26,14 +26,38 @@ type Operator struct {
 
 // Service 业务服务根结构，按领域拆分到不同文件
 type Service struct {
-	UploadDir    string
-	CustomerRepo *repository.CustomerRepo
+	UploadDir        string
+	AuthRepo         *repository.AuthRepo
+	UserRepo         *repository.UserRepo
+	CustomerRepo     *repository.CustomerRepo
+	AssetRepo        *repository.AssetRepo
+	CalendarRepo     *repository.CalendarRepo
+	NotificationRepo *repository.NotificationRepo
+	SettingsRepo     *repository.SettingsRepo
+	PackageRepo      *repository.PackageRepo
+	LeadRepo         *repository.LeadRepo
+	OrderRepo        *repository.OrderRepo
+	DeliveryRepo     *repository.DeliveryRepo
+	FinanceRepo      *repository.FinanceRepo
+	DashboardRepo    *repository.DashboardRepo
 }
 
 func New(uploadDir string) *Service {
 	return &Service{
-		UploadDir:    uploadDir,
-		CustomerRepo: repository.NewCustomerRepo(),
+		UploadDir:        uploadDir,
+		AuthRepo:         repository.NewAuthRepo(),
+		UserRepo:         repository.NewUserRepo(),
+		CustomerRepo:     repository.NewCustomerRepo(),
+		AssetRepo:        repository.NewAssetRepo(),
+		CalendarRepo:     repository.NewCalendarRepo(),
+		NotificationRepo: repository.NewNotificationRepo(),
+		SettingsRepo:     repository.NewSettingsRepo(),
+		PackageRepo:      repository.NewPackageRepo(),
+		LeadRepo:         repository.NewLeadRepo(),
+		OrderRepo:        repository.NewOrderRepo(),
+		DeliveryRepo:     repository.NewDeliveryRepo(),
+		FinanceRepo:      repository.NewFinanceRepo(),
+		DashboardRepo:    repository.NewDashboardRepo(),
 	}
 }
 

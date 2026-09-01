@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) UserList(c *gin.Context) {
@@ -24,7 +24,7 @@ func (h *Controller) UserList(c *gin.Context) {
 
 func (h *Controller) UserCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.UserCreateReq
+	var req dto.UserCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -43,7 +43,7 @@ func (h *Controller) UserUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.UserUpdateReq
+	var req dto.UserUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -76,9 +76,7 @@ func (h *Controller) UserResetPassword(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Password string `json:"password" binding:"required"`
-	}
+	var req dto.ResetPasswordReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -102,16 +100,12 @@ func (h *Controller) RoleList(c *gin.Context) {
 
 func (h *Controller) RoleCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req struct {
-		Name   string `json:"name" binding:"required"`
-		Code   string `json:"code" binding:"required"`
-		Remark string `json:"remark"`
-	}
+	var req dto.RoleCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreateRole(op, req.Name, req.Code, req.Remark); err != nil {
+	if err := h.Svc.CreateRole(op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -125,17 +119,12 @@ func (h *Controller) RoleUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Name   string `json:"name"`
-		Code   string `json:"code"`
-		Remark string `json:"remark"`
-		Status int    `json:"status"`
-	}
+	var req dto.RoleUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateRole(op, id, req.Name, req.Code, req.Remark, req.Status); err != nil {
+	if err := h.Svc.UpdateRole(op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -168,16 +157,12 @@ func (h *Controller) StoreList(c *gin.Context) {
 
 func (h *Controller) StoreCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req struct {
-		Name    string `json:"name" binding:"required"`
-		Address string `json:"address"`
-		Phone   string `json:"phone"`
-	}
+	var req dto.StoreCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreateStore(op, req.Name, req.Address, req.Phone); err != nil {
+	if err := h.Svc.CreateStore(op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -191,17 +176,12 @@ func (h *Controller) StoreUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Name    string `json:"name"`
-		Address string `json:"address"`
-		Phone   string `json:"phone"`
-		Status  int    `json:"status"`
-	}
+	var req dto.StoreUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateStore(op, id, req.Name, req.Address, req.Phone, req.Status); err != nil {
+	if err := h.Svc.UpdateStore(op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}

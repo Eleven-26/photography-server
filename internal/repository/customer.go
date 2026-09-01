@@ -75,3 +75,12 @@ func (r *CustomerRepo) Stats(companyID int64) (total, active, goldUp int64, err 
 	}
 	return
 }
+
+// GetByMobile 根据手机号查询客户
+func (r *CustomerRepo) GetByMobile(companyID int64, mobile string) (*model.Customer, error) {
+	var c model.Customer
+	if err := tenant(companyID).Where("mobile = ?", mobile).First(&c).Error; err != nil {
+		return nil, err
+	}
+	return &c, nil
+}

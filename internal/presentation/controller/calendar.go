@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) CalendarList(c *gin.Context) {
@@ -20,7 +20,7 @@ func (h *Controller) CalendarList(c *gin.Context) {
 
 func (h *Controller) CalendarLock(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.BlockReq
+	var req dto.CalendarBlockReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

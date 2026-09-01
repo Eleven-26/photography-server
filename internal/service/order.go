@@ -1,41 +1,20 @@
 package service
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/dto"
 )
 
 func f2(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
-}
-
-type OrderCreateReq struct {
-	CustomerID     int64   `json:"customer_id"`
-	LeadID         int64   `json:"lead_id"`
-	QuoteID        int64   `json:"quote_id"`
-	PackageID      int64   `json:"package_id" binding:"required"`
-	AddonAmount    float64 `json:"addon_amount"`
-	ShootDate      string  `json:"shoot_date"`
-	ShootTime      string  `json:"shoot_time"`
-	ShootAddress   string  `json:"shoot_address"`
-	PhotographerID int64   `json:"photographer_id"`
-	Photographer   string  `json:"photographer"`
-	Remark         string  `json:"remark"`
-	OwnerID        int64   `json:"owner_id"`
-}
-
-type OrderUpdateReq struct {
-	ShootDate      string `json:"shoot_date"`
-	ShootTime      string `json:"shoot_time"`
-	ShootAddress   string `json:"shoot_address"`
-	PhotographerID int64  `json:"photographer_id"`
-	Photographer   string `json:"photographer"`
-	Remark         string `json:"remark"`
 }
 
 // 状态流转白名单：当前状态 -> 允许目标状态
@@ -49,16 +28,24 @@ var orderTransition = map[string][]string{
 	model.OrderStatusCancelled:        {},
 }
 
-func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, error) {
-	var pkg model.Package
-	if err := s.tenant(op).First(&pkg, req.PackageID).Error; err != nil {
-		return nil, errs.NotFound("套餐不存在")
+func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order, error) {
+	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrPackageNotFound)
+		}
+		return nil, err
 	}
 	var customer model.Customer
 	if req.CustomerID > 0 {
-		if err := s.tenant(op).First(&customer, req.CustomerID).Error; err != nil {
-			return nil, errs.NotFound("客户不存在")
+		c, err := s.CustomerRepo.GetByID(op.CompanyID, req.CustomerID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errs.NotFound(common.ErrCustomerNotFound)
+			}
+			return nil, err
 		}
+		customer = *c
 	} else if req.LeadID > 0 {
 		c, err := s.ConvertLeadToCustomer(op, req.LeadID)
 		if err != nil {
@@ -66,7 +53,7 @@ func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, er
 		}
 		customer = *c
 	} else {
-		return nil, errs.BadRequest("请选择客户或来源线索")
+		return nil, errs.BadRequest(common.ErrOrderNoCustomer)
 	}
 
 	deposit := round2(pkg.BasePrice * pkg.DepositRate / 100)
@@ -102,8 +89,8 @@ func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, er
 		OwnerID:        orDefaultInt64(req.OwnerID, op.UserID),
 	}
 
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&order).Error; err != nil {
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
+		if err := s.OrderRepo.Create(&order); err != nil {
 			return err
 		}
 		if req.ShootDate != "" {
@@ -123,19 +110,19 @@ func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, er
 				Photographer:   req.Photographer,
 				Status:         model.BlockStatusLocked,
 			}
-			if err := tx.Create(&block).Error; err != nil {
+			if err := s.OrderRepo.CreateCalendarBlock(tx, &block); err != nil {
 				return err
 			}
 		}
 		// 线索标记为已成交，报价单标记为已成交
 		if req.LeadID > 0 {
-			tx.Model(&model.Lead{}).Where("id = ?", req.LeadID).Update("status", model.LeadStatusConfirmed)
+			s.LeadRepo.Update(op.CompanyID, req.LeadID, map[string]interface{}{"status": model.LeadStatusConfirmed})
 		}
 		if req.QuoteID > 0 {
-			tx.Model(&model.Quote{}).Where("id = ?", req.QuoteID).Update("status", model.QuoteStatusConverted)
+			s.LeadRepo.UpdateQuote(op.CompanyID, req.QuoteID, map[string]interface{}{"status": model.QuoteStatusConverted})
 		}
 		// 客户冗余统计
-		tx.Model(&model.Customer{}).Where("id = ?", customer.ID).Updates(map[string]interface{}{
+		s.CustomerRepo.Update(op.CompanyID, customer.ID, map[string]interface{}{
 			"order_count":  gorm.Expr("order_count + 1"),
 			"total_amount": gorm.Expr("total_amount + ?", order.TotalAmt),
 		})
@@ -149,33 +136,7 @@ func (s *Service) CreateOrder(op Operator, req OrderCreateReq) (*model.Order, er
 }
 
 func (s *Service) ListOrders(op Operator, page, pageSize int, keyword, status string, customerID, photographerID int64, date string) ([]model.Order, int64, error) {
-	q := s.tenant(op)
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		q = q.Where("code LIKE ? OR customer_name LIKE ? OR customer_mobile LIKE ?", kw, kw, kw)
-	}
-	if status != "" {
-		q = q.Where("status = ?", status)
-	}
-	if customerID > 0 {
-		q = q.Where("customer_id = ?", customerID)
-	}
-	if photographerID > 0 {
-		q = q.Where("photographer_id = ?", photographerID)
-	}
-	if date != "" {
-		q = q.Where("shoot_date = ?", date)
-	}
-	var total int64
-	if err := q.Model(&model.Order{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	var list []model.Order
-	page, pageSize = normalizePage(page, pageSize)
-	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
-		return nil, 0, err
-	}
-	return list, total, nil
+	return s.OrderRepo.List(op.CompanyID, page, pageSize, keyword, status, customerID, photographerID, date)
 }
 
 type OrderDetail struct {
@@ -187,56 +148,65 @@ type OrderDetail struct {
 }
 
 func (s *Service) GetOrder(op Operator, id int64) (*OrderDetail, error) {
-	var o model.Order
-	if err := s.tenant(op).First(&o, id).Error; err != nil {
-		return nil, errs.NotFound("订单不存在")
+	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrOrderNotFound)
+		}
+		return nil, err
 	}
-	d := &OrderDetail{Order: o}
-	s.tenant(op).Where("order_id = ?", id).Order("id ASC").Find(&d.Payments)
-	s.tenant(op).Where("order_id = ?", id).Order("id ASC").Find(&d.Refunds)
-	s.tenant(op).Where("order_id = ?", id).Order("id ASC").Find(&d.Logs)
-	var dv model.Delivery
-	if err := s.tenant(op).Where("order_id = ?", id).First(&dv).Error; err == nil {
-		d.Delivery = &dv
+	d := &OrderDetail{Order: *o}
+	d.Payments, _ = s.OrderRepo.ListPayments(op.CompanyID, id)
+	d.Refunds, _ = s.OrderRepo.ListRefunds(op.CompanyID, id)
+	d.Logs, _ = s.OrderRepo.ListLogs(op.CompanyID, id)
+	dv, err := s.OrderRepo.GetDelivery(op.CompanyID, id)
+	if err == nil {
+		d.Delivery = dv
 	}
 	return d, nil
 }
 
-func (s *Service) UpdateOrder(op Operator, id int64, req OrderUpdateReq) error {
-	var o model.Order
-	if err := s.tenant(op).First(&o, id).Error; err != nil {
-		return errs.NotFound("订单不存在")
+func (s *Service) UpdateOrder(op Operator, id int64, req dto.OrderUpdateReq) error {
+	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrOrderNotFound)
+		}
+		return err
 	}
 	if o.Status == model.OrderStatusCompleted || o.Status == model.OrderStatusCancelled {
-		return errs.BadRequest("已完成或已取消的订单不可修改")
+		return errs.BadRequest(common.ErrOrderCompleted)
 	}
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&o).Updates(map[string]interface{}{
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
+		if err := s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{
 			"shoot_date": req.ShootDate, "shoot_time": req.ShootTime,
 			"shoot_address": req.ShootAddress, "photographer_id": req.PhotographerID,
 			"photographer": req.Photographer, "remark": req.Remark, "updated_by": op.UserID,
-		}).Error; err != nil {
+		}); err != nil {
 			return err
 		}
 		// 同步更新关联档期
-		return tx.Model(&model.CalendarBlock{}).Where("order_id = ?", id).Updates(map[string]interface{}{
+		return s.OrderRepo.UpdateCalendarBlockByOrder(tx, id, map[string]interface{}{
 			"date": req.ShootDate, "time_range": req.ShootTime,
 			"photographer_id": req.PhotographerID, "photographer": req.Photographer,
 			"updated_by": op.UserID,
-		}).Error
+		})
 	})
 	return err
 }
 
 // ChangeOrderStatus 订单状态流转（含档期释放、完成时间等联动）
 func (s *Service) ChangeOrderStatus(op Operator, id int64, to string, content string) error {
-	var o model.Order
-	if err := s.tenant(op).First(&o, id).Error; err != nil {
-		return errs.NotFound("订单不存在")
+	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrOrderNotFound)
+		}
+		return err
 	}
 	allowed, ok := orderTransition[o.Status]
 	if !ok {
-		return errs.BadRequest("订单状态不允许流转")
+		return errs.BadRequest(common.ErrOrderStatusInvalid)
 	}
 	valid := false
 	for _, s := range allowed {
@@ -246,10 +216,10 @@ func (s *Service) ChangeOrderStatus(op Operator, id int64, to string, content st
 		}
 	}
 	if !valid {
-		return errs.BadRequest("订单状态不允许从 " + o.Status + " 流转到 " + to)
+		return errs.BadRequest(common.ErrOrderStatusInvalid)
 	}
 
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
 		updates := map[string]interface{}{"status": to, "updated_by": op.UserID}
 		if to == model.OrderStatusCompleted {
 			now := time.Now().Format("2006-01-02 15:04:05")
@@ -258,12 +228,11 @@ func (s *Service) ChangeOrderStatus(op Operator, id int64, to string, content st
 		if to == model.OrderStatusCancelled {
 			updates["cancel_reason"] = content
 			// 释放档期
-			if err := tx.Model(&model.CalendarBlock{}).Where("order_id = ?", id).
-				Update("status", model.BlockStatusCancelled).Error; err != nil {
+			if err := s.OrderRepo.CancelCalendarBlockByOrder(tx, id); err != nil {
 				return err
 			}
 		}
-		if err := tx.Model(&o).Updates(updates).Error; err != nil {
+		if err := s.OrderRepo.Update(op.CompanyID, id, updates); err != nil {
 			return err
 		}
 		return s.writeOrderLogTx(tx, id, "change_status", o.Status, to, content, op)
@@ -277,7 +246,7 @@ func (s *Service) CancelOrder(op Operator, id int64, reason string) error {
 
 // writeOrderLogTx 记录订单操作日志
 func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action, from, to, content string, op Operator) error {
-	return tx.Create(&model.OrderLog{
+	return s.OrderRepo.CreateLog(tx, &model.OrderLog{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
@@ -289,5 +258,5 @@ func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action, from, to, 
 		Content:      content,
 		OperatorID:   op.UserID,
 		OperatorName: op.Nickname,
-	}).Error
+	})
 }

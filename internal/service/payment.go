@@ -1,32 +1,41 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/dto"
 )
 
-type PaymentCreateReq struct {
-	Type     string  `json:"type" binding:"required"` // deposit-定金 final-尾款 addon-加选
-	Amount   float64 `json:"amount" binding:"required"`
-	MethodID int64   `json:"method_id"`
-	PaidAt   string  `json:"paid_at"`
-	Voucher  string  `json:"voucher"`
-	Remark   string  `json:"remark"`
+func typeName(t string) string {
+	switch t {
+	case "deposit":
+		return "定金"
+	case "final":
+		return "尾款"
+	case "addon":
+		return "加选"
+	}
+	return t
 }
 
-func (s *Service) CreatePayment(op Operator, orderID int64, req PaymentCreateReq) (*model.OrderPayment, error) {
-	var o model.Order
-	if err := s.tenant(op).First(&o, orderID).Error; err != nil {
-		return nil, errs.NotFound("订单不存在")
+func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
+	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrOrderNotFound)
+		}
+		return nil, err
 	}
 	methodName := "其他"
-	var method model.PaymentMethod
 	if req.MethodID > 0 {
-		if err := s.tenant(op).First(&method, req.MethodID).Error; err == nil {
+		method, err := s.SettingsRepo.GetPaymentMethodByID(op.CompanyID, req.MethodID)
+		if err == nil {
 			methodName = method.Name
 		}
 	}
@@ -49,51 +58,43 @@ func (s *Service) CreatePayment(op Operator, orderID int64, req PaymentCreateReq
 		OperatorName: op.Nickname,
 		Remark:       req.Remark,
 	}
-	if err := s.tenant(op).Create(&p).Error; err != nil {
+	if err := s.OrderRepo.CreatePayment(&p); err != nil {
 		return nil, err
 	}
 	s.writeOrderLog(op, orderID, "create_payment", o.Status, o.Status, "登记收款("+typeName(req.Type)+")："+f2(p.Amount))
 	return &p, nil
 }
 
-func typeName(t string) string {
-	switch t {
-	case "deposit":
-		return "定金"
-	case "final":
-		return "尾款"
-	case "addon":
-		return "加选"
-	}
-	return t
-}
-
 func (s *Service) ListPayments(op Operator, orderID int64) ([]model.OrderPayment, error) {
-	var list []model.OrderPayment
-	err := s.tenant(op).Where("order_id = ?", orderID).Order("id ASC").Find(&list).Error
-	return list, err
+	return s.OrderRepo.ListPayments(op.CompanyID, orderID)
 }
 
 // ConfirmPayment 核验收款：累加已收金额，定金到账后订单进入待拍摄
 func (s *Service) ConfirmPayment(op Operator, paymentID int64) error {
-	var p model.OrderPayment
-	if err := s.tenant(op).First(&p, paymentID).Error; err != nil {
-		return errs.NotFound("收款记录不存在")
+	p, err := s.OrderRepo.GetPaymentByID(op.CompanyID, paymentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrPaymentNotFound)
+		}
+		return err
 	}
 	if p.Status == model.PaymentStatusConfirmed {
-		return errs.BadRequest("该收款已核验")
+		return errs.BadRequest(common.ErrPaymentConfirmed)
 	}
-	var o model.Order
-	if err := s.tenant(op).First(&o, p.OrderID).Error; err != nil {
-		return errs.NotFound("订单不存在")
+	o, err := s.OrderRepo.GetByID(op.CompanyID, p.OrderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrOrderNotFound)
+		}
+		return err
 	}
 
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&p).Updates(map[string]interface{}{
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
+		if err := s.OrderRepo.UpdatePayment(op.CompanyID, paymentID, map[string]interface{}{
 			"status":     model.PaymentStatusConfirmed,
 			"paid_at":    time.Now().Format("2006-01-02 15:04:05"),
 			"updated_by": op.UserID,
-		}).Error; err != nil {
+		}); err != nil {
 			return err
 		}
 		// 订单累计已收
@@ -102,12 +103,12 @@ func (s *Service) ConfirmPayment(op Operator, paymentID int64) error {
 			"payment_status": model.PaymentStatusConfirmed,
 			"updated_by":     op.UserID,
 		}
-		if err := tx.Model(&o).Updates(updates).Error; err != nil {
+		if err := s.OrderRepo.Update(op.CompanyID, p.OrderID, updates); err != nil {
 			return err
 		}
 		// 定金到账：待定金 -> 待拍摄
 		if p.Type == "deposit" && o.Status == model.OrderStatusPendingDeposit {
-			if err := tx.Model(&o).Update("status", model.OrderStatusScheduled).Error; err != nil {
+			if err := s.OrderRepo.Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": model.OrderStatusScheduled}); err != nil {
 				return err
 			}
 		}
@@ -116,7 +117,7 @@ func (s *Service) ConfirmPayment(op Operator, paymentID int64) error {
 			paid := o.PaidAmt + p.Amount
 			if paid >= o.TotalAmt {
 				now := time.Now().Format("2006-01-02 15:04:05")
-				tx.Model(&o).Updates(map[string]interface{}{"status": model.OrderStatusCompleted, "finished_at": now})
+				s.OrderRepo.Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": model.OrderStatusCompleted, "finished_at": now})
 			}
 		}
 		return s.writeOrderLogTx(tx, o.ID, "confirm_payment", o.Status, o.Status, "核验收款("+typeName(p.Type)+")："+f2(p.Amount), op)
@@ -126,21 +127,25 @@ func (s *Service) ConfirmPayment(op Operator, paymentID int64) error {
 
 // DeletePayment 删除收款记录（已核验的先回退金额）
 func (s *Service) DeletePayment(op Operator, paymentID int64) error {
-	var p model.OrderPayment
-	if err := s.tenant(op).First(&p, paymentID).Error; err != nil {
-		return errs.NotFound("收款记录不存在")
+	p, err := s.OrderRepo.GetPaymentByID(op.CompanyID, paymentID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrPaymentNotFound)
+		}
+		return err
 	}
 	return s.DB().Transaction(func(tx *gorm.DB) error {
 		if p.Status == model.PaymentStatusConfirmed {
-			if err := tx.Model(&model.Order{}).Where("id = ?", p.OrderID).
-				Update("paid_amt", gorm.Expr("paid_amt - ?", p.Amount)).Error; err != nil {
+			if err := s.OrderRepo.Update(op.CompanyID, p.OrderID, map[string]interface{}{
+				"paid_amt": gorm.Expr("paid_amt - ?", p.Amount),
+			}); err != nil {
 				return err
 			}
 		}
-		return tx.Delete(&p).Error
+		return s.OrderRepo.DeletePayment(tx, paymentID)
 	})
 }
 
 func (s *Service) writeOrderLog(op Operator, orderID int64, action, from, to, content string) error {
-	return s.writeOrderLogTx(s.tenant(op), orderID, action, from, to, content, op)
+	return s.writeOrderLogTx(s.DB(), orderID, action, from, to, content, op)
 }

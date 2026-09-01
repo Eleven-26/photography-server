@@ -6,13 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) OrderCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.OrderCreateReq
+	var req dto.OrderCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -61,7 +61,7 @@ func (h *Controller) OrderUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.OrderUpdateReq
+	var req dto.OrderUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -81,10 +81,7 @@ func (h *Controller) OrderStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Status  string `json:"status" binding:"required"`
-		Content string `json:"content"`
-	}
+	var req dto.OrderStatusReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -141,7 +138,7 @@ func (h *Controller) PaymentCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.PaymentCreateReq
+	var req dto.PaymentCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -206,7 +203,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.RefundCreateReq
+	var req dto.RefundCreateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

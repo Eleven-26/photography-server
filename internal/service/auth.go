@@ -1,35 +1,25 @@
 package service
 
 import (
-	"time"
-
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
+	"photography-server/internal/presentation/dto"
 )
 
-type LoginReq struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResp struct {
-	Token string        `json:"token"`
-	User  model.SysUser `json:"user"`
-}
-
-func (s *Service) Login(secret, issuer string, expireHours int, req LoginReq, ip string) (*LoginResp, error) {
-	var u model.SysUser
-	if err := s.DB().Where("username = ?", req.Username).First(&u).Error; err != nil {
-		return nil, errs.BadRequest("账号或密码错误")
+func (s *Service) Login(secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
+	u, err := s.AuthRepo.GetByUsername(req.Username)
+	if err != nil {
+		return nil, errs.BadRequest(common.ErrAccountWrong)
 	}
 	if u.Status != 1 {
-		return nil, errs.Forbidden("账号已被停用")
+		return nil, errs.Forbidden(common.ErrAccountDisabled)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)) != nil {
-		return nil, errs.BadRequest("账号或密码错误")
+		return nil, errs.BadRequest(common.ErrAccountWrong)
 	}
 
 	token, err := jwtpkg.Generate(secret, issuer, expireHours, jwtpkg.Claims{
@@ -43,35 +33,31 @@ func (s *Service) Login(secret, issuer string, expireHours int, req LoginReq, ip
 		return nil, errs.Internal("")
 	}
 
-	now := time.Now().Format("2006-01-02 15:04:05")
-	s.DB().Model(&u).Updates(map[string]interface{}{
-		"last_login_at": now,
-		"last_login_ip": ip,
-	})
+	s.AuthRepo.UpdateLoginInfo(u.ID, ip)
 	u.Password = ""
-	return &LoginResp{Token: token, User: u}, nil
+	return &dto.LoginResp{Token: token, User: *u}, nil
 }
 
 func (s *Service) Profile(op Operator) (*model.SysUser, error) {
-	var u model.SysUser
-	if err := s.tenant(op).First(&u, op.UserID).Error; err != nil {
-		return nil, errs.NotFound("用户不存在")
+	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
+	if err != nil {
+		return nil, errs.NotFound(common.ErrUserNotFound)
 	}
 	u.Password = ""
-	return &u, nil
+	return u, nil
 }
 
 func (s *Service) ChangePassword(op Operator, oldPwd, newPwd string) error {
-	var u model.SysUser
-	if err := s.tenant(op).First(&u, op.UserID).Error; err != nil {
-		return errs.NotFound("用户不存在")
+	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
+	if err != nil {
+		return errs.NotFound(common.ErrUserNotFound)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(oldPwd)) != nil {
-		return errs.BadRequest("原密码错误")
+		return errs.BadRequest(common.ErrPasswordWrong)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
 	if err != nil {
 		return errs.Internal("")
 	}
-	return s.tenant(op).Model(&u).Update("password", string(hash)).Error
+	return s.AuthRepo.UpdatePassword(op.UserID, string(hash))
 }

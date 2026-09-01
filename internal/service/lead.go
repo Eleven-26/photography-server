@@ -1,75 +1,33 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 )
 
-type LeadCreateReq struct {
-	StoreID     int64   `json:"store_id"`
-	Name        string  `json:"name" binding:"required"`
-	Mobile      string  `json:"mobile"`
-	Source      string  `json:"source"`
-	ProjectType string  `json:"project_type"`
-	BudgetMin   float64 `json:"budget_min"`
-	BudgetMax   float64 `json:"budget_max"`
-	ShootDate   string  `json:"shoot_date"`
-	Remark      string  `json:"remark"`
-	OwnerID     int64   `json:"owner_id"`
-}
-
-type LeadUpdateReq struct {
-	StoreID     int64   `json:"store_id"`
-	Name        string  `json:"name"`
-	Mobile      string  `json:"mobile"`
-	Source      string  `json:"source"`
-	ProjectType string  `json:"project_type"`
-	BudgetMin   float64 `json:"budget_min"`
-	BudgetMax   float64 `json:"budget_max"`
-	Status      string  `json:"status"`
-	ShootDate   string  `json:"shoot_date"`
-	Remark      string  `json:"remark"`
-	OwnerID     int64   `json:"owner_id"`
-}
-
 func (s *Service) ListLeads(op Operator, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
-	q := s.tenant(op)
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
-	}
-	if status != "" {
-		q = q.Where("status = ?", status)
-	}
-	if ownerID > 0 {
-		q = q.Where("owner_id = ?", ownerID)
-	}
-	var total int64
-	if err := q.Model(&model.Lead{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	var list []model.Lead
-	page, pageSize = normalizePage(page, pageSize)
-	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
-		return nil, 0, err
-	}
-	return list, total, nil
+	return s.LeadRepo.List(op.CompanyID, page, pageSize, keyword, status, ownerID)
 }
 
 func (s *Service) GetLead(op Operator, id int64) (*model.Lead, error) {
-	var l model.Lead
-	if err := s.tenant(op).First(&l, id).Error; err != nil {
-		return nil, errs.NotFound("线索不存在")
+	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrLeadNotFound)
+		}
+		return nil, err
 	}
-	return &l, nil
+	return l, nil
 }
 
-func (s *Service) CreateLead(op Operator, req LeadCreateReq) (*model.Lead, error) {
+func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, error) {
 	l := model.Lead{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -88,64 +46,73 @@ func (s *Service) CreateLead(op Operator, req LeadCreateReq) (*model.Lead, error
 		Remark:      req.Remark,
 		OwnerID:     orDefaultInt64(req.OwnerID, op.UserID),
 	}
-	if err := s.tenant(op).Create(&l).Error; err != nil {
+	if err := s.LeadRepo.Create(&l); err != nil {
 		return nil, err
 	}
 	return &l, nil
 }
 
-func (s *Service) UpdateLead(op Operator, id int64, req LeadUpdateReq) error {
-	var l model.Lead
-	if err := s.tenant(op).First(&l, id).Error; err != nil {
-		return errs.NotFound("线索不存在")
+func (s *Service) UpdateLead(op Operator, id int64, req dto.LeadUpdateReq) error {
+	_, err := s.LeadRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrLeadNotFound)
+		}
+		return err
 	}
-	return s.tenant(op).Model(&l).Updates(map[string]interface{}{
+	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"store_id": req.StoreID, "name": req.Name, "mobile": req.Mobile,
 		"source": req.Source, "project_type": req.ProjectType,
 		"budget_min": req.BudgetMin, "budget_max": req.BudgetMax,
 		"status": req.Status, "shoot_date": req.ShootDate,
 		"remark": req.Remark, "owner_id": req.OwnerID, "updated_by": op.UserID,
-	}).Error
+	})
 }
 
 func (s *Service) DeleteLead(op Operator, id int64) error {
-	return s.tenant(op).Delete(&model.Lead{}, id).Error
+	return s.LeadRepo.Delete(op.CompanyID, id)
 }
 
 // FollowLead 跟进记录：跟进次数+1，更新最近跟进时间
 func (s *Service) FollowLead(op Operator, id int64, remark string) error {
-	var l model.Lead
-	if err := s.tenant(op).First(&l, id).Error; err != nil {
-		return errs.NotFound("线索不存在")
+	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrLeadNotFound)
+		}
+		return err
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.tenant(op).Model(&l).Updates(map[string]interface{}{
+	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"follower":       l.Follower + 1,
 		"last_follow_at": now,
 		"remark":         remark,
 		"updated_by":     op.UserID,
-	}).Error
+	})
 }
 
 // ConvertLeadToCustomer 线索转客户（按手机号查重）
 func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Customer, error) {
-	var l model.Lead
-	if err := s.tenant(op).First(&l, leadID).Error; err != nil {
-		return nil, errs.NotFound("线索不存在")
+	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrLeadNotFound)
+		}
+		return nil, err
 	}
 	if l.CustomerID > 0 {
-		var c model.Customer
-		if err := s.tenant(op).First(&c, l.CustomerID).Error; err == nil {
-			return &c, nil
+		c, err := s.CustomerRepo.GetByID(op.CompanyID, l.CustomerID)
+		if err == nil {
+			return c, nil
 		}
 	}
 	var customer *model.Customer
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
 		if l.Mobile != "" {
-			var exist model.Customer
-			if err := tx.Where("company_id = ? AND mobile = ?", op.CompanyID, l.Mobile).First(&exist).Error; err == nil {
+			exist, err := s.CustomerRepo.GetByMobile(op.CompanyID, l.Mobile)
+			if err == nil {
 				l.CustomerID = exist.ID
-				return tx.Model(&l).Update("customer_id", exist.ID).Error
+				return s.LeadRepo.Update(op.CompanyID, leadID, map[string]interface{}{"customer_id": exist.ID})
 			}
 		}
 		c, err := s.CreateCustomerTx(tx, op, dto.CustomerCreateReq{
@@ -157,39 +124,37 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 		}
 		customer = c
 		l.CustomerID = c.ID
-		return tx.Model(&l).Updates(map[string]interface{}{"customer_id": c.ID, "updated_by": op.UserID}).Error
+		return s.LeadRepo.Update(op.CompanyID, leadID, map[string]interface{}{"customer_id": c.ID, "updated_by": op.UserID})
 	})
 	if err != nil {
 		return nil, err
 	}
 	if customer == nil {
-		var c model.Customer
-		if err := s.tenant(op).First(&c, l.CustomerID).Error; err != nil {
+		c, err := s.CustomerRepo.GetByID(op.CompanyID, l.CustomerID)
+		if err != nil {
 			return nil, err
 		}
-		customer = &c
+		customer = c
 	}
 	return customer, nil
 }
 
 // -------- 报价单 --------
 
-type QuoteCreateReq struct {
-	PackageID  int64   `json:"package_id" binding:"required"`
-	Title      string  `json:"title"`
-	AddonPrice float64 `json:"addon_price"`
-	ShootDate  string  `json:"shoot_date"`
-	Remark     string  `json:"remark"`
-}
-
-func (s *Service) CreateQuote(op Operator, leadID int64, req QuoteCreateReq) (*model.Quote, error) {
-	var l model.Lead
-	if err := s.tenant(op).First(&l, leadID).Error; err != nil {
-		return nil, errs.NotFound("线索不存在")
+func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
+	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrLeadNotFound)
+		}
+		return nil, err
 	}
-	var pkg model.Package
-	if err := s.tenant(op).First(&pkg, req.PackageID).Error; err != nil {
-		return nil, errs.NotFound("套餐不存在")
+	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errs.NotFound(common.ErrPackageNotFound)
+		}
+		return nil, err
 	}
 	q := model.Quote{
 		TenantBase: model.TenantBase{
@@ -211,23 +176,24 @@ func (s *Service) CreateQuote(op Operator, leadID int64, req QuoteCreateReq) (*m
 		OwnerID:     l.OwnerID,
 		ShootDate:   strPtr(req.ShootDate),
 	}
-	if err := s.tenant(op).Create(&q).Error; err != nil {
+	if err := s.LeadRepo.CreateQuote(&q); err != nil {
 		return nil, err
 	}
-	s.tenant(op).Model(&l).Update("status", model.LeadStatusQuoted)
+	s.LeadRepo.Update(op.CompanyID, leadID, map[string]interface{}{"status": model.LeadStatusQuoted})
 	return &q, nil
 }
 
 func (s *Service) ListQuotes(op Operator, leadID int64) ([]model.Quote, error) {
-	var list []model.Quote
-	err := s.tenant(op).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
-	return list, err
+	return s.LeadRepo.ListQuotesByLead(op.CompanyID, leadID)
 }
 
 func (s *Service) UpdateQuoteStatus(op Operator, quoteID int64, status string) error {
-	var q model.Quote
-	if err := s.tenant(op).First(&q, quoteID).Error; err != nil {
-		return errs.NotFound("报价单不存在")
+	_, err := s.LeadRepo.GetQuoteByID(op.CompanyID, quoteID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errs.NotFound(common.ErrQuoteNotFound)
+		}
+		return err
 	}
-	return s.tenant(op).Model(&q).Updates(map[string]interface{}{"status": status, "updated_by": op.UserID}).Error
+	return s.LeadRepo.UpdateQuote(op.CompanyID, quoteID, map[string]interface{}{"status": status, "updated_by": op.UserID})
 }

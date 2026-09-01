@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) Workspace(c *gin.Context) {
@@ -20,7 +20,7 @@ func (h *Controller) Workspace(c *gin.Context) {
 
 func (h *Controller) CompanyUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.CompanyUpdateReq
+	var req dto.CompanyUpdateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -44,20 +44,12 @@ func (h *Controller) PaymentMethodList(c *gin.Context) {
 
 func (h *Controller) PaymentMethodCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req struct {
-		Name        string `json:"name" binding:"required"`
-		Type        string `json:"type"`
-		AccountName string `json:"account_name"`
-		AccountNo   string `json:"account_no"`
-		Qrcode      string `json:"qrcode"`
-		Status      int    `json:"status"`
-		Sort        int    `json:"sort"`
-	}
+	var req dto.PaymentMethodReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreatePaymentMethod(op, req.Name, req.Type, req.AccountName, req.AccountNo, req.Qrcode, req.Status, req.Sort); err != nil {
+	if err := h.Svc.CreatePaymentMethod(op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -71,20 +63,12 @@ func (h *Controller) PaymentMethodUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req struct {
-		Name        string `json:"name"`
-		Type        string `json:"type"`
-		AccountName string `json:"account_name"`
-		AccountNo   string `json:"account_no"`
-		Qrcode      string `json:"qrcode"`
-		Status      int    `json:"status"`
-		Sort        int    `json:"sort"`
-	}
+	var req dto.PaymentMethodReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdatePaymentMethod(op, id, req.Name, req.Type, req.AccountName, req.AccountNo, req.Qrcode, req.Status, req.Sort); err != nil {
+	if err := h.Svc.UpdatePaymentMethod(op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}

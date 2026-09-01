@@ -3,46 +3,15 @@ package service
 import (
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/dto"
 )
 
-type UserCreateReq struct {
-	StoreID  int64  `json:"store_id"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Nickname string `json:"nickname"`
-	Mobile   string `json:"mobile"`
-	RoleID   int64  `json:"role_id" binding:"required"`
-	Status   int    `json:"status"`
-}
-
-type UserUpdateReq struct {
-	StoreID  int64  `json:"store_id"`
-	Nickname string `json:"nickname"`
-	Mobile   string `json:"mobile"`
-	Email    string `json:"email"`
-	Avatar   string `json:"avatar"`
-	RoleID   int64  `json:"role_id"`
-	Status   int    `json:"status"`
-}
-
 func (s *Service) ListUsers(op Operator, page, pageSize int, keyword string, storeID int64) ([]model.SysUser, int64, error) {
-	q := s.tenant(op)
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		q = q.Where("username LIKE ? OR nickname LIKE ? OR mobile LIKE ?", kw, kw, kw)
-	}
-	if storeID > 0 {
-		q = q.Where("store_id = ?", storeID)
-	}
-	var total int64
-	if err := q.Model(&model.SysUser{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	var list []model.SysUser
-	page, pageSize = normalizePage(page, pageSize)
-	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
+	list, total, err := s.UserRepo.List(op.CompanyID, page, pageSize, keyword, storeID)
+	if err != nil {
 		return nil, 0, err
 	}
 	for i := range list {
@@ -51,11 +20,10 @@ func (s *Service) ListUsers(op Operator, page, pageSize int, keyword string, sto
 	return list, total, nil
 }
 
-func (s *Service) CreateUser(op Operator, req UserCreateReq) error {
-	var count int64
-	s.tenant(op).Model(&model.SysUser{}).Where("username = ?", req.Username).Count(&count)
+func (s *Service) CreateUser(op Operator, req dto.UserCreateReq) error {
+	count, _ := s.UserRepo.CountByUsername(op.CompanyID, req.Username)
 	if count > 0 {
-		return errs.Conflict("登录账号已存在")
+		return errs.Conflict(common.ErrUserDuplicate)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -77,15 +45,15 @@ func (s *Service) CreateUser(op Operator, req UserCreateReq) error {
 	if u.Status == 0 {
 		u.Status = 1
 	}
-	return s.tenant(op).Create(&u).Error
+	return s.UserRepo.Create(&u)
 }
 
-func (s *Service) UpdateUser(op Operator, id int64, req UserUpdateReq) error {
-	var u model.SysUser
-	if err := s.tenant(op).First(&u, id).Error; err != nil {
-		return errs.NotFound("用户不存在")
+func (s *Service) UpdateUser(op Operator, id int64, req dto.UserUpdateReq) error {
+	_, err := s.UserRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		return errs.NotFound(common.ErrUserNotFound)
 	}
-	return s.tenant(op).Model(&u).Updates(map[string]interface{}{
+	return s.UserRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"store_id":   req.StoreID,
 		"nickname":   req.Nickname,
 		"mobile":     req.Mobile,
@@ -94,106 +62,81 @@ func (s *Service) UpdateUser(op Operator, id int64, req UserUpdateReq) error {
 		"role_id":    req.RoleID,
 		"status":     req.Status,
 		"updated_by": op.UserID,
-	}).Error
+	})
 }
 
 func (s *Service) DeleteUser(op Operator, id int64) error {
 	if id == op.UserID {
-		return errs.BadRequest("不能删除当前登录账号")
+		return errs.BadRequest(common.ErrUserSelfDelete)
 	}
-	return s.tenant(op).Delete(&model.SysUser{}, id).Error
+	return s.UserRepo.Delete(op.CompanyID, id)
 }
 
 func (s *Service) ResetPassword(op Operator, id int64, pwd string) error {
-	var u model.SysUser
-	if err := s.tenant(op).First(&u, id).Error; err != nil {
-		return errs.NotFound("用户不存在")
+	_, err := s.UserRepo.GetByID(op.CompanyID, id)
+	if err != nil {
+		return errs.NotFound(common.ErrUserNotFound)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
 	if err != nil {
 		return errs.Internal("")
 	}
-	return s.tenant(op).Model(&u).Update("password", string(hash)).Error
+	return s.UserRepo.UpdatePassword(op.CompanyID, id, string(hash))
 }
 
 // -------- 角色 --------
 
 func (s *Service) ListRoles(op Operator) ([]model.SysRole, error) {
-	var list []model.SysRole
-	err := s.tenant(op).Order("id ASC").Find(&list).Error
-	return list, err
+	return s.UserRepo.ListRoles(op.CompanyID)
 }
 
-func (s *Service) CreateRole(op Operator, name, code, remark string) error {
+func (s *Service) CreateRole(op Operator, req dto.RoleCreateReq) error {
 	r := model.SysRole{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Name:   name,
-		Code:   code,
-		Remark: remark,
+		Name:   req.Name,
+		Code:   req.Code,
+		Remark: req.Remark,
 		Status: 1,
 	}
-	return s.tenant(op).Create(&r).Error
+	return s.UserRepo.CreateRole(&r)
 }
 
-func (s *Service) UpdateRole(op Operator, id int64, name, code, remark string, status int) error {
-	var r model.SysRole
-	if err := s.tenant(op).First(&r, id).Error; err != nil {
-		return errs.NotFound("角色不存在")
-	}
-	return s.tenant(op).Model(&r).Updates(map[string]interface{}{
-		"name": name, "code": code, "remark": remark, "status": status, "updated_by": op.UserID,
-	}).Error
+func (s *Service) UpdateRole(op Operator, id int64, req dto.RoleUpdateReq) error {
+	return s.UserRepo.UpdateRole(op.CompanyID, id, map[string]interface{}{
+		"name": req.Name, "code": req.Code, "remark": req.Remark, "status": req.Status, "updated_by": op.UserID,
+	})
 }
 
 func (s *Service) DeleteRole(op Operator, id int64) error {
-	return s.tenant(op).Delete(&model.SysRole{}, id).Error
+	return s.UserRepo.DeleteRole(op.CompanyID, id)
 }
 
 // -------- 门店 --------
 
 func (s *Service) ListStores(op Operator) ([]model.SysStore, error) {
-	var list []model.SysStore
-	err := s.tenant(op).Order("id ASC").Find(&list).Error
-	return list, err
+	return s.UserRepo.ListStores(op.CompanyID)
 }
 
-func (s *Service) CreateStore(op Operator, name, address, phone string) error {
+func (s *Service) CreateStore(op Operator, req dto.StoreCreateReq) error {
 	st := model.SysStore{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Name: name, Address: address, Phone: phone, Status: 1,
+		Name: req.Name, Address: req.Address, Phone: req.Phone, Status: 1,
 	}
-	return s.tenant(op).Create(&st).Error
+	return s.UserRepo.CreateStore(&st)
 }
 
-func (s *Service) UpdateStore(op Operator, id int64, name, address, phone string, status int) error {
-	var st model.SysStore
-	if err := s.tenant(op).First(&st, id).Error; err != nil {
-		return errs.NotFound("门店不存在")
-	}
-	return s.tenant(op).Model(&st).Updates(map[string]interface{}{
-		"name": name, "address": address, "phone": phone, "status": status, "updated_by": op.UserID,
-	}).Error
+func (s *Service) UpdateStore(op Operator, id int64, req dto.StoreUpdateReq) error {
+	return s.UserRepo.UpdateStore(op.CompanyID, id, map[string]interface{}{
+		"name": req.Name, "address": req.Address, "phone": req.Phone, "status": req.Status, "updated_by": op.UserID,
+	})
 }
 
 func (s *Service) DeleteStore(op Operator, id int64) error {
-	return s.tenant(op).Delete(&model.SysStore{}, id).Error
-}
-
-func normalizePage(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if pageSize > 200 {
-		pageSize = 200
-	}
-	return page, pageSize
+	return s.UserRepo.DeleteStore(op.CompanyID, id)
 }

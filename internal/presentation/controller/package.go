@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 func (h *Controller) PackageList(c *gin.Context) {
@@ -37,7 +37,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 
 func (h *Controller) PackageCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req service.PackageReq
+	var req dto.PackageReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *Controller) PackageUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req service.PackageReq
+	var req dto.PackageReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
