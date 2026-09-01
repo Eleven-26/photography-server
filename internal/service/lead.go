@@ -7,6 +7,7 @@ import (
 
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/dto"
 )
 
 type LeadCreateReq struct {
@@ -147,7 +148,7 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 				return tx.Model(&l).Update("customer_id", exist.ID).Error
 			}
 		}
-		c, err := s.createCustomerTx(tx, op, CustomerCreateReq{
+		c, err := s.CreateCustomerTx(tx, op, dto.CustomerCreateReq{
 			StoreID: l.StoreID, Name: l.Name, Mobile: l.Mobile,
 			Source: l.Source, Remark: l.Remark, Status: model.CustomerStatusPotential,
 		})

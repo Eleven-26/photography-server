@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/common"
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/service"
@@ -23,7 +24,7 @@ func New(svc *service.Service, cfg *config.Config) *Controller {
 // bindJSON 绑定 JSON 请求体
 func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindJSON(obj); err != nil {
-		return errs.BadRequest("请求参数错误：" + err.Error())
+		return errs.BadRequest(common.ErrBadRequest + "：" + err.Error())
 	}
 	return nil
 }
@@ -31,19 +32,22 @@ func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 // bindQuery 绑定查询参数
 func (h *Controller) bindQuery(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindQuery(obj); err != nil {
-		return errs.BadRequest("查询参数错误：" + err.Error())
+		return errs.BadRequest(common.ErrBadRequest + "：" + err.Error())
 	}
 	return nil
 }
 
 func pager(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(common.DefaultPage)))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", strconv.Itoa(common.DefaultPageSize)))
 	if page <= 0 {
-		page = 1
+		page = common.DefaultPage
 	}
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = 20
+	if pageSize <= 0 {
+		pageSize = common.DefaultPageSize
+	}
+	if pageSize > common.MaxPageSize {
+		pageSize = common.MaxPageSize
 	}
 	return page, pageSize
 }

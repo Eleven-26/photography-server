@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/infrastructure"
+	"photography-server/internal/repository"
 )
 
 // Operator 当前操作人（由认证中间件注入）
@@ -25,11 +26,15 @@ type Operator struct {
 
 // Service 业务服务根结构，按领域拆分到不同文件
 type Service struct {
-	UploadDir string
+	UploadDir    string
+	CustomerRepo *repository.CustomerRepo
 }
 
 func New(uploadDir string) *Service {
-	return &Service{UploadDir: uploadDir}
+	return &Service{
+		UploadDir:    uploadDir,
+		CustomerRepo: repository.NewCustomerRepo(),
+	}
 }
 
 // DB 获取 MySQL 单例
