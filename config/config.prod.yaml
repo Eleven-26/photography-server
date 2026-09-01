@@ -39,3 +39,12 @@ log:
 upload:
   dir: /data/uploads
   max_size_mb: 100
+
+xxljob:
+  enable: ${APP_XXLJOB_ENABLE:-false}
+  server_addr: ${APP_XXLJOB_SERVER_ADDR:-http://xxl-job-admin:8080/xxl-job-admin}
+  access_token: ${APP_XXLJOB_ACCESS_TOKEN:-}
+  executor_ip: ${APP_XXLJOB_EXECUTOR_IP:-127.0.0.1}
+  executor_port: ${APP_XXLJOB_EXECUTOR_PORT:-"9999"}
+  registry_key: ${APP_XXLJOB_REGISTRY_KEY:-photography-server}
+  log_dir: ${APP_XXLJOB_LOG_DIR:-/data/logs/xxl-job}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"photography-server/internal/presentation/job"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"photography-server/internal/infrastructure"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/logger"
+	"photography-server/internal/presentation/mq"
 	"photography-server/internal/router"
 	"photography-server/internal/service"
 )
@@ -53,6 +55,19 @@ func main() {
 
 	if err := infrastructure.InitNATS(&cfg.NATS); err != nil {
 		logger.Warnf("nats not available, skipping: %v", err)
+	}
+
+	if err := infrastructure.InitXxlJob(cfg); err != nil {
+		logger.Warnf("xxl-job not available, skipping: %v", err)
+	}
+	if executor := infrastructure.XxlExecutor(); executor != nil {
+		job.Register(executor)
+	}
+
+	// 启动 NATS 消费者
+	if nc := infrastructure.NATS(); nc != nil {
+		consumer := mq.New(nc)
+		consumer.Start()
 	}
 
 	middleware.Init(cfg)

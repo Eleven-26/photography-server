@@ -17,6 +17,17 @@ type Config struct {
 	NATS   NATS   `mapstructure:"nats"`
 	Log    Log    `mapstructure:"log"`
 	Upload Upload `mapstructure:"upload"`
+	XxlJob XxlJob `mapstructure:"xxljob"`
+}
+
+type XxlJob struct {
+	Enable       bool   `mapstructure:"enable"`
+	ServerAddr   string `mapstructure:"server_addr"`
+	AccessToken  string `mapstructure:"access_token"`
+	ExecutorIp   string `mapstructure:"executor_ip"`
+	ExecutorPort string `mapstructure:"executor_port"`
+	RegistryKey  string `mapstructure:"registry_key"`
+	LogDir       string `mapstructure:"log_dir"`
 }
 
 type App struct {

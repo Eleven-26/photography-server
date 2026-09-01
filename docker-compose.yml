@@ -57,6 +57,26 @@ services:
     networks:
       - backend-net
 
+  # XXL-JOB 任务调度中心
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:${XXLJOB_ADMIN_VERSION:-latest}
+    container_name: photography-xxl-job-admin
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://${XXLJOB_DB_HOST:-mysql}:${XXLJOB_DB_PORT:-3306}/${XXLJOB_DB_NAME:-xxl_job}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: ${XXLJOB_DB_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SERVER_PORT: ${XXLJOB_ADMIN_PORT:-8080}
+      XXLJOB_ACCESS_TOKEN: ${XXLJOB_ACCESS_TOKEN:-}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${XXLJOB_ADMIN_EXPOSE_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   # 后端服务
   backend:
     build:
@@ -70,6 +90,8 @@ services:
       redis:
         condition: service_healthy
       nats:
+        condition: service_started
+      xxl-job-admin:
         condition: service_started
     environment:
       APP_MODE: ${APP_MODE:-release}
@@ -85,6 +107,13 @@ services:
       APP_JWT_SECRET: ${APP_JWT_SECRET}   # 必须从 .env 读取
       APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-warn}
+      APP_XXLJOB_ENABLE: ${APP_XXLJOB_ENABLE:-true}
+      APP_XXLJOB_SERVER_ADDR: ${APP_XXLJOB_SERVER_ADDR:-http://xxl-job-admin:8080/xxl-job-admin}
+      APP_XXLJOB_ACCESS_TOKEN: ${XXLJOB_ACCESS_TOKEN:-}
+      APP_XXLJOB_EXECUTOR_IP: ${APP_XXLJOB_EXECUTOR_IP:-127.0.0.1}
+      APP_XXLJOB_EXECUTOR_PORT: ${APP_XXLJOB_EXECUTOR_PORT:-"9999"}
+      APP_XXLJOB_REGISTRY_KEY: ${APP_XXLJOB_REGISTRY_KEY:-photography-server}
+      APP_XXLJOB_LOG_DIR: ${APP_XXLJOB_LOG_DIR:-/app/logs/xxl-job}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

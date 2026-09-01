@@ -38,3 +38,12 @@ log:
 upload:
   dir: ./uploads
   max_size_mb: 20
+
+xxljob:
+  enable: false
+  server_addr: http://127.0.0.1:8080/xxl-job-admin
+  access_token: ""
+  executor_ip: 127.0.0.1
+  executor_port: "9999"
+  registry_key: photography-server
+  log_dir: ./logs/xxl-job
