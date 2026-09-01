@@ -36,24 +36,24 @@ INSERT INTO `biz_payment_method` (`created_by`,`updated_by`,`company_id`,`name`,
 INSERT INTO `biz_package`
 (`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`name`,`category`,`base_price`,`deposit_rate`,`deposit_amt`,`photos_included`,`shoot_hours`,`content_desc`,`addon_unit_price`,`status`,`version`,`base_version`,`published_at`)
 VALUES
-(1, 1, 1, 1, 'PK-001', '婚纱经典套餐', '婚纱', 6999.00, 30.00, 2099.70, 25, 8.00, '含化妆造型2套、外景拍摄、精修25张、赠送全部底片', 100.00, 'active', 1, 0, NOW()),
-(1, 1, 1, 1, 'PK-002', '个人写真轻奢套餐', '写真', 2999.00, 30.00, 899.70, 15, 4.00, '含妆造1套、棚拍+外景、精修15张', 80.00, 'active', 1, 0, NOW()),
-(1, 1, 1, 1, 'PK-003', '儿童成长套餐', '儿童', 3999.00, 30.00, 1199.70, 20, 5.00, '含主题拍摄、抓拍跟拍、精修20张', 90.00, 'active', 1, 0, NOW());
+(1, 1, 1, 1, 'PK-001', '婚纱经典套餐', '婚纱', 6999.00, 30.00, 2099.70, 25, 8.00, '含化妆造型2套、外景拍摄、精修25张、赠送全部底片', 100.00, 1, 1, 0, NOW()),
+(1, 1, 1, 1, 'PK-002', '个人写真轻奢套餐', '写真', 2999.00, 30.00, 899.70, 15, 4.00, '含妆造1套、棚拍+外景、精修15张', 80.00, 1, 1, 0, NOW()),
+(1, 1, 1, 1, 'PK-003', '儿童成长套餐', '儿童', 3999.00, 30.00, 1199.70, 20, 5.00, '含主题拍摄、抓拍跟拍、精修20张', 90.00, 1, 1, 0, NOW());
 
 -- 示例客户
 INSERT INTO `crm_customer`
 (`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`name`,`mobile`,`wechat`,`gender`,`level`,`source`,`tags`,`status`,`remark`)
 VALUES
-(1, 1, 1, 1, 'CU-001', '林女士', '13911112222', 'lin2026', 'female', 'gold', '小红书', '婚纱,外景', 'active', '意向12月婚纱拍摄');
+(1, 1, 1, 1, 'CU-001', '林女士', '13911112222', 'lin2026', 'female', 3, '小红书', '婚纱,外景', 2, '意向12月婚纱拍摄');
 
 -- 示例线索
 INSERT INTO `crm_lead`
 (`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`customer_id`,`name`,`mobile`,`source`,`project_type`,`budget_min`,`budget_max`,`status`,`shoot_date`,`remark`,`owner_id`)
 VALUES
-(1, 1, 1, 1, 'LD-001', 1, '林女士', '13911112222', '小红书', '婚纱', 6000.00, 8000.00, 'quoting', '2026-12-12', '看重外景拍摄质量', 1);
+(1, 1, 1, 1, 'LD-001', 1, '林女士', '13911112222', '小红书', '婚纱', 6000.00, 8000.00, 2, '2026-12-12', '看重外景拍摄质量', 1);
 
 -- 示例报价单
 INSERT INTO `biz_quote`
 (`created_by`,`updated_by`,`company_id`,`code`,`lead_id`,`customer_id`,`package_id`,`version`,`title`,`package_name`,`base_price`,`addon_price`,`total_price`,`status`,`owner_id`,`shoot_date`)
 VALUES
-(1, 1, 1, 'QT-001', 1, 1, 1, 1, '林女士婚纱报价', '婚纱经典套餐', 6999.00, 0.00, 6999.00, 'sent', 1, '2026-12-12');
+(1, 1, 1, 'QT-001', 1, 1, 1, 1, '林女士婚纱报价', '婚纱经典套餐', 6999.00, 0.00, 6999.00, 2, 1, '2026-12-12');
