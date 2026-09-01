@@ -170,7 +170,7 @@ func (h *Controller) NATSStatus(c *gin.Context) {
 }
 
 func (h *Controller) Test(c *gin.Context) {
-	status := enum.OrderStatusPendingDeposit
+	status := enum.OrderStatusPendingDeposit.Code
 	fmt.Println("当前状态:", status)
 	statusName := enum.OrderStatusName(status)
 	fmt.Println("当前状态名称：", statusName)
