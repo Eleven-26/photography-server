@@ -30,7 +30,7 @@ type OrderUpdateReq struct {
 
 // OrderStatusReq 订单状态流转
 type OrderStatusReq struct {
-	Status  string `json:"status" binding:"required"` // 目标状态
+	Status  int    `json:"status" binding:"required"` // 目标状态
 	Content string `json:"content"`                   // 状态变更说明
 }
 

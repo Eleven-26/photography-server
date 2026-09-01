@@ -3,48 +3,44 @@ package repository
 import (
 	"time"
 
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 )
 
 type DashboardRepo struct{}
 
-func NewDashboardRepo() *DashboardRepo {
-	return &DashboardRepo{}
+func NewDashboardRepo() *DashboardRepo { return &DashboardRepo{} }
+
+type Overview struct {
+	PendingDeposit  int64   `json:"pending_deposit"`
+	PendingRetouch  int64   `json:"pending_retouch"`
+	UpcomingShoots  int64   `json:"upcoming_shoots"`
+	PendingPayments int64   `json:"pending_payments"`
+	TodayConfirmed  float64 `json:"today_confirmed"`
+	TodayPending    float64 `json:"today_pending"`
+	UnreadNotify    int64   `json:"unread_notify"`
 }
 
-// Overview 首页概览
-func (r *DashboardRepo) Overview(companyID, userID int64) (*DashboardOverview, error) {
-	ov := &DashboardOverview{}
-	now := time.Now()
-	todayStart := now.Format("2006-01-02") + " 00:00:00"
-	todayEnd := now.Format("2006-01-02") + " 23:59:59"
-	weekStart := now.Format("2006-01-02")
-	weekEnd := now.AddDate(0, 0, 7).Format("2006-01-02")
-
+func (r *DashboardRepo) GetOverview(companyID, userID int64) (*Overview, error) {
+	var ov Overview
 	q := tenant(companyID)
-	q.Model(&model.Order{}).Where("created_at BETWEEN ? AND ?", todayStart, todayEnd).Count(&ov.TodayNewOrders)
-	q.Model(&model.Order{}).Where("status = ?", model.OrderStatusPendingDeposit).Count(&ov.PendingDeposit)
-	q.Model(&model.Order{}).Where("status NOT IN ? AND shoot_date BETWEEN ? AND ?",
-		[]string{model.OrderStatusCompleted, model.OrderStatusCancelled}, weekStart, weekEnd).Count(&ov.UpcomingShoots)
-	q.Model(&model.OrderPayment{}).Where("status = ?", model.PaymentStatusConfirmed).
-		Select("COALESCE(SUM(amount),0)").
-		Where("paid_at BETWEEN ? AND ?", now.Format("2006-01")+"-01 00:00:00", now.Format("2006-01")+"-31 23:59:59").
-		Scan(&ov.MonthRevenue)
-	q.Model(&model.SysNotification{}).Where("receiver_id = ? AND is_read = ?", userID, model.NotificationUnread).
-		Count(&ov.UnreadNotices)
-	q.Order("id DESC").Limit(10).Find(&ov.RecentOrders)
-	q.Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, model.BlockStatusLocked).
-		Order("date ASC").Find(&ov.UpcomingCalendar)
-	return ov, nil
+
+	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusPendingDeposit)).Count(&ov.PendingDeposit)
+	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusRetouching)).Count(&ov.PendingRetouch)
+
+	weekStart := time.Now().Format("2006-01-02")
+	q.Model(&model.Order{}).Where("status IN ? AND shoot_date >= ?",
+		[]int{int(enum.OrderStatusCompleted), int(enum.OrderStatusCancelled)}, weekStart).Count(&ov.UpcomingShoots)
+
+	q.Model(&model.OrderPayment{}).Where("status = ?", int(enum.PaymentStatusPending)).Count(&ov.PendingPayments)
+
+	q.Model(&model.SysNotification{}).Where("receiver_id = ? AND is_read = ?", userID, int(enum.NotificationUnread)).Count(&ov.UnreadNotify)
+
+	return &ov, nil
 }
 
-// DashboardOverview 首页概览响应
-type DashboardOverview struct {
-	TodayNewOrders   int64                 `json:"today_new_orders"`
-	PendingDeposit   int64                 `json:"pending_deposit"`
-	UpcomingShoots   int64                 `json:"upcoming_shoots"`
-	MonthRevenue     float64               `json:"month_revenue"`
-	UnreadNotices    int64                 `json:"unread_notices"`
-	RecentOrders     []model.Order         `json:"recent_orders"`
-	UpcomingCalendar []model.CalendarBlock `json:"upcoming_calendar"`
+func (r *DashboardRepo) GetCalendarBlocks(companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {
+	var list []model.CalendarBlock
+	err := tenant(companyID).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
+	return list, err
 }

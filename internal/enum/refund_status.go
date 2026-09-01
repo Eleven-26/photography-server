@@ -4,17 +4,17 @@ package enum
 type RefundStatus int
 
 const (
-	RefundStatusPending  RefundStatus = 1 // 待审核
+	RefundStatusApplying RefundStatus = 1 // 申请中
 	RefundStatusApproved RefundStatus = 2 // 已通过
-	RefundStatusRejected RefundStatus = 3 // 已驳回
-	RefundStatusRefunded RefundStatus = 4 // 已退款
+	RefundStatusDone     RefundStatus = 3 // 已退款
+	RefundStatusRejected RefundStatus = 4 // 已驳回
 )
 
 var refundStatusName = map[RefundStatus]string{
-	RefundStatusPending:  "待审核",
+	RefundStatusApplying: "申请中",
 	RefundStatusApproved: "已通过",
+	RefundStatusDone:     "已退款",
 	RefundStatusRejected: "已驳回",
-	RefundStatusRefunded: "已退款",
 }
 
 func RefundStatusName(status RefundStatus) string {

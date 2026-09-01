@@ -4,19 +4,19 @@ package enum
 type LeadStatus int
 
 const (
-	LeadStatusNew       LeadStatus = 1 // 新线索
-	LeadStatusFollowing LeadStatus = 2 // 跟进中
-	LeadStatusQuoting   LeadStatus = 3 // 报价中
-	LeadStatusConverted LeadStatus = 4 // 已转化
-	LeadStatusLost      LeadStatus = 5 // 已流失
+	LeadStatusPending   LeadStatus = 1 // 待回复
+	LeadStatusQuoting   LeadStatus = 2 // 待报价
+	LeadStatusQuoted    LeadStatus = 3 // 已报价
+	LeadStatusConfirmed LeadStatus = 4 // 待确认/已成交
+	LeadStatusLose      LeadStatus = 5 // 已流失
 )
 
 var leadStatusName = map[LeadStatus]string{
-	LeadStatusNew:       "新线索",
-	LeadStatusFollowing: "跟进中",
-	LeadStatusQuoting:   "报价中",
-	LeadStatusConverted: "已转化",
-	LeadStatusLost:      "已流失",
+	LeadStatusPending:   "待回复",
+	LeadStatusQuoting:   "待报价",
+	LeadStatusQuoted:    "已报价",
+	LeadStatusConfirmed: "已成交",
+	LeadStatusLose:      "已流失",
 }
 
 func LeadStatusName(status LeadStatus) string {

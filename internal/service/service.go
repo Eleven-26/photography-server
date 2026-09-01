@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/infrastructure"
+	"photography-server/internal/model"
 	"photography-server/internal/repository"
 )
 
@@ -124,4 +125,30 @@ func refundRatio(shootDate string, hoursBeforeShoot time.Duration) (float64, str
 	default:
 		return 0, "shoot_lt_24h"
 	}
+}
+
+func (s *Service) writeOrderLog(orderID int64, action string, from, to interface{}, content string, op Operator) error {
+	log := model.OrderLog{
+		OrderID:      orderID,
+		Action:       action,
+		FromStatus:   fmt.Sprintf("%v", from),
+		ToStatus:     fmt.Sprintf("%v", to),
+		Content:      content,
+		OperatorID:   op.UserID,
+		OperatorName: op.Username,
+	}
+	return s.DB().Create(&log).Error
+}
+
+func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action string, from, to interface{}, content string, op Operator) error {
+	log := model.OrderLog{
+		OrderID:      orderID,
+		Action:       action,
+		FromStatus:   fmt.Sprintf("%v", from),
+		ToStatus:     fmt.Sprintf("%v", to),
+		Content:      content,
+		OperatorID:   op.UserID,
+		OperatorName: op.Username,
+	}
+	return tx.Create(&log).Error
 }

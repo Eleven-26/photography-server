@@ -1,11 +1,7 @@
 package service
 
-import (
-	"photography-server/internal/repository"
-)
+import "photography-server/internal/repository"
 
-type DashboardOverview = repository.DashboardOverview
-
-func (s *Service) Overview(op Operator) (*DashboardOverview, error) {
-	return s.DashboardRepo.Overview(op.CompanyID, op.UserID)
+func (s *Service) Overview(op Operator) (*repository.Overview, error) {
+	return s.DashboardRepo.GetOverview(op.CompanyID, op.UserID)
 }

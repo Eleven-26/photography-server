@@ -1,59 +1,43 @@
 package service
 
 import (
-	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
 	"photography-server/internal/common"
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 )
 
-// ApplyRefund 申请退款：按拍摄时间距离自动计算可退比例与金额
-func (s *Service) ApplyRefund(op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
+func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errs.NotFound(common.ErrOrderNotFound)
-		}
-		return nil, err
+		return nil, errs.NotFound(common.ErrOrderNotFound)
 	}
-	if o.Status == model.OrderStatusCancelled {
+	if o.Status == enum.OrderStatusCancelled {
 		return nil, errs.BadRequest(common.ErrRefundCancelled)
 	}
-	if o.RefundAmt >= o.PaidAmt {
+
+	amount := req.Amount
+	if amount == 0 {
+		amount = o.PaidAmt
+	}
+	if amount <= 0 {
 		return nil, errs.BadRequest(common.ErrRefundZero)
 	}
 
-	ratio := 0.0
-	rule := ""
-	if o.ShootDate != nil && *o.ShootDate != "" {
-		shoot, err := time.ParseInLocation("2006-01-02", *o.ShootDate, time.Local)
-		if err == nil {
-			diff := time.Until(shoot)
-			if diff < 0 {
-				ratio, rule = 0, "shoot_past"
-			} else {
-				ratio, rule = refundRatio(*o.ShootDate, diff)
-			}
-		}
-	} else {
-		ratio, rule = 0, "no_shoot_date"
+	shootDate := ""
+	if o.ShootDate != nil {
+		shootDate = *o.ShootDate
 	}
-
-	// 可退基数=已收定金部分（封顶 order.deposit_amt）
-	base := o.DepositAmt
-	if o.PaidAmt < base {
-		base = o.PaidAmt
-	}
-	amount := round2(base * ratio)
-	if req.Amount > 0 && req.Amount < amount {
-		amount = round2(req.Amount)
-	}
-	if amount <= 0 {
+	shootTime, _ := time.Parse("2006-01-02", shootDate)
+	hoursBeforeShoot := time.Until(shootTime).Hours()
+	ratio, rule := refundRatio(shootDate, time.Duration(hoursBeforeShoot)*time.Hour)
+	refundAmt := round2(amount * ratio)
+	if refundAmt <= 0 {
 		return nil, errs.BadRequest(common.ErrRefundNoTime)
 	}
 
@@ -65,71 +49,61 @@ func (s *Service) ApplyRefund(op Operator, orderID int64, req dto.RefundCreateRe
 		OrderID:    orderID,
 		Code:       genCode("RF"),
 		CustomerID: o.CustomerID,
-		Amount:     amount,
+		Amount:     refundAmt,
 		Reason:     req.Reason,
 		RefundRule: rule,
-		Status:     model.RefundStatusApplying,
+		Status:     enum.RefundStatusApplying,
 		ApplyBy:    op.UserID,
-		ApplyName:  op.Nickname,
+		ApplyName:  op.Username,
 	}
-	if err := s.OrderRepo.CreateRefund(&rf); err != nil {
+	if err := s.DB().Create(&rf).Error; err != nil {
 		return nil, err
 	}
-	s.writeOrderLog(op, orderID, "apply_refund", o.Status, o.Status, "申请退款："+f2(amount)+"（规则档位："+rule+"）")
 	return &rf, nil
+}
+
+func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark string) error {
+	rf, err := s.OrderRepo.GetRefundByID(op.CompanyID, id)
+	if err != nil {
+		return errs.NotFound(common.ErrRefundNotFound)
+	}
+	if rf.Status != enum.RefundStatusApplying {
+		return errs.BadRequest(common.ErrRefundProcessed)
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	status := enum.RefundStatusRejected
+	if approved {
+		status = enum.RefundStatusApproved
+	}
+
+	return s.DB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&rf).Updates(map[string]interface{}{
+			"status":       status,
+			"audit_by":     op.UserID,
+			"audit_at":     now,
+			"audit_remark": remark,
+		}).Error; err != nil {
+			return err
+		}
+
+		if approved {
+			if err := tx.Model(&model.Order{}).Where("id = ?", rf.OrderID).Updates(map[string]interface{}{
+				"refund_amt":     gorm.Expr("refund_amt + ?", rf.Amount),
+				"payment_status": enum.PaymentStatusRefunded,
+			}).Error; err != nil {
+				return err
+			}
+			tx.Model(&rf).Update("refund_at", now)
+			s.writeOrderLog(rf.OrderID, "refund_approved", 0, enum.RefundStatusApproved, "退款审核通过", op)
+		} else {
+			s.writeOrderLog(rf.OrderID, "refund_rejected", 0, enum.RefundStatusRejected, "退款审核驳回: "+remark, op)
+		}
+
+		return nil
+	})
 }
 
 func (s *Service) ListRefunds(op Operator, orderID int64) ([]model.OrderRefund, error) {
 	return s.OrderRepo.ListRefunds(op.CompanyID, orderID)
-}
-
-// AuditRefund 审核退款：通过后累加订单已退金额，订单支付状态置为已退款
-func (s *Service) AuditRefund(op Operator, refundID int64, approve bool, remark string) error {
-	rf, err := s.OrderRepo.GetRefundByID(op.CompanyID, refundID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errs.NotFound(common.ErrRefundNotFound)
-		}
-		return err
-	}
-	if rf.Status != model.RefundStatusApplying {
-		return errs.BadRequest(common.ErrRefundProcessed)
-	}
-	o, err := s.OrderRepo.GetByID(op.CompanyID, rf.OrderID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errs.NotFound(common.ErrOrderNotFound)
-		}
-		return err
-	}
-	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.DB().Transaction(func(tx *gorm.DB) error {
-		if approve {
-			if err := s.OrderRepo.UpdateRefund(op.CompanyID, refundID, map[string]interface{}{
-				"status":       model.RefundStatusApproved,
-				"audit_by":     op.UserID,
-				"audit_at":     now,
-				"audit_remark": remark,
-			}); err != nil {
-				return err
-			}
-			if err := s.OrderRepo.Update(op.CompanyID, rf.OrderID, map[string]interface{}{
-				"refund_amt":     gorm.Expr("refund_amt + ?", rf.Amount),
-				"payment_status": model.PaymentStatusRefunded,
-				"updated_by":     op.UserID,
-			}); err != nil {
-				return err
-			}
-			return s.writeOrderLogTx(tx, o.ID, "approve_refund", o.Status, o.Status, "审核通过退款："+f2(rf.Amount), op)
-		}
-		if err := s.OrderRepo.UpdateRefund(op.CompanyID, refundID, map[string]interface{}{
-			"status":       model.RefundStatusRejected,
-			"audit_by":     op.UserID,
-			"audit_at":     now,
-			"audit_remark": remark,
-		}); err != nil {
-			return err
-		}
-		return s.writeOrderLogTx(tx, o.ID, "reject_refund", o.Status, o.Status, "驳回退款申请", op)
-	})
 }

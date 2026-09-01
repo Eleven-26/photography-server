@@ -20,8 +20,7 @@ func (h *Controller) FinanceSummary(c *gin.Context) {
 func (h *Controller) FinancePayments(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListFinancePayments(op, page, pageSize,
-		queryStr(c, "start_date"), queryStr(c, "end_date"))
+	list, total, err := h.Svc.ListFinancePayments(op, page, pageSize, queryStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -32,8 +31,7 @@ func (h *Controller) FinancePayments(c *gin.Context) {
 func (h *Controller) FinanceRefunds(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListFinanceRefunds(op, page, pageSize,
-		queryStr(c, "start_date"), queryStr(c, "end_date"))
+	list, total, err := h.Svc.ListFinanceRefunds(op, page, pageSize)
 	if err != nil {
 		response.Fail(c, err)
 		return

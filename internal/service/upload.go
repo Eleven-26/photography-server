@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 )
@@ -24,7 +25,7 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 		ext = ".bin"
 	}
 	fileType := detectFileType(ext)
-	if fileType == "file" {
+	if fileType == enum.UploadTypeFile {
 		// 仅允许图片/视频上传
 		return nil, errs.BadRequest("仅支持图片/视频文件")
 	}
@@ -47,7 +48,7 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 		StoreID:  storeID,
 		BizType:  bizType,
 		BizID:    bizID,
-		FileType: fileType,
+		FileType: enum.UploadTypeName(fileType),
 		FileName: fileName,
 		FileURL:  url,
 		FilePath: path,
@@ -57,15 +58,15 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 	if err := s.tenant(op).Create(&u).Error; err != nil {
 		return nil, err
 	}
-	return &UploadResult{URL: url, FileName: fileName, FileType: fileType, Size: int64(len(data))}, nil
+	return &UploadResult{URL: url, FileName: fileName, FileType: enum.UploadTypeName(fileType), Size: int64(len(data))}, nil
 }
 
-func detectFileType(ext string) string {
+func detectFileType(ext string) enum.UploadType {
 	switch strings.ToLower(ext) {
 	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic":
-		return model.UploadTypeImage
+		return enum.UploadTypeImage
 	case ".mp4", ".mov", ".avi", ".mkv", ".webm":
-		return model.UploadTypeVideo
+		return enum.UploadTypeVideo
 	}
-	return model.UploadTypeFile
+	return enum.UploadTypeFile
 }

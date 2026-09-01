@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
@@ -29,9 +30,8 @@ func (h *Controller) OrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	customerID, _ := strconv.ParseInt(c.Query("customer_id"), 10, 64)
-	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
 	list, total, err := h.Svc.ListOrders(op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "status"), customerID, photographerID, queryStr(c, "date"))
+		queryStr(c, "status"), customerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -46,7 +46,7 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	detail, err := h.Svc.GetOrder(op, id)
+	detail, err := h.Svc.GetOrderDetail(op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *Controller) OrderStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ChangeOrderStatus(op, id, req.Status, req.Content); err != nil {
+	if err := h.Svc.ChangeOrderStatus(op, id, enum.OrderStatus(req.Status), req.Content); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -121,7 +121,7 @@ func (h *Controller) OrderLogs(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	detail, err := h.Svc.GetOrder(op, id)
+	detail, err := h.Svc.GetOrderDetail(op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -181,16 +181,6 @@ func (h *Controller) PaymentConfirm(c *gin.Context) {
 }
 
 func (h *Controller) PaymentDelete(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.DeletePayment(op, id); err != nil {
-		response.Fail(c, err)
-		return
-	}
 	response.OKNil(c)
 }
 
@@ -208,7 +198,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	r, err := h.Svc.ApplyRefund(op, id, req)
+	r, err := h.Svc.CreateRefund(op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return

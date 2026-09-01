@@ -1,50 +1,53 @@
 package repository
 
 import (
+	"time"
+
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 )
 
 type FinanceRepo struct{}
 
-func NewFinanceRepo() *FinanceRepo {
-	return &FinanceRepo{}
+func NewFinanceRepo() *FinanceRepo { return &FinanceRepo{} }
+
+type Summary struct {
+	TotalIncome  float64 `json:"total_income"`
+	DepositTotal float64 `json:"deposit_total"`
+	FinalTotal   float64 `json:"final_total"`
+	RefundTotal  float64 `json:"refund_total"`
+	PendingCount int64   `json:"pending_count"`
 }
 
-// Summary 财务汇总
-func (r *FinanceRepo) Summary(companyID int64, start, end string) (*FinanceSummary, error) {
-	sum := &FinanceSummary{}
+func (r *FinanceRepo) GetSummary(companyID int64, start, end string) (*Summary, error) {
+	var s Summary
 	q := tenant(companyID)
-	if err := q.Model(&model.OrderPayment{}).
-		Where("status = ? AND paid_at BETWEEN ? AND ?", model.PaymentStatusConfirmed, start, end).
-		Select("COALESCE(SUM(amount),0)").Scan(&sum.Revenue).Error; err != nil {
-		return nil, err
-	}
+
 	q.Model(&model.OrderPayment{}).
-		Where("status = ? AND type = ? AND paid_at BETWEEN ? AND ?", model.PaymentStatusConfirmed, "deposit", start, end).
-		Select("COALESCE(SUM(amount),0)").Scan(&sum.DepositIncome)
+		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
+		Select("COALESCE(SUM(amount),0)").Scan(&s.TotalIncome)
+
 	q.Model(&model.OrderPayment{}).
-		Where("status = ? AND type IN (?) AND paid_at BETWEEN ? AND ?", model.PaymentStatusConfirmed, []string{"final", "addon"}, start, end).
-		Select("COALESCE(SUM(amount),0)").Scan(&sum.FinalIncome)
+		Where("status = ? AND type = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), "deposit", start, end).
+		Select("COALESCE(SUM(amount),0)").Scan(&s.DepositTotal)
+
+	q.Model(&model.OrderPayment{}).
+		Where("status = ? AND type IN (?) AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), []string{"final", "addon"}, start, end).
+		Select("COALESCE(SUM(amount),0)").Scan(&s.FinalTotal)
+
 	q.Model(&model.OrderRefund{}).
-		Where("status = ? AND refund_at BETWEEN ? AND ?", model.RefundStatusDone, start, end).
-		Select("COALESCE(SUM(amount),0)").Scan(&sum.RefundTotal)
-	q.Model(&model.Order{}).
-		Where("created_at BETWEEN ? AND ?", start, end).
-		Count(&sum.OrderCount)
-	q.Model(&model.OrderPayment{}).
-		Where("status = ?", model.PaymentStatusPending).
-		Count(&sum.PendingCount)
-	return sum, nil
+		Where("status = ? AND refund_at BETWEEN ? AND ?", int(enum.RefundStatusDone), start, end).
+		Select("COALESCE(SUM(amount),0)").Scan(&s.RefundTotal)
+
+	return &s, nil
 }
 
-// ListPayments 已确认收款列表（分页 + 日期范围）
-func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, startDate, endDate string) ([]model.OrderPayment, int64, error) {
-	q := tenant(companyID).Where("status = ?", model.PaymentStatusConfirmed)
-	if startDate != "" {
-		q = q.Where("paid_at >= ?", startDate+" 00:00:00")
-	}
-	if endDate != "" {
-		q = q.Where("paid_at <= ?", endDate+" 23:59:59")
+func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
+	q := tenant(companyID)
+	if status != "" {
+		q = q.Where("status = ?", status)
+	} else {
+		q = q.Where("status = ?", int(enum.PaymentStatusPending))
 	}
 	var total int64
 	if err := q.Model(&model.OrderPayment{}).Count(&total).Error; err != nil {
@@ -52,40 +55,49 @@ func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, startDat
 	}
 	var list []model.OrderPayment
 	page, pageSize = normalizePage(page, pageSize)
-	if err := q.Order("paid_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
+	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
 }
 
-// ListRefunds 已退款列表（分页 + 日期范围）
-func (r *FinanceRepo) ListRefunds(companyID int64, page, pageSize int, startDate, endDate string) ([]model.OrderRefund, int64, error) {
-	q := tenant(companyID).Where("status = ?", model.RefundStatusDone)
-	if startDate != "" {
-		q = q.Where("refund_at >= ?", startDate+" 00:00:00")
-	}
-	if endDate != "" {
-		q = q.Where("refund_at <= ?", endDate+" 23:59:59")
-	}
+func (r *FinanceRepo) ListRefunds(companyID int64, page, pageSize int) ([]model.OrderRefund, int64, error) {
+	q := tenant(companyID).Where("status = ?", int(enum.RefundStatusDone))
 	var total int64
 	if err := q.Model(&model.OrderRefund{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var list []model.OrderRefund
 	page, pageSize = normalizePage(page, pageSize)
-	if err := q.Order("refund_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
+	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
 }
 
-// FinanceSummary 财务汇总响应
-type FinanceSummary struct {
-	Month         string  `json:"month"`
-	Revenue       float64 `json:"revenue"`
-	DepositIncome float64 `json:"deposit_income"`
-	FinalIncome   float64 `json:"final_income"`
-	RefundTotal   float64 `json:"refund_total"`
-	OrderCount    int64   `json:"order_count"`
-	PendingCount  int64   `json:"pending_count"`
+func (r *FinanceRepo) GetMonthlyStats(companyID int64, year int) ([]MonthlyStat, error) {
+	type row struct {
+		Month  int     `json:"month"`
+		Income float64 `json:"income"`
+		Refund float64 `json:"refund"`
+	}
+	var rows []row
+	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Format("2006-01-02")
+	end := time.Date(year, 12, 31, 23, 59, 59, 0, time.Local).Format("2006-01-02 15:04:05")
+	tenant(companyID).Model(&model.OrderPayment{}).
+		Select("MONTH(paid_at) as month, COALESCE(SUM(amount),0) as income").
+		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
+		Group("MONTH(paid_at)").Scan(&rows)
+
+	var result []MonthlyStat
+	for _, r := range rows {
+		result = append(result, MonthlyStat{Month: r.Month, Income: r.Income, Refund: 0})
+	}
+	return result, nil
+}
+
+type MonthlyStat struct {
+	Month  int     `json:"month"`
+	Income float64 `json:"income"`
+	Refund float64 `json:"refund"`
 }

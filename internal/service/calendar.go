@@ -1,30 +1,19 @@
 package service
 
 import (
-	"errors"
-
-	"gorm.io/gorm"
-
 	"photography-server/internal/common"
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) ListCalendar(op Operator, startDate, endDate string) ([]model.CalendarBlock, error) {
-	return s.CalendarRepo.List(op.CompanyID, startDate, endDate)
+func (s *Service) ListCalendar(op Operator, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
+	return s.CalendarRepo.List(op.CompanyID, startDate, endDate, photographerID)
 }
 
-// LockBlock 锁定档期：校验同一摄影师同一时间段是否已占用
-func (s *Service) LockBlock(op Operator, req dto.CalendarBlockReq) error {
-	count, err := s.CalendarRepo.CountByPhotographer(op.CompanyID, req.Date, req.TimeRange, req.PhotographerID)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return errs.Conflict("该档期已被锁定，请选择其他时间段")
-	}
-	b := model.CalendarBlock{
+func (s *Service) BlockCalendar(op Operator, req dto.CalendarBlockReq) (*model.CalendarBlock, error) {
+	block := model.CalendarBlock{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
@@ -38,21 +27,21 @@ func (s *Service) LockBlock(op Operator, req dto.CalendarBlockReq) error {
 		ProjectType:    req.ProjectType,
 		PhotographerID: req.PhotographerID,
 		Photographer:   req.Photographer,
-		Status:         model.BlockStatusLocked,
 		Remark:         req.Remark,
+		Status:         enum.BlockStatusLocked,
 	}
-	return s.CalendarRepo.Create(&b)
+	if err := s.DB().Create(&block).Error; err != nil {
+		return nil, err
+	}
+	return &block, nil
 }
 
-func (s *Service) CancelBlock(op Operator, id int64) error {
+func (s *Service) CancelCalendarBlock(op Operator, id int64) error {
 	_, err := s.CalendarRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errs.NotFound(common.ErrCalendarNotFound)
-		}
-		return err
+		return errs.NotFound(common.ErrCalendarNotFound)
 	}
 	return s.CalendarRepo.Update(op.CompanyID, id, map[string]interface{}{
-		"status": model.BlockStatusCancelled, "updated_by": op.UserID,
+		"status": enum.BlockStatusCancelled, "updated_by": op.UserID,
 	})
 }

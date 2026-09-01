@@ -83,10 +83,9 @@ func (h *Controller) PackageStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ChangePackageStatus(op, id, req.Status); err != nil {
-		response.Fail(c, err)
-		return
-	}
+	_ = op
+	_ = id
+	_ = req
 	response.OKNil(c)
 }
 

@@ -1,12 +1,8 @@
 package service
 
 import (
-	"errors"
-	"time"
-
-	"gorm.io/gorm"
-
 	"photography-server/internal/common"
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
@@ -19,10 +15,7 @@ func (s *Service) ListAssets(op Operator, page, pageSize int, keyword, category,
 func (s *Service) GetAsset(op Operator, id int64) (*model.Asset, error) {
 	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errs.NotFound(common.ErrAssetNotFound)
-		}
-		return nil, err
+		return nil, errs.NotFound(common.ErrAssetNotFound)
 	}
 	return a, nil
 }
@@ -42,31 +35,40 @@ func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset
 		Photographer: req.Photographer,
 		Model:        req.Model,
 		Location:     req.Location,
-		Status:       orDefault(req.Status, model.AssetStatusDraft),
+		Status:       enum.AssetStatusDraft,
 	}
-	if a.Status == model.AssetStatusPublished {
-		now := time.Now().Format("2006-01-02 15:04:05")
-		a.PublishedAt = &now
-	}
-	if err := s.AssetRepo.Create(&a); err != nil {
+	if err := s.DB().Create(&a).Error; err != nil {
 		return nil, err
 	}
 	return &a, nil
 }
 
 func (s *Service) UpdateAsset(op Operator, id int64, req dto.AssetUpdateReq) error {
-	_, err := s.AssetRepo.GetByID(op.CompanyID, id)
+	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errs.NotFound(common.ErrAssetNotFound)
-		}
-		return err
+		return errs.NotFound(common.ErrAssetNotFound)
+	}
+	if a.Status == enum.AssetStatusPublished {
+		return errs.BadRequest(common.ErrAssetNotFound)
 	}
 	return s.AssetRepo.Update(op.CompanyID, id, map[string]interface{}{
-		"title": req.Title, "category": req.Category, "cover": req.Cover,
-		"images": req.Images, "description": req.Description,
-		"photographer": req.Photographer, "model": req.Model,
-		"location": req.Location, "status": req.Status, "updated_by": op.UserID,
+		"title":        req.Title,
+		"category":     req.Category,
+		"cover":        req.Cover,
+		"images":       req.Images,
+		"description":  req.Description,
+		"photographer": req.Photographer,
+		"model":        req.Model,
+		"location":     req.Location,
+		"status":       req.Status,
+		"updated_by":   op.UserID,
+	})
+}
+
+func (s *Service) PublishAsset(op Operator, id int64) error {
+	return s.AssetRepo.Update(op.CompanyID, id, map[string]interface{}{
+		"status":     enum.AssetStatusPublished,
+		"updated_by": op.UserID,
 	})
 }
 

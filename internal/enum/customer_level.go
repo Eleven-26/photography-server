@@ -4,17 +4,17 @@ package enum
 type CustomerLevel int
 
 const (
-	CustomerLevelNormal CustomerLevel = 1 // 普通
-	CustomerLevelSilver CustomerLevel = 2 // 银卡
-	CustomerLevelGold   CustomerLevel = 3 // 金卡
-	CustomerLevelSVIP   CustomerLevel = 4 // SVIP
+	CustomerLevelNormal   CustomerLevel = 1 // 普通
+	CustomerLevelGold     CustomerLevel = 2 // 黄金
+	CustomerLevelPlatinum CustomerLevel = 3 // 铂金
+	CustomerLevelDiamond  CustomerLevel = 4 // 钻石
 )
 
 var customerLevelName = map[CustomerLevel]string{
-	CustomerLevelNormal: "普通",
-	CustomerLevelSilver: "银卡",
-	CustomerLevelGold:   "金卡",
-	CustomerLevelSVIP:   "SVIP",
+	CustomerLevelNormal:   "普通",
+	CustomerLevelGold:     "黄金",
+	CustomerLevelPlatinum: "铂金",
+	CustomerLevelDiamond:  "钻石",
 }
 
 func CustomerLevelName(level CustomerLevel) string {

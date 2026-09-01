@@ -4,14 +4,16 @@ package enum
 type PaymentStatus int
 
 const (
-	PaymentStatusPending   PaymentStatus = 1 // 待确认
+	PaymentStatusPending   PaymentStatus = 1 // 待核验
 	PaymentStatusConfirmed PaymentStatus = 2 // 已确认
-	PaymentStatusRefunded  PaymentStatus = 3 // 已退款
+	PaymentStatusUnpaid    PaymentStatus = 3 // 待支付
+	PaymentStatusRefunded  PaymentStatus = 4 // 已退款
 )
 
 var paymentStatusName = map[PaymentStatus]string{
-	PaymentStatusPending:   "待确认",
+	PaymentStatusPending:   "待核验",
 	PaymentStatusConfirmed: "已确认",
+	PaymentStatusUnpaid:    "待支付",
 	PaymentStatusRefunded:  "已退款",
 }
 

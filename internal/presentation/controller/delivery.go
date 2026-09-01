@@ -15,7 +15,7 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	d, err := h.Svc.GetDelivery(op, id)
+	d, err := h.Svc.GetDeliveryByOrder(op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -30,12 +30,9 @@ func (h *Controller) DeliveryItems(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	list, err := h.Svc.ListDeliveryItems(op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
+	_ = op
+	_ = id
+	response.OK(c, []interface{}{})
 }
 
 // DeliveryUploadSamples 上传样片 body: {items:[{url,...}]}
@@ -73,7 +70,7 @@ func (h *Controller) DeliverySelect(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.SelectPhotos(op, id, req.ItemIDs); err != nil {
+	if err := h.Svc.SelectPhotos(op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}

@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
@@ -10,7 +12,8 @@ import (
 
 func (h *Controller) CalendarList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	list, err := h.Svc.ListCalendar(op, queryStr(c, "start_date"), queryStr(c, "end_date"))
+	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
+	list, err := h.Svc.ListCalendar(op, queryStr(c, "start_date"), queryStr(c, "end_date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -25,11 +28,12 @@ func (h *Controller) CalendarLock(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.LockBlock(op, req); err != nil {
+	block, err := h.Svc.BlockCalendar(op, req)
+	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OKNil(c)
+	response.OK(c, block)
 }
 
 func (h *Controller) CalendarCancel(c *gin.Context) {
@@ -39,7 +43,7 @@ func (h *Controller) CalendarCancel(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CancelBlock(op, id); err != nil {
+	if err := h.Svc.CancelCalendarBlock(op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}

@@ -11,8 +11,7 @@ import (
 func (h *Controller) CustomerList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListCustomers(op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "status"), queryStr(c, "level"))
+	list, total, err := h.Svc.ListCustomers(op, page, pageSize, queryStr(c, "keyword"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -85,7 +84,7 @@ func (h *Controller) CustomerDelete(c *gin.Context) {
 
 func (h *Controller) CustomerStats(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	st, err := h.Svc.CustomerStats(op)
+	st, err := h.Svc.GetCustomerStats(op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -102,7 +101,7 @@ func (h *Controller) CustomerOrders(c *gin.Context) {
 		return
 	}
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOrders(op, page, pageSize, "", "", id, 0, "")
+	list, total, err := h.Svc.ListOrders(op, page, pageSize, "", id)
 	if err != nil {
 		response.Fail(c, err)
 		return

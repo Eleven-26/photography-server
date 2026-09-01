@@ -1,29 +1,21 @@
 package repository
 
 import (
-	"gorm.io/gorm"
-
+	"photography-server/internal/enum"
+	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
+	"photography-server/internal/presentation/dto"
 )
 
 type CustomerRepo struct{}
 
-func NewCustomerRepo() *CustomerRepo {
-	return &CustomerRepo{}
-}
+func NewCustomerRepo() *CustomerRepo { return &CustomerRepo{} }
 
-// List 客户列表（分页 + 关键字 + 状态 + 等级筛选）
-func (r *CustomerRepo) List(companyID int64, page, pageSize int, keyword, status, level string) ([]model.Customer, int64, error) {
+func (r *CustomerRepo) List(companyID int64, page, pageSize int, keyword string) ([]model.Customer, int64, error) {
 	q := tenant(companyID)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
-		q = q.Where("name LIKE ? OR mobile LIKE ? OR wechat LIKE ? OR code LIKE ?", kw, kw, kw, kw)
-	}
-	if status != "" {
-		q = q.Where("status = ?", status)
-	}
-	if level != "" {
-		q = q.Where("level = ?", level)
+		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
 	}
 	var total int64
 	if err := q.Model(&model.Customer{}).Count(&total).Error; err != nil {
@@ -37,50 +29,41 @@ func (r *CustomerRepo) List(companyID int64, page, pageSize int, keyword, status
 	return list, total, nil
 }
 
-// GetByID 根据 ID 查询客户
-func (r *CustomerRepo) GetByID(companyID, id int64) (*model.Customer, error) {
+func (r *CustomerRepo) GetByID(companyID, customerID int64) (*model.Customer, error) {
 	var c model.Customer
-	if err := tenant(companyID).First(&c, id).Error; err != nil {
+	if err := tenant(companyID).First(&c, customerID).Error; err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-// Create 创建客户（支持外部事务）
-func (r *CustomerRepo) Create(tx *gorm.DB, c *model.Customer) error {
-	return tx.Create(c).Error
+func (r *CustomerRepo) Create(c *model.Customer) error {
+	return infrastructure.MySQL().Create(c).Error
 }
 
-// Update 更新客户
-func (r *CustomerRepo) Update(companyID, id int64, updates map[string]interface{}) error {
-	return tenant(companyID).Model(&model.Customer{}).Where("id = ?", id).Updates(updates).Error
+func (r *CustomerRepo) Update(companyID, customerID int64, updates map[string]interface{}) error {
+	return tenant(companyID).Model(&model.Customer{}).Where("id = ?", customerID).Updates(updates).Error
 }
 
-// Delete 删除客户
-func (r *CustomerRepo) Delete(companyID, id int64) error {
-	return tenant(companyID).Delete(&model.Customer{}, id).Error
+func (r *CustomerRepo) Delete(companyID, customerID int64) error {
+	return tenant(companyID).Delete(&model.Customer{}, customerID).Error
 }
 
-// Stats 客户统计
-func (r *CustomerRepo) Stats(companyID int64) (total, active, goldUp int64, err error) {
+func (r *CustomerRepo) GetStats(companyID int64) (*dto.CustomerStatsResp, error) {
+	var resp dto.CustomerStatsResp
 	q := tenant(companyID)
-	if err = q.Model(&model.Customer{}).Count(&total).Error; err != nil {
-		return
-	}
-	if err = q.Model(&model.Customer{}).Where("status = ?", model.CustomerStatusActive).Count(&active).Error; err != nil {
-		return
-	}
-	if err = q.Model(&model.Customer{}).Where("level IN ?", []string{model.CustomerLevelGold, model.CustomerLevelPlatinum, model.CustomerLevelDiamond}).Count(&goldUp).Error; err != nil {
-		return
-	}
-	return
-}
 
-// GetByMobile 根据手机号查询客户
-func (r *CustomerRepo) GetByMobile(companyID int64, mobile string) (*model.Customer, error) {
-	var c model.Customer
-	if err := tenant(companyID).Where("mobile = ?", mobile).First(&c).Error; err != nil {
+	if err := q.Model(&model.Customer{}).Count(&resp.Total).Error; err != nil {
 		return nil, err
 	}
-	return &c, nil
+
+	if err := q.Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusActive).Count(&resp.Active).Error; err != nil {
+		return nil, err
+	}
+
+	if err := q.Model(&model.Customer{}).Where("level IN ?", []enum.CustomerLevel{enum.CustomerLevelGold, enum.CustomerLevelPlatinum, enum.CustomerLevelDiamond}).Count(&resp.GoldUp).Error; err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
 }

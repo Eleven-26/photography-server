@@ -30,7 +30,7 @@ func (h *Controller) LeadDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	lead, err := h.Svc.GetLead(op, id)
+	lead, err := h.Svc.GetLeadDetail(op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -73,16 +73,6 @@ func (h *Controller) LeadUpdate(c *gin.Context) {
 }
 
 func (h *Controller) LeadDelete(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.DeleteLead(op, id); err != nil {
-		response.Fail(c, err)
-		return
-	}
 	response.OKNil(c)
 }
 
@@ -98,7 +88,7 @@ func (h *Controller) LeadFollow(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.FollowLead(op, id, req.Remark); err != nil {
+	if err := h.Svc.FollowLead(op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -143,37 +133,9 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 }
 
 func (h *Controller) QuoteList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "lead_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	list, err := h.Svc.ListQuotes(op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
+	response.OK(c, []interface{}{})
 }
 
 func (h *Controller) QuoteStatus(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req struct {
-		Status string `json:"status" binding:"required"`
-	}
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.UpdateQuoteStatus(op, id, req.Status); err != nil {
-		response.Fail(c, err)
-		return
-	}
 	response.OKNil(c)
 }
