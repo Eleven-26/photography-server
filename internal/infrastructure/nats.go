@@ -80,13 +80,7 @@ func (c *NatsClient) ensureStream(name, subj string) {
 	if c == nil || c.js == nil {
 		return
 	}
-	// 查询 stream 是否存在
-	_, err := c.js.StreamInfo(name)
-	if err == nil {
-		return // 已存在
-	}
-	// 创建 stream
-	_, err = c.js.AddStream(&nats.StreamConfig{
+	cfg := &nats.StreamConfig{
 		Name:      name,
 		Subjects:  []string{subj},
 		Storage:   nats.FileStorage,
@@ -95,11 +89,28 @@ func (c *NatsClient) ensureStream(name, subj string) {
 		MaxBytes:  -1,
 		MaxAge:    24 * time.Hour,
 		Replicas:  1,
-	})
+		NoAck:     subj == ">", // 通配符必须设置 NoAck
+	}
+	// 查询 stream 是否存在
+	info, err := c.js.StreamInfo(name)
 	if err != nil {
-		logger.Errorf("create jetStream stream [%s] failed: %v", name, err)
-	} else {
-		logger.Infof("jetStream stream [%s] created", name)
+		// 不存在则创建
+		_, err = c.js.AddStream(cfg)
+		if err != nil {
+			logger.Errorf("create jetStream stream [%s] failed: %v", name, err)
+		} else {
+			logger.Infof("jetStream stream [%s] created", name)
+		}
+		return
+	}
+	// 已存在，检查配置是否一致，不一致则更新
+	if info.Config.Subjects == nil || len(info.Config.Subjects) == 0 || info.Config.Subjects[0] != subj || info.Config.NoAck != cfg.NoAck {
+		_, err = c.js.UpdateStream(cfg)
+		if err != nil {
+			logger.Errorf("update jetStream stream [%s] failed: %v", name, err)
+		} else {
+			logger.Infof("jetStream stream [%s] updated", name)
+		}
 	}
 }
 
