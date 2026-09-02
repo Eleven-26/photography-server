@@ -49,7 +49,7 @@ services:
     ports:
       - "${NATS_PORT:-4222}:4222"
       - "${NATS_MONITOR_PORT:-8222}:8222"
-    command: -c /etc/nats/nats.conf
+    command: ["-c", "/etc/nats/nats.conf", "-js", "-sd", "/data"]
     volumes:
       - ${NATS_CONF_DIR:-./nats/conf}/nats.conf:/etc/nats/nats.conf:ro
       - ${NATS_DATA_DIR:-./nats/data}:/data
