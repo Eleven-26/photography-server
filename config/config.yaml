@@ -41,9 +41,9 @@ upload:
 
 xxljob:
   enable: true
-  server_addr: http://127.0.0.1:8080/xxl-job-admin
-  access_token: ""
-  executor_ip: 127.0.0.1
-  executor_port: "9999"
-  registry_key: photography-server
+  server_addr: http://127.0.0.1:9100 # xxl-job 地址
+  access_token: default_token # 确保已创建容器时的一致
+  executor_ip: host.docker.internal # 回调的go程序地址，不能用127.0.0.1，这个指向了xxl-job容器本身，go不在该容器内
+  executor_port: "9999" # 回调的go程序所在主机的端口
+  registry_key: photography-server # 确保与 Admin 后台执行器管理的 AppName 一致
   log_dir: ./logs/xxl-job

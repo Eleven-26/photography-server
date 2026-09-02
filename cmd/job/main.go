@@ -14,6 +14,7 @@ import (
 	"photography-server/internal/pkg/logger"
 )
 
+// 这个可以单独启动调试，上线时无需启动，因为在主程序main有启动
 func main() {
 	var configPath string
 	var profile string
