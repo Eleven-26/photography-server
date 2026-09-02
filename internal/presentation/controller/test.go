@@ -110,7 +110,7 @@ type natsPubReq struct {
 	Msg     string `json:"msg" binding:"required"`
 }
 
-// NATSPub 发布消息
+// NATSPub 发布消息（非持久化）
 // POST /test/nats/pub
 func (h *Controller) NATSPub(c *gin.Context) {
 	var req natsPubReq
@@ -118,18 +118,49 @@ func (h *Controller) NATSPub(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.NATS() == nil {
+	if h.Svc.NatsClient() == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	if err := h.Svc.NATS().Publish(req.Subject, []byte(req.Msg)); err != nil {
+	if err := h.Svc.NatsClient().Publish(req.Subject, []byte(req.Msg)); err != nil {
 		response.Fail(c, errs.Internal("nats pub 失败: "+err.Error()))
 		return
 	}
-	response.OK(c, gin.H{"subject": req.Subject, "msg": req.Msg})
+	response.OK(c, gin.H{"subject": req.Subject, "msg": req.Msg, "mode": "non-persistent"})
 }
 
-// NATSRequest 发布请求并等待回复（demo 用 inbox）
+// NATSPubPersistent 发布消息（持久化，通过 JetStream）
+// POST /test/nats/pub-persistent
+func (h *Controller) NATSPubPersistent(c *gin.Context) {
+	var req natsPubReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	client := h.Svc.NatsClient()
+	if client == nil {
+		response.Fail(c, errs.Internal("nats 未连接"))
+		return
+	}
+	if !client.IsJetStreamEnabled() {
+		response.Fail(c, errs.Internal("jetStream 未启用"))
+		return
+	}
+	ack, err := client.PublishPersistent(req.Subject, []byte(req.Msg))
+	if err != nil {
+		response.Fail(c, errs.Internal("nats persistent pub 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{
+		"subject":  req.Subject,
+		"msg":      req.Msg,
+		"mode":     "persistent",
+		"stream":   ack.Stream,
+		"sequence": ack.Sequence,
+	})
+}
+
+// NATSRequest 发布请求并等待回复
 // POST /test/nats/request
 func (h *Controller) NATSRequest(c *gin.Context) {
 	var req natsPubReq
@@ -137,22 +168,23 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.NATS() == nil {
+	if h.Svc.NatsClient() == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	msg, err := h.Svc.NATS().Request(req.Subject, []byte(req.Msg), 3*time.Second)
+	data, err := h.Svc.NatsClient().Request(req.Subject, []byte(req.Msg), 3*time.Second)
 	if err != nil {
 		response.Fail(c, errs.Internal("nats request 超时或失败: "+err.Error()))
 		return
 	}
-	response.OK(c, gin.H{"subject": req.Subject, "reply": string(msg.Data)})
+	response.OK(c, gin.H{"subject": req.Subject, "reply": string(data)})
 }
 
 // NATSStatus 检查 NATS 连接状态
 // POST /test/nats/status
 func (h *Controller) NATSStatus(c *gin.Context) {
-	if h.Svc.NATS() == nil {
+	client := h.Svc.NatsClient()
+	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
@@ -166,6 +198,7 @@ func (h *Controller) NATSStatus(c *gin.Context) {
 		"status":    status,
 		"server_id": nc.ConnectedServerId(),
 		"servers":   servers,
+		"jetstream": client.IsJetStreamEnabled(),
 	})
 }
 

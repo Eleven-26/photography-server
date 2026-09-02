@@ -23,19 +23,32 @@ func (c *Consumer) Start() {
 		return
 	}
 
-	// 示例：订单状态变更消费
+	// ===== 非持久化消息消费 =====
+
+	// 测试消费
+	c.subscribe("test.msg", handleTestMsg)
+
+	// 订单状态变更消费
 	c.subscribe("order.status.change", handleOrderStatusChange)
 
-	// 示例：通知消息消费
+	// 通知消息消费
 	c.subscribe("notification.push", handleNotificationPush)
 
-	// 示例：测试消费
-	c.subscribe("test.msg", handleTestMsg)
+	// ===== 持久化消息消费（JetStream） =====
+
+	// 测试持久化消费
+	c.jsSubscribe("test.persistent", handleTestPersistent)
+
+	// 订单创建持久化消费
+	c.jsSubscribe("order.created.persistent", handleOrderCreatedPersistent)
+
+	// 支付回调持久化消费
+	c.jsSubscribe("payment.callback.persistent", handlePaymentCallbackPersistent)
 
 	logger.Infof("nats consumers started")
 }
 
-// subscribe 订阅 subject 并注册回调
+// subscribe 订阅非持久化消息
 func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
 	_, err := c.nc.Subscribe(subject, handler)
 	if err != nil {
@@ -44,6 +57,23 @@ func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
 	}
 	logger.Infof("nats subscribed: %s", subject)
 }
+
+// jsSubscribe 订阅持久化消息（JetStream）
+func (c *Consumer) jsSubscribe(subject string, handler nats.MsgHandler) {
+	js, err := c.nc.JetStream()
+	if err != nil {
+		logger.Warnf("jetStream not available, skip persistent subscribe [%s]: %v", subject, err)
+		return
+	}
+	_, err = js.Subscribe(subject, handler)
+	if err != nil {
+		logger.Errorf("jetStream subscribe [%s] failed: %v", subject, err)
+		return
+	}
+	logger.Infof("jetStream subscribed: %s", subject)
+}
+
+// ======================== 非持久化消息处理 ========================
 
 // handleTestMsg 测试消息消费
 func handleTestMsg(msg *nats.Msg) {
@@ -62,4 +92,35 @@ func handleNotificationPush(msg *nats.Msg) {
 	logger.Infof("[NotificationPush] subject: %s, data: %s", msg.Subject, string(msg.Data))
 	// TODO: 实现通知推送逻辑
 	// 例如：WebSocket 推送、公众号模板消息等
+}
+
+// ======================== 持久化消息处理 ========================
+
+// handleTestPersistent 测试持久化消费
+func handleTestPersistent(msg *nats.Msg) {
+	logger.Infof("[TestPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	// ACK 消息
+	if err := msg.Ack(); err != nil {
+		logger.Errorf("[TestPersistent] ack failed: %v", err)
+	}
+}
+
+// handleOrderCreatedPersistent 订单创建持久化消费
+func handleOrderCreatedPersistent(msg *nats.Msg) {
+	logger.Infof("[OrderCreatedPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	// TODO: 订单创建后的持久化处理
+	// 例如：发送确认通知、记录审计日志等
+	if err := msg.Ack(); err != nil {
+		logger.Errorf("[OrderCreatedPersistent] ack failed: %v", err)
+	}
+}
+
+// handlePaymentCallbackPersistent 支付回调持久化消费
+func handlePaymentCallbackPersistent(msg *nats.Msg) {
+	logger.Infof("[PaymentCallbackPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	// TODO: 支付回调的持久化处理
+	// 例如：更新订单状态、记录支付流水等
+	if err := msg.Ack(); err != nil {
+		logger.Errorf("[PaymentCallbackPersistent] ack failed: %v", err)
+	}
 }

@@ -194,6 +194,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/redis/del", ctl.RedisDel)
 	t.POST("/nats/status", ctl.NATSStatus)
 	t.POST("/nats/pub", ctl.NATSPub)
+	t.POST("/nats/pub-persistent", ctl.NATSPubPersistent)
 	t.POST("/nats/request", ctl.NATSRequest)
 
 	t.POST("/test", ctl.Test)

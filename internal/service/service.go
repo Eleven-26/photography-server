@@ -77,6 +77,11 @@ func (s *Service) NATS() *nats.Conn {
 	return infrastructure.NATS()
 }
 
+// NatsClient 获取 NATS 包装客户端
+func (s *Service) NatsClient() *infrastructure.NatsClient {
+	return infrastructure.GetNatsClient()
+}
+
 // tenant 返回按 company_id 过滤的查询会话，实现 SaaS 多租户隔离
 func (s *Service) tenant(op Operator) *gorm.DB {
 	return s.DB().Where("company_id = ?", op.CompanyID)
