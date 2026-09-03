@@ -15,6 +15,7 @@ type Config struct {
 	DB     DB     `mapstructure:"db"`
 	Redis  Redis  `mapstructure:"redis"`
 	NATS   NATS   `mapstructure:"nats"`
+	Mongo  Mongo  `mapstructure:"mongodb"`
 	Log    Log    `mapstructure:"log"`
 	Upload Upload `mapstructure:"upload"`
 	XxlJob XxlJob `mapstructure:"xxljob"`
@@ -80,6 +81,14 @@ type Redis struct {
 
 type NATS struct {
 	URL string `mapstructure:"url"`
+}
+
+type Mongo struct {
+	Enable   bool   `mapstructure:"enable"`
+	URI      string `mapstructure:"uri"`
+	Database string `mapstructure:"database"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
 type Log struct {

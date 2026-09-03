@@ -202,6 +202,14 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/es/search", ctl.ESSearch)
 	t.POST("/es/list", ctl.ESList)
 	t.POST("/es/delete", ctl.ESDelete)
+	t.POST("/mongo/status", ctl.MongoStatus)
+	t.POST("/mongo/insert", ctl.MongoInsert)
+	t.POST("/mongo/insert-many", ctl.MongoInsertMany)
+	t.POST("/mongo/find", ctl.MongoFind)
+	t.POST("/mongo/find-one", ctl.MongoFindOne)
+	t.POST("/mongo/update", ctl.MongoUpdate)
+	t.POST("/mongo/delete", ctl.MongoDelete)
+	t.POST("/mongo/delete-by-id", ctl.MongoDeleteByID)
 
 	t.POST("/test", ctl.Test)
 }

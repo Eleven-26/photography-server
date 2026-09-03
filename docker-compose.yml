@@ -69,7 +69,7 @@ services:
       XXLJOB_ACCESS_TOKEN: ${XXLJOB_ACCESS_TOKEN:-}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${XXLJOB_ADMIN_EXPOSE_PORT:-9100}:-8080}"
+      - "${XXLJOB_ADMIN_EXPOSE_PORT:-9100}:8080"
     depends_on:
       mysql:
         condition: service_healthy
@@ -99,6 +99,27 @@ services:
     networks:
       - backend-net
 
+  # 文档数据库
+  mongo:
+    image: mongo:${MONGO_VERSION:-7.0}
+    container_name: photography-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-}
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - ${MONGO_DATA_DIR:-./mongo/data}:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: ${MYSQL_HEALTH_INTERVAL:-5s}
+      timeout: ${MYSQL_HEALTH_TIMEOUT:-5s}
+      retries: ${MYSQL_HEALTH_RETRIES:-10}
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   # 后端服务
   backend:
     build:
@@ -117,6 +138,8 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_healthy
+      mongo:
+        condition: service_started
     environment:
       APP_MODE: ${APP_MODE:-release}
       APP_PROFILE: ${APP_PROFILE:-prod}
@@ -142,6 +165,11 @@ services:
       APP_ES_URL: ${APP_ES_URL:-http://elasticsearch:9200}
       APP_ES_USERNAME: ${APP_ES_USERNAME:-}
       APP_ES_PASSWORD: ${APP_ES_PASSWORD:-}
+      APP_MONGO_ENABLE: ${APP_MONGO_ENABLE:-false}
+      APP_MONGO_URI: ${APP_MONGO_URI:-mongodb://mongo:27017}
+      APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
+      APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
+      APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

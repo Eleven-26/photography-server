@@ -32,6 +32,13 @@ redis:
 nats:
   url: nats://127.0.0.1:4222
 
+mongodb:
+  enable: true
+  uri: mongodb://127.0.0.1:27017
+  database: photography
+  username: ""
+  password: ""
+
 log:
   level: info
 

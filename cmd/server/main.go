@@ -61,6 +61,10 @@ func main() {
 		logger.Warnf("elasticsearch not available, skipping: %v", err)
 	}
 
+	if err := infrastructure.InitMongoDB(&cfg.Mongo); err != nil {
+		logger.Warnf("mongodb not available, skipping: %v", err)
+	}
+
 	if err := infrastructure.InitXxlJob(cfg); err != nil {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
 	}

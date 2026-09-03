@@ -25,3 +25,4 @@ logs/
 # os
 .DS_Store
 Thumbs.db
+.workbuddy

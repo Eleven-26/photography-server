@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"photography-server/internal/infrastructure"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/response"
 )
@@ -432,4 +435,262 @@ func (h *Controller) ESDelete(c *gin.Context) {
 	var result map[string]interface{}
 	json.Unmarshal(body, &result)
 	response.OK(c, result)
+}
+
+// ======================== MongoDB 示例 ========================
+
+// MongoStatus 检查 MongoDB 连接状态
+// POST /test/mongo/status
+func (h *Controller) MongoStatus(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := h.Svc.Mongo().Ping(ctx, nil); err != nil {
+		response.Fail(c, errs.Internal("mongodb ping 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{"status": "connected"})
+}
+
+type mongoInsertReq struct {
+	Collection string                 `json:"collection" binding:"required"`
+	Doc        map[string]interface{} `json:"doc" binding:"required"`
+}
+
+// MongoInsert 插入单个文档
+// POST /test/mongo/insert
+func (h *Controller) MongoInsert(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoInsertReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := h.Svc.MongoDB().Collection(req.Collection).InsertOne(ctx, req.Doc)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo insert 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{"inserted_id": res.InsertedID})
+}
+
+type mongoInsertManyReq struct {
+	Collection string                   `json:"collection" binding:"required"`
+	Docs       []map[string]interface{} `json:"docs" binding:"required"`
+}
+
+// MongoInsertMany 批量插入文档
+// POST /test/mongo/insert-many
+func (h *Controller) MongoInsertMany(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoInsertManyReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	docs := make([]interface{}, 0, len(req.Docs))
+	for _, d := range req.Docs {
+		docs = append(docs, d)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := h.Svc.MongoDB().Collection(req.Collection).InsertMany(ctx, docs)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo insert-many 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{"inserted_count": len(res.InsertedIDs), "inserted_ids": res.InsertedIDs})
+}
+
+type mongoFindReq struct {
+	Collection string                 `json:"collection" binding:"required"`
+	Filter     map[string]interface{} `json:"filter"` // 查询条件，为空查全部
+	Page       int                    `json:"page"`
+	PageSize   int                    `json:"page_size"`
+}
+
+// MongoFind 查询文档（支持分页）
+// POST /test/mongo/find
+func (h *Controller) MongoFind(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoFindReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
+	filter := req.Filter
+	if filter == nil {
+		filter = bson.M{}
+	}
+	coll := h.Svc.MongoDB().Collection(req.Collection)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 总数
+	total, err := coll.CountDocuments(ctx, filter)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo count 失败: "+err.Error()))
+		return
+	}
+
+	skip := int64((req.Page - 1) * req.PageSize)
+	limit := int64(req.PageSize)
+	opts := options.Find().SetSkip(skip).SetLimit(limit)
+	cursor, err := coll.Find(ctx, filter, opts)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo find 失败: "+err.Error()))
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var docs []map[string]interface{}
+	if err := cursor.All(ctx, &docs); err != nil {
+		response.Fail(c, errs.Internal("mongo decode 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{
+		"total":     total,
+		"page":      req.Page,
+		"page_size": req.PageSize,
+		"list":      docs,
+	})
+}
+
+type mongoFindOneReq struct {
+	Collection string                 `json:"collection" binding:"required"`
+	Filter     map[string]interface{} `json:"filter" binding:"required"`
+}
+
+// MongoFindOne 查询单个文档
+// POST /test/mongo/find-one
+func (h *Controller) MongoFindOne(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoFindOneReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var doc map[string]interface{}
+	err := h.Svc.MongoDB().Collection(req.Collection).FindOne(ctx, req.Filter).Decode(&doc)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo find-one 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, doc)
+}
+
+type mongoUpdateReq struct {
+	Collection string                 `json:"collection" binding:"required"`
+	Filter     map[string]interface{} `json:"filter" binding:"required"`
+	Update     map[string]interface{} `json:"update" binding:"required"`
+}
+
+// MongoUpdate 更新文档（单个）
+// POST /test/mongo/update
+func (h *Controller) MongoUpdate(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoUpdateReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := h.Svc.MongoDB().Collection(req.Collection).UpdateOne(ctx, req.Filter, req.Update)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo update 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{
+		"matched_count":  res.MatchedCount,
+		"modified_count": res.ModifiedCount,
+		"upserted_id":    res.UpsertedID,
+	})
+}
+
+type mongoDeleteReq struct {
+	Collection string                 `json:"collection" binding:"required"`
+	Filter     map[string]interface{} `json:"filter" binding:"required"`
+}
+
+// MongoDelete 删除文档（可删多个）
+// POST /test/mongo/delete
+func (h *Controller) MongoDelete(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoDeleteReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := h.Svc.MongoDB().Collection(req.Collection).DeleteMany(ctx, req.Filter)
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo delete 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{"deleted_count": res.DeletedCount})
+}
+
+type mongoDeleteIDReq struct {
+	Collection string `json:"collection" binding:"required"`
+	ID         string `json:"id" binding:"required"`
+}
+
+// MongoDeleteByID 按 ObjectID 删除文档
+// POST /test/mongo/delete-by-id
+func (h *Controller) MongoDeleteByID(c *gin.Context) {
+	if !infrastructure.MongoIsConnected() {
+		response.Fail(c, errs.Internal("mongodb 未连接"))
+		return
+	}
+	var req mongoDeleteIDReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	oid, err := bson.ObjectIDFromHex(req.ID)
+	if err != nil {
+		response.Fail(c, errs.BadRequest("无效的 ObjectID: "+err.Error()))
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := h.Svc.MongoDB().Collection(req.Collection).DeleteOne(ctx, bson.M{"_id": oid})
+	if err != nil {
+		response.Fail(c, errs.Internal("mongo delete-by-id 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{"deleted_count": res.DeletedCount})
 }

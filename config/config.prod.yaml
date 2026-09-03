@@ -33,6 +33,13 @@ redis:
 nats:
   url: ${APP_NATS_URL:-nats://nats:4222}
 
+mongodb:
+  enable: ${APP_MONGO_ENABLE:-false}
+  uri: ${APP_MONGO_URI:-mongodb://mongo:27017}
+  database: ${APP_MONGO_DATABASE:-photography}
+  username: ${APP_MONGO_USERNAME:-}
+  password: ${APP_MONGO_PASSWORD:-}
+
 log:
   level: warn
 
