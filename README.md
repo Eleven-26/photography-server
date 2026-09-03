@@ -99,9 +99,18 @@ make docker-up / docker-down / docker-build
 主要配置段：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
 
 ## Docker 部署
+```
+把photography-server的 .env.example 复制出来改成 .env（value要改成真实值）
+把photography-server的 docker-compose.yml 复制出来
 
-```bash
-cp .env.example .env   # 按需修改
+目录结构
+pro
+├── photography-server
+├── photography-frontend
+├── docker-compose.yml
+├── .env
+
+在pro目录下执行
 docker compose up -d --build
 ```
 

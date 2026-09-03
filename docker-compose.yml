@@ -59,7 +59,7 @@ services:
 
   # XXL-JOB 任务调度中心
   xxl-job-admin:
-    image: xuxueli/xxl-job-admin:${XXLJOB_ADMIN_VERSION:-latest}
+    image: xuxueli/xxl-job-admin:${XXLJOB_ADMIN_VERSION:-3.4.2}
     container_name: photography-xxl-job-admin
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://${XXLJOB_DB_HOST:-mysql}:${XXLJOB_DB_PORT:-3306}/${XXLJOB_DB_NAME:-xxl_job}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
@@ -79,7 +79,7 @@ services:
 
   # 搜索引擎
   elasticsearch:
-    image: elasticsearch:${ES_VERSION:-8.19.7}
+    image: elasticsearch:${ES_VERSION:-8.19.0}
     container_name: photography-elasticsearch
     environment:
       - discovery.type=single-node
