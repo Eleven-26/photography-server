@@ -11,6 +11,7 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
+- **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
 - **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / 后端 / 前端）
 
@@ -30,25 +31,26 @@ photography-server
 │   ├── 需求文档-摄影工作室管理系统.md
 │   └── sql                 # DDL / DML 建库脚本
 ├── internal
-│   ├── common              # 通用常量
+│   ├── common              # 通用常量（响应码 / 分页 / 上传）
 │   ├── config              # 配置加载（多环境合并 + 环境变量展开）
-│   ├── enum                # 业务枚举
-│   ├── factory             # 数据工厂
+│   ├── domain              # 领域纯函数（订单状态机 / 退款比例 / 编号生成 / 金额取整）
+│   ├── enum                # 业务枚举（int 状态位）
 │   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB）
 │   ├── middleware          # CORS / JWT 认证 / 请求日志 / Recovery / 操作审计
 │   ├── model               # 数据模型（统一 5 固定字段 + company_id 多租户）
-│   ├── pkg                 # logger / errs / jwtpkg
-│   ├── presentation        # 展示层
+│   ├── pkg                 # 基础能力包
+│   │   ├── errs            # 错误类型 + 业务错误文案（统一出口）
+│   │   ├── jwtpkg          # JWT 签发 / 校验
+│   │   └── logger          # 日志封装
+│   ├── presentation        # 外围接入层（HTTP / 定时任务 / 消息消费）
 │   │   ├── controller      # HTTP 控制器
 │   │   ├── dto             # 接口入参和出参的结构体
 │   │   ├── job             # XXL-JOB 任务
-│   │   ├── mq              # NATS 消费者
-│   │   ├── openapi         # 开放接口
-│   │   └── wechat          # 微信相关
-│   ├── repository          # 数据访问层
+│   │   └── mq              # NATS 消费者
+│   ├── repository          # 数据访问层（WithTx 事务透传 + company_id 租户过滤）
 │   ├── response            # 统一响应
 │   ├── router              # 路由（pc/miniapp/app/h5 分组）
-│   └── service             # 业务服务层
+│   └── service             # 业务服务层（只经 repository/domain 访问数据，不直连基础设施）
 ├── uploads                 # 上传文件目录（运行时生成）
 ├── Dockerfile
 ├── docker-compose.yml
@@ -134,9 +136,9 @@ docker compose up -d --build
 - 路由风格：`POST /{pc|miniapp|app|h5}/{module}/{action}[/:id]`（业务接口均需 JWT）
 - 完整接口清单见 `docs/需求文档-摄影工作室管理系统.md`
 
-### 测试接口（`/test/*`，需登录，生产可下线）
+### 调试接口（`/test/*`，仅 dev/test 注册）
 
-用于验证各基础设施连通性：
+用于验证各基础设施连通性：直连基础设施单例、不挂业务鉴权；路由仅在非 `release` 模式注册，生产自动下线。
 
 | 模块 | 接口 |
 |------|------|
@@ -145,6 +147,19 @@ docker compose up -d --build
 | Elasticsearch | `/test/es/status` `/index` `/search` `/list` `/delete` |
 | MongoDB | `/test/mongo/status` `/insert` `/insert-many` `/find` `/find-one` `/update` `/delete` `/delete-by-id` |
 
+## 单元测试
+
+测试与被测代码同目录同包放置（Go 惯例，白盒可测未导出实现），`make test` 即 `go test ./...`：
+
+| 包 | 文件 | 覆盖 |
+|---|---|---|
+| `internal/domain` | `domain_test.go` | 订单状态机流转 / 回退边界、退款四档与临界时间、金额取整、编号格式 |
+| `internal/repository` | `order_repo_test.go`、`base_test.go` | 事务 WithTx 提交与回滚、CAS 条件更新、company_id 租户过滤、行锁读（FOR UPDATE）、分页归一化 |
+
+- repository 测试经 go-sqlmock 注入 mock MySQL 连接（`newMockRepo` 白盒构造），不依赖真实数据库；
+- 大量静态 mock 数据（如 JSON fixture）按 Go 惯例放各包下 `testdata/`（工具链自动忽略、测试以相对路径读取），无需另建 test 目录；
+- 需真实中间件、不进主链路的集成 / E2E 测试，才建议独立目录 + build tag（如 `test/integration`），当前仓库无此场景。
+
 ## 核心业务规则速览
 
 - 定金 = 基础套餐价 × 定金比例；加选精修费全部计入尾款。
@@ -152,4 +167,5 @@ docker compose up -d --build
 - 退款按拍摄前小时数分档：≥72h 退 100%、48~72h 退 80%、24~48h 退 50%、<24h 不可退。
 - 套餐被订单引用后改价自动生成新版本（历史订单快照一致）。
 - 取消订单自动释放档期。
-- 多租户：业务查询统一按 `company_id` 隔离（见 `service.tenant`）。
+- 订单状态机 / 退款分档 / 编号生成 / 金额取整等纯业务规则集中在 `internal/domain`（零依赖、可独立单测），service 只做编排。
+- 多租户：数据访问全部收敛在 repository 层并按 `company_id` 过滤；事务以 `repository.Tx` 为唯一入口，service 不持有数据库句柄。
