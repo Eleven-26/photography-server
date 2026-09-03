@@ -3,7 +3,6 @@ package service
 import (
 	"golang.org/x/crypto/bcrypt"
 
-	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
@@ -13,13 +12,13 @@ import (
 func (s *Service) Login(secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
 	u, err := s.AuthRepo.GetByUsername(req.Username)
 	if err != nil {
-		return nil, errs.BadRequest(common.ErrAccountWrong)
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
 	if u.Status != 1 {
-		return nil, errs.Forbidden(common.ErrAccountDisabled)
+		return nil, errs.Forbidden(errs.ErrAccountDisabled)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)) != nil {
-		return nil, errs.BadRequest(common.ErrAccountWrong)
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
 
 	token, err := jwtpkg.Generate(secret, issuer, expireHours, jwtpkg.Claims{
@@ -41,7 +40,7 @@ func (s *Service) Login(secret, issuer string, expireHours int, req dto.LoginReq
 func (s *Service) Profile(op Operator) (*model.SysUser, error) {
 	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrUserNotFound)
+		return nil, errs.NotFound(errs.ErrUserNotFound)
 	}
 	u.Password = ""
 	return u, nil
@@ -50,10 +49,10 @@ func (s *Service) Profile(op Operator) (*model.SysUser, error) {
 func (s *Service) ChangePassword(op Operator, oldPwd, newPwd string) error {
 	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
 	if err != nil {
-		return errs.NotFound(common.ErrUserNotFound)
+		return errs.NotFound(errs.ErrUserNotFound)
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(oldPwd)) != nil {
-		return errs.BadRequest(common.ErrPasswordWrong)
+		return errs.BadRequest(errs.ErrPasswordWrong)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
 	if err != nil {

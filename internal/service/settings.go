@@ -5,7 +5,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
@@ -22,7 +21,7 @@ func (s *Service) Workspace(op Operator) (*Workspace, error) {
 	c, err := s.SettingsRepo.GetCompany(op.CompanyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errs.NotFound(common.ErrCompanyNotFound)
+			return nil, errs.NotFound(errs.ErrCompanyNotFound)
 		}
 		return nil, err
 	}
@@ -72,7 +71,7 @@ func (s *Service) UpdatePaymentMethod(op Operator, id int64, req dto.PaymentMeth
 	_, err := s.SettingsRepo.GetPaymentMethodByID(op.CompanyID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errs.NotFound(common.ErrPaymentMethodNotFound)
+			return errs.NotFound(errs.ErrPaymentMethodNotFound)
 		}
 		return err
 	}

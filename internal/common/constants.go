@@ -21,11 +21,3 @@ const (
 const (
 	MaxUploadSizeMB = 100
 )
-
-// 退款比例（按拍摄前小时数）
-const (
-	RefundRatioFull = 1.0 // >=72h 全额
-	RefundRatio80   = 0.8 // >=48h 退80%
-	RefundRatio50   = 0.5 // >=24h 退50%
-	RefundRatioNone = 0   // <24h 不退
-)

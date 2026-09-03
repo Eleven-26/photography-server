@@ -1,7 +1,6 @@
 package service
 
 import (
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -16,7 +15,7 @@ func (s *Service) ListCustomers(op Operator, page, pageSize int, keyword string)
 func (s *Service) GetCustomer(op Operator, id int64) (*model.Customer, error) {
 	c, err := s.CustomerRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrCustomerNotFound)
+		return nil, errs.NotFound(errs.ErrCustomerNotFound)
 	}
 	return c, nil
 }
@@ -50,7 +49,7 @@ func (s *Service) CreateCustomer(op Operator, req dto.CustomerCreateReq) (*model
 func (s *Service) UpdateCustomer(op Operator, id int64, req dto.CustomerUpdateReq) error {
 	_, err := s.CustomerRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrCustomerNotFound)
+		return errs.NotFound(errs.ErrCustomerNotFound)
 	}
 	return s.CustomerRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"store_id":   req.StoreID,

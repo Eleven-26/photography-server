@@ -5,7 +5,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -17,10 +16,10 @@ import (
 func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrOrderNotFound)
+		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
-		return nil, errs.BadRequest(common.ErrOrderCompleted)
+		return nil, errs.BadRequest(errs.ErrOrderCompleted)
 	}
 
 	p := model.OrderPayment{
@@ -49,10 +48,10 @@ func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreat
 func (s *Service) ConfirmPayment(op Operator, id int64) error {
 	p, err := s.OrderRepo.GetPaymentByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrPaymentNotFound)
+		return errs.NotFound(errs.ErrPaymentNotFound)
 	}
 	if p.Status == enum.PaymentStatusConfirmed {
-		return errs.BadRequest(common.ErrPaymentConfirmed)
+		return errs.BadRequest(errs.ErrPaymentConfirmed)
 	}
 
 	return repository.Tx(func(tx *gorm.DB) error {
@@ -61,7 +60,7 @@ func (s *Service) ConfirmPayment(op Operator, id int64) error {
 		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认）
 		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(op.CompanyID, p.OrderID)
 		if err != nil {
-			return errs.NotFound(common.ErrOrderNotFound)
+			return errs.NotFound(errs.ErrOrderNotFound)
 		}
 
 		// 2. 收款记录置为已确认（CAS：仅当仍为待核验时生效，防并发重复确认）
@@ -74,7 +73,7 @@ func (s *Service) ConfirmPayment(op Operator, id int64) error {
 			return err
 		}
 		if !ok {
-			return errs.BadRequest(common.ErrPaymentConfirmed)
+			return errs.BadRequest(errs.ErrPaymentConfirmed)
 		}
 
 		// 3. 累加订单已收金额（带租户过滤，同一事务连接）

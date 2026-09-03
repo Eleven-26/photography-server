@@ -5,7 +5,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -17,10 +16,10 @@ import (
 func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrOrderNotFound)
+		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCancelled {
-		return nil, errs.BadRequest(common.ErrRefundCancelled)
+		return nil, errs.BadRequest(errs.ErrRefundCancelled)
 	}
 
 	amount := req.Amount
@@ -28,7 +27,7 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 		amount = o.PaidAmt
 	}
 	if amount <= 0 {
-		return nil, errs.BadRequest(common.ErrRefundZero)
+		return nil, errs.BadRequest(errs.ErrRefundZero)
 	}
 
 	shootDate := ""
@@ -40,7 +39,7 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 	ratio, rule := domain.RefundRatio(time.Duration(hoursBeforeShoot) * time.Hour)
 	refundAmt := domain.Round2(amount * ratio)
 	if refundAmt <= 0 {
-		return nil, errs.BadRequest(common.ErrRefundNoTime)
+		return nil, errs.BadRequest(errs.ErrRefundNoTime)
 	}
 
 	rf := model.OrderRefund{
@@ -67,10 +66,10 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark string) error {
 	rf, err := s.OrderRepo.GetRefundByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrRefundNotFound)
+		return errs.NotFound(errs.ErrRefundNotFound)
 	}
 	if rf.Status != enum.RefundStatusApplying {
-		return errs.BadRequest(common.ErrRefundProcessed)
+		return errs.BadRequest(errs.ErrRefundProcessed)
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -91,13 +90,13 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 			return err
 		}
 		if !ok {
-			return errs.BadRequest(common.ErrRefundProcessed)
+			return errs.BadRequest(errs.ErrRefundProcessed)
 		}
 
 		if approved {
 			// 2. 事务内锁定读取订单，避免并发审核导致退款金额重复累加
 			if _, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(op.CompanyID, rf.OrderID); err != nil {
-				return errs.NotFound(common.ErrOrderNotFound)
+				return errs.NotFound(errs.ErrOrderNotFound)
 			}
 			// 3. 累加订单已退金额（带租户过滤，同一事务连接）
 			if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, rf.OrderID, map[string]interface{}{

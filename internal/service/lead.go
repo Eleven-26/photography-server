@@ -3,7 +3,6 @@ package service
 import (
 	"time"
 
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -18,7 +17,7 @@ func (s *Service) ListLeads(op Operator, page, pageSize int, keyword, status str
 func (s *Service) GetLeadDetail(op Operator, id int64) (*model.Lead, error) {
 	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrLeadNotFound)
+		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 	return l, nil
 }
@@ -51,7 +50,7 @@ func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, e
 func (s *Service) UpdateLead(op Operator, id int64, req dto.LeadUpdateReq) error {
 	_, err := s.LeadRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrLeadNotFound)
+		return errs.NotFound(errs.ErrLeadNotFound)
 	}
 	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"name":         req.Name,
@@ -71,7 +70,7 @@ func (s *Service) UpdateLead(op Operator, id int64, req dto.LeadUpdateReq) error
 func (s *Service) FollowLead(op Operator, id int64, req dto.LeadFollowReq) error {
 	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrLeadNotFound)
+		return errs.NotFound(errs.ErrLeadNotFound)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
@@ -85,7 +84,7 @@ func (s *Service) FollowLead(op Operator, id int64, req dto.LeadFollowReq) error
 func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Customer, error) {
 	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrLeadNotFound)
+		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 
 	c := model.Customer{
@@ -115,12 +114,12 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
 	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrLeadNotFound)
+		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 
 	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrPackageNotFound)
+		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
 
 	q := model.Quote{

@@ -24,7 +24,7 @@ func New(svc *service.Service, cfg *config.Config) *Controller {
 // bindJSON 绑定 JSON 请求体
 func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindJSON(obj); err != nil {
-		return errs.BadRequest(common.ErrBadRequest + "：" + err.Error())
+		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
 	}
 	return nil
 }
@@ -32,7 +32,7 @@ func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 // bindQuery 绑定查询参数
 func (h *Controller) bindQuery(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindQuery(obj); err != nil {
-		return errs.BadRequest(common.ErrBadRequest + "：" + err.Error())
+		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
 	}
 	return nil
 }

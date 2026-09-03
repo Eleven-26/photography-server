@@ -1,7 +1,6 @@
 package service
 
 import (
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -16,7 +15,7 @@ func (s *Service) ListPackages(op Operator, page, pageSize int, keyword, status,
 func (s *Service) GetPackage(op Operator, id int64) (*model.Package, error) {
 	p, err := s.PackageRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrPackageNotFound)
+		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
 	return p, nil
 }
@@ -51,10 +50,10 @@ func (s *Service) CreatePackage(op Operator, req dto.PackageReq) (*model.Package
 func (s *Service) UpdatePackage(op Operator, id int64, req dto.PackageReq) error {
 	p, err := s.PackageRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrPackageNotFound)
+		return errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if p.Status == enum.PackageStatusActive {
-		return errs.BadRequest(common.ErrPackageActiveDelete)
+		return errs.BadRequest(errs.ErrPackageActiveDelete)
 	}
 	return s.PackageRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"name":             req.Name,
@@ -75,10 +74,10 @@ func (s *Service) UpdatePackage(op Operator, id int64, req dto.PackageReq) error
 func (s *Service) PublishPackage(op Operator, id int64) error {
 	p, err := s.PackageRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrPackageNotFound)
+		return errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if p.Status == enum.PackageStatusActive {
-		return errs.BadRequest(common.ErrPackageActiveDelete)
+		return errs.BadRequest(errs.ErrPackageActiveDelete)
 	}
 
 	count, _ := s.PackageRepo.CountOrdersByPackage(op.CompanyID, id)
@@ -110,10 +109,10 @@ func (s *Service) PublishPackage(op Operator, id int64) error {
 func (s *Service) OfflinePackage(op Operator, id int64) error {
 	p, err := s.PackageRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrPackageNotFound)
+		return errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if p.Status == enum.PackageStatusActive {
-		return errs.BadRequest(common.ErrPackageActiveDelete)
+		return errs.BadRequest(errs.ErrPackageActiveDelete)
 	}
 	return s.PackageRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"status":     enum.PackageStatusOffline,
@@ -124,10 +123,10 @@ func (s *Service) OfflinePackage(op Operator, id int64) error {
 func (s *Service) DeletePackage(op Operator, id int64) error {
 	p, err := s.PackageRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrPackageNotFound)
+		return errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if p.Status == enum.PackageStatusActive {
-		return errs.BadRequest(common.ErrPackageActiveDelete)
+		return errs.BadRequest(errs.ErrPackageActiveDelete)
 	}
 	return s.PackageRepo.Delete(op.CompanyID, id)
 }

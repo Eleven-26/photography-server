@@ -5,7 +5,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -21,7 +20,7 @@ func (s *Service) ListOrders(op Operator, page, pageSize int, status string, cus
 func (s *Service) GetOrderDetail(op Operator, id int64) (*dto.OrderDetail, error) {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrOrderNotFound)
+		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 	payments, _ := s.OrderRepo.ListPayments(op.CompanyID, id)
 	refunds, _ := s.OrderRepo.ListRefunds(op.CompanyID, id)
@@ -40,7 +39,7 @@ func (s *Service) GetOrderDetail(op Operator, id int64) (*dto.OrderDetail, error
 func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order, error) {
 	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrPackageNotFound)
+		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
 
 	o := model.Order{
@@ -128,10 +127,10 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 func (s *Service) UpdateOrder(op Operator, id int64, req dto.OrderUpdateReq) error {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrOrderNotFound)
+		return errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
-		return errs.BadRequest(common.ErrOrderCompleted)
+		return errs.BadRequest(errs.ErrOrderCompleted)
 	}
 	return s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"shoot_date":      req.ShootDate,
@@ -147,11 +146,11 @@ func (s *Service) UpdateOrder(op Operator, id int64, req dto.OrderUpdateReq) err
 func (s *Service) ChangeOrderStatus(op Operator, id int64, to enum.OrderStatus, content string) error {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrOrderNotFound)
+		return errs.NotFound(errs.ErrOrderNotFound)
 	}
 	from := o.Status
 	if !domain.OrderCanTransit(from, to) {
-		return errs.BadRequest(common.ErrOrderStatusInvalid)
+		return errs.BadRequest(errs.ErrOrderStatusInvalid)
 	}
 
 	if err := s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{"status": to, "updated_by": op.UserID}); err != nil {

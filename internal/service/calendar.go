@@ -1,7 +1,6 @@
 package service
 
 import (
-	"photography-server/internal/common"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -39,7 +38,7 @@ func (s *Service) BlockCalendar(op Operator, req dto.CalendarBlockReq) (*model.C
 func (s *Service) CancelCalendarBlock(op Operator, id int64) error {
 	_, err := s.CalendarRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrCalendarNotFound)
+		return errs.NotFound(errs.ErrCalendarNotFound)
 	}
 	return s.CalendarRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"status": enum.BlockStatusCancelled, "updated_by": op.UserID,

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -16,7 +15,7 @@ func (s *Service) ListAssets(op Operator, page, pageSize int, keyword, category,
 func (s *Service) GetAsset(op Operator, id int64) (*model.Asset, error) {
 	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrAssetNotFound)
+		return nil, errs.NotFound(errs.ErrAssetNotFound)
 	}
 	return a, nil
 }
@@ -47,10 +46,10 @@ func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset
 func (s *Service) UpdateAsset(op Operator, id int64, req dto.AssetUpdateReq) error {
 	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrAssetNotFound)
+		return errs.NotFound(errs.ErrAssetNotFound)
 	}
 	if a.Status == enum.AssetStatusPublished {
-		return errs.BadRequest(common.ErrAssetNotFound)
+		return errs.BadRequest(errs.ErrAssetNotFound)
 	}
 	return s.AssetRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"title":        req.Title,

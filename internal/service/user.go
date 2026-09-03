@@ -3,7 +3,6 @@ package service
 import (
 	"golang.org/x/crypto/bcrypt"
 
-	"photography-server/internal/common"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
@@ -23,7 +22,7 @@ func (s *Service) ListUsers(op Operator, page, pageSize int, keyword string, sto
 func (s *Service) CreateUser(op Operator, req dto.UserCreateReq) error {
 	count, _ := s.UserRepo.CountByUsername(op.CompanyID, req.Username)
 	if count > 0 {
-		return errs.Conflict(common.ErrUserDuplicate)
+		return errs.Conflict(errs.ErrUserDuplicate)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -51,7 +50,7 @@ func (s *Service) CreateUser(op Operator, req dto.UserCreateReq) error {
 func (s *Service) UpdateUser(op Operator, id int64, req dto.UserUpdateReq) error {
 	_, err := s.UserRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrUserNotFound)
+		return errs.NotFound(errs.ErrUserNotFound)
 	}
 	return s.UserRepo.Update(op.CompanyID, id, map[string]interface{}{
 		"store_id":   req.StoreID,
@@ -67,7 +66,7 @@ func (s *Service) UpdateUser(op Operator, id int64, req dto.UserUpdateReq) error
 
 func (s *Service) DeleteUser(op Operator, id int64) error {
 	if id == op.UserID {
-		return errs.BadRequest(common.ErrUserSelfDelete)
+		return errs.BadRequest(errs.ErrUserSelfDelete)
 	}
 	return s.UserRepo.Delete(op.CompanyID, id)
 }
@@ -75,7 +74,7 @@ func (s *Service) DeleteUser(op Operator, id int64) error {
 func (s *Service) ResetPassword(op Operator, id int64, pwd string) error {
 	_, err := s.UserRepo.GetByID(op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound(common.ErrUserNotFound)
+		return errs.NotFound(errs.ErrUserNotFound)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
 	if err != nil {

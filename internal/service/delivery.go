@@ -1,7 +1,6 @@
 package service
 
 import (
-	"photography-server/internal/common"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -12,7 +11,7 @@ import (
 func (s *Service) CreateDelivery(op Operator, orderID int64) (*model.Delivery, error) {
 	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
 	if err != nil {
-		return nil, errs.NotFound(common.ErrOrderNotFound)
+		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 
 	d := model.Delivery{
@@ -39,10 +38,10 @@ func (s *Service) GetDeliveryByOrder(op Operator, orderID int64) (*model.Deliver
 func (s *Service) UploadSamples(op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
 	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
 	if err != nil {
-		return errs.NotFound(common.ErrDeliveryNotFound)
+		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
 	if d.Stage != enum.DeliveryStagePendingSamples {
-		return errs.BadRequest(common.ErrDeliveryStageInvalid)
+		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
 	}
 
 	for _, item := range items {
@@ -73,10 +72,10 @@ func (s *Service) UploadSamples(op Operator, deliveryID int64, items []dto.Deliv
 func (s *Service) SelectPhotos(op Operator, deliveryID int64, req dto.DeliverySelectReq) error {
 	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
 	if err != nil {
-		return errs.NotFound(common.ErrDeliveryNotFound)
+		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
 	if d.Stage != enum.DeliveryStageSelecting {
-		return errs.BadRequest(common.ErrDeliveryStageInvalid)
+		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
 	}
 
 	for _, itemID := range req.ItemIDs {
@@ -94,7 +93,7 @@ func (s *Service) SelectPhotos(op Operator, deliveryID int64, req dto.DeliverySe
 func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
 	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
 	if err != nil {
-		return errs.NotFound(common.ErrDeliveryNotFound)
+		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
 
 	for _, item := range items {
@@ -125,10 +124,10 @@ func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []dto.Del
 func (s *Service) ConfirmDelivered(op Operator, deliveryID int64) error {
 	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
 	if err != nil {
-		return errs.NotFound(common.ErrDeliveryNotFound)
+		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
 	if d.Stage != enum.DeliveryStagePendingConfirm {
-		return errs.BadRequest(common.ErrDeliveryStageInvalid)
+		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
 	}
 
 	now := "2006-01-02 15:04:05"
