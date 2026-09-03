@@ -11,6 +11,7 @@ import (
 )
 
 const defaultStream = "PHOTOGRAPHY"
+const defaultSubject = "photography.>"
 
 // NatsClient NATS 包装客户端（支持持久化/非持久化发布）
 type NatsClient struct {
@@ -68,7 +69,7 @@ func newNatsClient(nc *nats.Conn) *NatsClient {
 			logger.Warnf("nats jetStream not available, persistent mode disabled: %v", err)
 		} else {
 			c.js = js
-			c.ensureStream(defaultStream, ">")
+			c.ensureStream(defaultStream, defaultSubject)
 			logger.Infof("nats jetStream enabled")
 		}
 	}
@@ -89,7 +90,7 @@ func (c *NatsClient) ensureStream(name, subj string) {
 		MaxBytes:  -1,
 		MaxAge:    24 * time.Hour,
 		Replicas:  1,
-		NoAck:     subj == ">", // 通配符必须设置 NoAck
+		NoAck:     false,
 	}
 	// 查询 stream 是否存在
 	info, err := c.js.StreamInfo(name)
@@ -104,7 +105,7 @@ func (c *NatsClient) ensureStream(name, subj string) {
 		return
 	}
 	// 已存在，检查配置是否一致，不一致则更新
-	if info.Config.Subjects == nil || len(info.Config.Subjects) == 0 || info.Config.Subjects[0] != subj || info.Config.NoAck != cfg.NoAck {
+	if info.Config.Subjects == nil || len(info.Config.Subjects) == 0 || info.Config.Subjects[0] != subj {
 		_, err = c.js.UpdateStream(cfg)
 		if err != nil {
 			logger.Errorf("update jetStream stream [%s] failed: %v", name, err)

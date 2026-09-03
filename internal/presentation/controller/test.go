@@ -146,13 +146,15 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 		response.Fail(c, errs.Internal("jetStream 未启用"))
 		return
 	}
-	ack, err := client.PublishPersistent(req.Subject, []byte(req.Msg))
+	// 自动加 photography. 前缀
+	subject := "photography." + req.Subject
+	ack, err := client.PublishPersistent(subject, []byte(req.Msg))
 	if err != nil {
 		response.Fail(c, errs.Internal("nats persistent pub 失败: "+err.Error()))
 		return
 	}
 	response.OK(c, gin.H{
-		"subject":  req.Subject,
+		"subject":  subject,
 		"msg":      req.Msg,
 		"mode":     "persistent",
 		"stream":   ack.Stream,

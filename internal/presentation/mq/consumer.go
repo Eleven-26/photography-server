@@ -1,6 +1,8 @@
 package mq
 
 import (
+	"strings"
+
 	"github.com/nats-io/nats.go"
 
 	"photography-server/internal/pkg/logger"
@@ -8,12 +10,13 @@ import (
 
 // Consumer NATS 消费者
 type Consumer struct {
-	nc *nats.Conn
+	nc   *nats.Conn
+	subs []*nats.Subscription
 }
 
 // New 创建消费者实例
 func New(nc *nats.Conn) *Consumer {
-	return &Consumer{nc: nc}
+	return &Consumer{nc: nc, subs: make([]*nats.Subscription, 0)}
 }
 
 // Start 启动所有消费者订阅
@@ -27,34 +30,38 @@ func (c *Consumer) Start() {
 
 	// 测试消费
 	c.subscribe("test.msg", handleTestMsg)
-
-	// 订单状态变更消费
 	c.subscribe("order.status.change", handleOrderStatusChange)
-
-	// 通知消息消费
 	c.subscribe("notification.push", handleNotificationPush)
 
 	// ===== 持久化消息消费（JetStream） =====
+	c.jsSubscribe("photography.test.persistent", handleTestPersistent)
+	c.jsSubscribe("photography.order.created.persistent", handleOrderCreatedPersistent)
+	c.jsSubscribe("photography.payment.callback.persistent", handlePaymentCallbackPersistent)
 
-	// 测试持久化消费
-	c.jsSubscribe("test.persistent", handleTestPersistent)
+	logger.Infof("nats consumers started, total subscriptions: %d", len(c.subs))
+}
 
-	// 订单创建持久化消费
-	c.jsSubscribe("order.created.persistent", handleOrderCreatedPersistent)
-
-	// 支付回调持久化消费
-	c.jsSubscribe("payment.callback.persistent", handlePaymentCallbackPersistent)
-
-	logger.Infof("nats consumers started")
+// Stop 停止所有订阅
+func (c *Consumer) Stop() {
+	for _, sub := range c.subs {
+		if sub.IsValid() {
+			if err := sub.Unsubscribe(); err != nil {
+				logger.Errorf("unsubscribe [%s] failed: %v", sub.Subject, err)
+			}
+		}
+	}
+	c.subs = nil
+	logger.Infof("nats consumers stopped")
 }
 
 // subscribe 订阅非持久化消息
 func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
-	_, err := c.nc.Subscribe(subject, handler)
+	sub, err := c.nc.Subscribe(subject, handler)
 	if err != nil {
 		logger.Errorf("nats subscribe [%s] failed: %v", subject, err)
 		return
 	}
+	c.subs = append(c.subs, sub)
 	logger.Infof("nats subscribed: %s", subject)
 }
 
@@ -65,12 +72,20 @@ func (c *Consumer) jsSubscribe(subject string, handler nats.MsgHandler) {
 		logger.Warnf("jetStream not available, skip persistent subscribe [%s]: %v", subject, err)
 		return
 	}
-	_, err = js.Subscribe(subject, handler)
+	// durable 名称不能包含点号
+	durable := strings.ReplaceAll(subject, ".", "_")
+	sub, err := js.Subscribe(subject, handler,
+		nats.Durable(durable),
+		nats.ManualAck(),
+		nats.DeliverAll(),
+		nats.MaxDeliver(3),
+	)
 	if err != nil {
 		logger.Errorf("jetStream subscribe [%s] failed: %v", subject, err)
 		return
 	}
-	logger.Infof("jetStream subscribed: %s", subject)
+	c.subs = append(c.subs, sub)
+	logger.Infof("jetStream subscribed: %s (durable: %s)", subject, durable)
 }
 
 // ======================== 非持久化消息处理 ========================
