@@ -204,6 +204,34 @@ func (h *Controller) NATSStatus(c *gin.Context) {
 	})
 }
 
+// NATSPubPull 发布消息到 Pull 订阅的 subject
+// POST /test/nats/pub-pull
+func (h *Controller) NATSPubPull(c *gin.Context) {
+	var req natsPubReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	client := h.Svc.NatsClient()
+	if client == nil {
+		response.Fail(c, errs.Internal("nats 未连接"))
+		return
+	}
+	subject := "photography." + req.Subject
+	ack, err := client.PublishPersistent(subject, []byte(req.Msg))
+	if err != nil {
+		response.Fail(c, errs.Internal("nats pub-pull 失败: "+err.Error()))
+		return
+	}
+	response.OK(c, gin.H{
+		"subject":  subject,
+		"msg":      req.Msg,
+		"mode":     "pull",
+		"stream":   ack.Stream,
+		"sequence": ack.Sequence,
+	})
+}
+
 func (h *Controller) Test(c *gin.Context) {
 	status := enum.OrderStatusPendingDeposit
 	fmt.Println("当前状态:", status)

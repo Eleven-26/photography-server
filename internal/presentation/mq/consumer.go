@@ -2,6 +2,7 @@ package mq
 
 import (
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 
@@ -10,16 +11,27 @@ import (
 
 // Consumer NATS 消费者
 type Consumer struct {
-	nc   *nats.Conn
-	subs []*nats.Subscription
+	nc       *nats.Conn
+	js       nats.JetStreamContext
+	subs     []*nats.Subscription
+	pullSubs []*nats.Subscription
 }
 
 // New 创建消费者实例
 func New(nc *nats.Conn) *Consumer {
-	return &Consumer{nc: nc, subs: make([]*nats.Subscription, 0)}
+	c := &Consumer{nc: nc, subs: make([]*nats.Subscription, 0)}
+	if nc != nil {
+		js, err := nc.JetStream()
+		if err != nil {
+			logger.Warnf("jetStream not available: %v", err)
+		} else {
+			c.js = js
+		}
+	}
+	return c
 }
 
-// Start 启动所有消费者订阅
+// Start 启动所有消费者（Push + Pull）
 func (c *Consumer) Start() {
 	if c.nc == nil {
 		logger.Warnf("nats not connected, consumer skipped")
@@ -27,34 +39,52 @@ func (c *Consumer) Start() {
 	}
 
 	// ===== 非持久化消息消费 =====
-
-	// 测试消费
 	c.subscribe("test.msg", handleTestMsg)
 	c.subscribe("order.status.change", handleOrderStatusChange)
 	c.subscribe("notification.push", handleNotificationPush)
 
-	// ===== 持久化消息消费（JetStream） =====
+	// ===== JetStream Push 消费（服务启动一次，自动接收） =====
 	c.jsSubscribe("photography.test.persistent", handleTestPersistent)
 	c.jsSubscribe("photography.order.created.persistent", handleOrderCreatedPersistent)
 	c.jsSubscribe("photography.payment.callback.persistent", handlePaymentCallbackPersistent)
 
-	logger.Infof("nats consumers started, total subscriptions: %d", len(c.subs))
+	// ===== JetStream Pull 消费（按需拉取） =====
+	c.jsPullSubscribe("photography.test.pull", handleTestPull)
+	c.jsPullSubscribe("photography.order.pull", handleOrderPull)
+
+	logger.Infof("nats consumers started, push: %d, pull: %d", len(c.subs), len(c.pullSubs))
 }
 
 // Stop 停止所有订阅
 func (c *Consumer) Stop() {
 	for _, sub := range c.subs {
 		if sub.IsValid() {
-			if err := sub.Unsubscribe(); err != nil {
-				logger.Errorf("unsubscribe [%s] failed: %v", sub.Subject, err)
-			}
+			sub.Unsubscribe()
+		}
+	}
+	for _, sub := range c.pullSubs {
+		if sub.IsValid() {
+			sub.Unsubscribe()
 		}
 	}
 	c.subs = nil
+	c.pullSubs = nil
 	logger.Infof("nats consumers stopped")
 }
 
-// subscribe 订阅非持久化消息
+// PullMessages 拉取 Pull 订阅的消息（外部调用）
+func (c *Consumer) PullMessages(subject string, batchSize int) ([]*nats.Msg, error) {
+	for _, sub := range c.pullSubs {
+		if sub.Subject == subject {
+			return sub.Fetch(batchSize)
+		}
+	}
+	return nil, nats.ErrBadSubscription
+}
+
+// ======================== 订阅方法 ========================
+
+// subscribe 非持久化订阅
 func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
 	sub, err := c.nc.Subscribe(subject, handler)
 	if err != nil {
@@ -65,77 +95,92 @@ func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
 	logger.Infof("nats subscribed: %s", subject)
 }
 
-// jsSubscribe 订阅持久化消息（JetStream）
+// jsSubscribe JetStream Push 订阅（服务启动后自动接收消息）
+// 服务只需启动一次，后续有消息自动推送
 func (c *Consumer) jsSubscribe(subject string, handler nats.MsgHandler) {
-	js, err := c.nc.JetStream()
-	if err != nil {
-		logger.Warnf("jetStream not available, skip persistent subscribe [%s]: %v", subject, err)
+	if c.js == nil {
+		logger.Warnf("jetStream not available, skip push subscribe [%s]", subject)
 		return
 	}
-	// durable 名称不能包含点号
-	durable := strings.ReplaceAll(subject, ".", "_")
-	sub, err := js.Subscribe(subject, handler,
+	durable := durableName(subject)
+	sub, err := c.js.Subscribe(subject, handler,
 		nats.Durable(durable),
 		nats.ManualAck(),
 		nats.DeliverAll(),
 		nats.MaxDeliver(3),
+		nats.AckWait(30*time.Second),
 	)
 	if err != nil {
-		logger.Errorf("jetStream subscribe [%s] failed: %v", subject, err)
+		logger.Errorf("jetStream push subscribe [%s] failed: %v", subject, err)
 		return
 	}
 	c.subs = append(c.subs, sub)
-	logger.Infof("jetStream subscribed: %s (durable: %s)", subject, durable)
+	logger.Infof("jetStream push subscribed: %s (durable: %s)", subject, durable)
+}
+
+// jsPullSubscribe JetStream Pull 订阅（按需拉取消息）
+func (c *Consumer) jsPullSubscribe(subject string, handler nats.MsgHandler) {
+	if c.js == nil {
+		logger.Warnf("jetStream not available, skip pull subscribe [%s]", subject)
+		return
+	}
+	durable := durableName(subject)
+	sub, err := c.js.PullSubscribe(subject, durable,
+		nats.DeliverAll(),
+		nats.MaxDeliver(3),
+		nats.AckWait(30*time.Second),
+	)
+	if err != nil {
+		logger.Errorf("jetStream pull subscribe [%s] failed: %v", subject, err)
+		return
+	}
+	c.pullSubs = append(c.pullSubs, sub)
+	logger.Infof("jetStream pull subscribed: %s (durable: %s)", subject, durable)
+}
+
+func durableName(subject string) string {
+	return strings.ReplaceAll(subject, ".", "_")
 }
 
 // ======================== 非持久化消息处理 ========================
 
-// handleTestMsg 测试消息消费
 func handleTestMsg(msg *nats.Msg) {
 	logger.Infof("[TestConsumer] subject: %s, data: %s", msg.Subject, string(msg.Data))
 }
 
-// handleOrderStatusChange 订单状态变更消费
 func handleOrderStatusChange(msg *nats.Msg) {
 	logger.Infof("[OrderStatusChange] subject: %s, data: %s", msg.Subject, string(msg.Data))
-	// TODO: 实现订单状态变更后的通知逻辑
-	// 例如：更新通知表、推送站内信等
 }
 
-// handleNotificationPush 通知推送消费
 func handleNotificationPush(msg *nats.Msg) {
 	logger.Infof("[NotificationPush] subject: %s, data: %s", msg.Subject, string(msg.Data))
-	// TODO: 实现通知推送逻辑
-	// 例如：WebSocket 推送、公众号模板消息等
 }
 
-// ======================== 持久化消息处理 ========================
+// ======================== JetStream Push 消息处理 ========================
 
-// handleTestPersistent 测试持久化消费
 func handleTestPersistent(msg *nats.Msg) {
-	logger.Infof("[TestPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
-	// ACK 消息
-	if err := msg.Ack(); err != nil {
-		logger.Errorf("[TestPersistent] ack failed: %v", err)
-	}
+	logger.Infof("[TestPush] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	msg.Ack()
 }
 
-// handleOrderCreatedPersistent 订单创建持久化消费
 func handleOrderCreatedPersistent(msg *nats.Msg) {
-	logger.Infof("[OrderCreatedPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
-	// TODO: 订单创建后的持久化处理
-	// 例如：发送确认通知、记录审计日志等
-	if err := msg.Ack(); err != nil {
-		logger.Errorf("[OrderCreatedPersistent] ack failed: %v", err)
-	}
+	logger.Infof("[OrderCreatedPush] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	msg.Ack()
 }
 
-// handlePaymentCallbackPersistent 支付回调持久化消费
 func handlePaymentCallbackPersistent(msg *nats.Msg) {
-	logger.Infof("[PaymentCallbackPersistent] subject: %s, data: %s", msg.Subject, string(msg.Data))
-	// TODO: 支付回调的持久化处理
-	// 例如：更新订单状态、记录支付流水等
-	if err := msg.Ack(); err != nil {
-		logger.Errorf("[PaymentCallbackPersistent] ack failed: %v", err)
-	}
+	logger.Infof("[PaymentCallbackPush] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	msg.Ack()
+}
+
+// ======================== JetStream Pull 消息处理 ========================
+
+func handleTestPull(msg *nats.Msg) {
+	logger.Infof("[TestPull] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	msg.Ack()
+}
+
+func handleOrderPull(msg *nats.Msg) {
+	logger.Infof("[OrderPull] subject: %s, data: %s", msg.Subject, string(msg.Data))
+	msg.Ack()
 }
