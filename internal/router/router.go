@@ -186,7 +186,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	up := g.Group("/upload")
 	up.POST("/file", ctl.UploadFile)
 
-	// 测试（Redis / NATS 示例，生产可去掉）
+	// 测试（Redis / NATS / ES 示例，生产可去掉）
 	t := g.Group("/test")
 	t.POST("/redis/ping", ctl.RedisPing)
 	t.POST("/redis/set", ctl.RedisSet)
@@ -197,6 +197,10 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/nats/pub-persistent", ctl.NATSPubPersistent)
 	t.POST("/nats/pub-pull", ctl.NATSPubPull)
 	t.POST("/nats/request", ctl.NATSRequest)
+	t.POST("/es/status", ctl.ESStatus)
+	t.POST("/es/index", ctl.ESIndex)
+	t.POST("/es/search", ctl.ESSearch)
+	t.POST("/es/delete", ctl.ESDelete)
 
 	t.POST("/test", ctl.Test)
 }

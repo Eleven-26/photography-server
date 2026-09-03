@@ -47,3 +47,10 @@ xxljob:
   executor_port: "9999" # 回调的go程序所在主机的端口
   registry_key: photography-server # 确保与 Admin 后台执行器管理的 AppName 一致
   log_dir: ./logs/xxl-job
+
+elasticsearch:
+  enable: true
+  urls:
+    - http://127.0.0.1:9200
+  username: ""
+  password: ""

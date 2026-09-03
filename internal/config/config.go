@@ -18,6 +18,14 @@ type Config struct {
 	Log    Log    `mapstructure:"log"`
 	Upload Upload `mapstructure:"upload"`
 	XxlJob XxlJob `mapstructure:"xxljob"`
+	ES     ES     `mapstructure:"elasticsearch"`
+}
+
+type ES struct {
+	Enable   bool     `mapstructure:"enable"`
+	Urls     []string `mapstructure:"urls"`
+	Username string   `mapstructure:"username"`
+	Password string   `mapstructure:"password"`
 }
 
 type XxlJob struct {

@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"photography-server/internal/enum"
 	"time"
 
@@ -146,7 +149,6 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 		response.Fail(c, errs.Internal("jetStream 未启用"))
 		return
 	}
-	// 自动加 photography. 前缀
 	subject := "photography." + req.Subject
 	ack, err := client.PublishPersistent(subject, []byte(req.Msg))
 	if err != nil {
@@ -237,4 +239,117 @@ func (h *Controller) Test(c *gin.Context) {
 	fmt.Println("当前状态:", status)
 	statusName := enum.OrderStatusName(status)
 	fmt.Println("当前状态名称：", statusName)
+}
+
+// ======================== Elasticsearch 示例 ========================
+
+// ESStatus 检查 ES 连接状态
+// POST /test/es/status
+func (h *Controller) ESStatus(c *gin.Context) {
+	if h.Svc.ES() == nil {
+		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		return
+	}
+	res, err := h.Svc.ES().Info()
+	if err != nil {
+		response.Fail(c, errs.Internal("elasticsearch info 失败: "+err.Error()))
+		return
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	var info map[string]interface{}
+	json.Unmarshal(body, &info)
+	response.OK(c, gin.H{"status": "connected", "info": info})
+}
+
+type esIndexReq struct {
+	Index string      `json:"index" binding:"required"`
+	Body  interface{} `json:"body" binding:"required"`
+}
+
+// ESIndex 创建文档
+// POST /test/es/index
+func (h *Controller) ESIndex(c *gin.Context) {
+	if h.Svc.ES() == nil {
+		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		return
+	}
+	var req esIndexReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	data, _ := json.Marshal(req.Body)
+	res, err := h.Svc.ES().API.Index(req.Index, bytes.NewReader(data))
+	if err != nil {
+		response.Fail(c, errs.Internal("es index 失败: "+err.Error()))
+		return
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	var result map[string]interface{}
+	json.Unmarshal(body, &result)
+	response.OK(c, result)
+}
+
+type esSearchReq struct {
+	Index string `json:"index" binding:"required"`
+	Query string `json:"query" binding:"required"`
+}
+
+// ESSearch 搜索文档
+// POST /test/es/search
+func (h *Controller) ESSearch(c *gin.Context) {
+	if h.Svc.ES() == nil {
+		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		return
+	}
+	var req esSearchReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	query := `{"query":{"match":{"_all":"` + req.Query + `"}}}`
+	res, err := h.Svc.ES().API.Search(
+		h.Svc.ES().API.Search.WithIndex(req.Index),
+		h.Svc.ES().API.Search.WithBody(bytes.NewReader([]byte(query))),
+	)
+	if err != nil {
+		response.Fail(c, errs.Internal("es search 失败: "+err.Error()))
+		return
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	var result map[string]interface{}
+	json.Unmarshal(body, &result)
+	response.OK(c, result)
+}
+
+type esDeleteReq struct {
+	Index string `json:"index" binding:"required"`
+	ID    string `json:"id" binding:"required"`
+}
+
+// ESDelete 删除文档
+// POST /test/es/delete
+func (h *Controller) ESDelete(c *gin.Context) {
+	if h.Svc.ES() == nil {
+		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		return
+	}
+	var req esDeleteReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	res, err := h.Svc.ES().API.Delete(req.Index, req.ID)
+	if err != nil {
+		response.Fail(c, errs.Internal("es delete 失败: "+err.Error()))
+		return
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	var result map[string]interface{}
+	json.Unmarshal(body, &result)
+	response.OK(c, result)
 }

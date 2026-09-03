@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -80,6 +81,11 @@ func (s *Service) NATS() *nats.Conn {
 // NatsClient 获取 NATS 包装客户端
 func (s *Service) NatsClient() *infrastructure.NatsClient {
 	return infrastructure.GetNatsClient()
+}
+
+// ES 获取 Elasticsearch 客户端
+func (s *Service) ES() *elasticsearch.Client {
+	return infrastructure.ES()
 }
 
 // tenant 返回按 company_id 过滤的查询会话，实现 SaaS 多租户隔离

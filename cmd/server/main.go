@@ -57,6 +57,10 @@ func main() {
 		logger.Warnf("nats not available, skipping: %v", err)
 	}
 
+	if err := infrastructure.InitES(&cfg.ES); err != nil {
+		logger.Warnf("elasticsearch not available, skipping: %v", err)
+	}
+
 	if err := infrastructure.InitXxlJob(cfg); err != nil {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
 	}

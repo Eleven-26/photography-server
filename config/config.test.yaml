@@ -41,3 +41,10 @@ xxljob:
   executor_port: "9999"
   registry_key: photography-server
   log_dir: /data/logs/xxl-job
+
+elasticsearch:
+  enable: true
+  urls:
+    - http://test-es:9200
+  username: ""
+  password: ""
