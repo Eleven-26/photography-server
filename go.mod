@@ -3,6 +3,7 @@ module photography-server
 go 1.26.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2 // 仅单元测试使用（repository WithTx/CAS 语义）
 	github.com/elastic/go-elasticsearch/v8 v8.19.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
