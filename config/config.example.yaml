@@ -32,6 +32,14 @@ db:
   max_open_conns: 100
   log_mode: false
 
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+
+nats:
+  url: nats://127.0.0.1:4222
+
 log:
   level: info
 
@@ -47,3 +55,10 @@ xxljob:
   executor_port: "9999"
   registry_key: photography-server
   log_dir: ./logs/xxl-job
+
+elasticsearch:
+  enable: true
+  urls:
+    - http://127.0.0.1:9200
+  username: ""
+  password: ""
