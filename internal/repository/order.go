@@ -62,6 +62,12 @@ func (r *OrderRepo) Update(companyID, orderID int64, updates map[string]interfac
 	return r.tenant(companyID).Model(&model.Order{}).Where("id = ?", orderID).Updates(updates).Error
 }
 
+// Create 创建订单主记录（company_id 由调用方在 model 上填充；
+// 事务内请使用 WithTx(tx).Create(...) 复用事务连接）
+func (r *OrderRepo) Create(o *model.Order) error {
+	return r.conn().Create(o).Error
+}
+
 func (r *OrderRepo) UpdateCalendarBlockStatus(companyID, orderID int64, status enum.BlockStatus) error {
 	return r.tenant(companyID).Model(&model.CalendarBlock{}).Where("order_id = ?", orderID).Update("status", status).Error
 }

@@ -6,13 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/nats-io/nats.go"
-	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"gorm.io/gorm"
 
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/repository"
 )
@@ -27,7 +22,9 @@ type Operator struct {
 	RoleID    int64
 }
 
-// Service 业务服务根结构，按领域拆分到不同文件
+// Service 业务服务根结构，按领域拆分到不同文件。
+// 分层纪律：service 只依赖 repository（数据访问唯一入口），
+// 不持有任何基础设施句柄；开启事务统一走 repository.Tx(...)。
 type Service struct {
 	UploadDir        string
 	AuthRepo         *repository.AuthRepo
@@ -43,6 +40,7 @@ type Service struct {
 	DeliveryRepo     *repository.DeliveryRepo
 	FinanceRepo      *repository.FinanceRepo
 	DashboardRepo    *repository.DashboardRepo
+	UploadRepo       *repository.UploadRepo
 }
 
 func New(uploadDir string) *Service {
@@ -61,48 +59,11 @@ func New(uploadDir string) *Service {
 		DeliveryRepo:     repository.NewDeliveryRepo(),
 		FinanceRepo:      repository.NewFinanceRepo(),
 		DashboardRepo:    repository.NewDashboardRepo(),
+		UploadRepo:       repository.NewUploadRepo(),
 	}
 }
 
-// DB 获取 MySQL 单例
-func (s *Service) DB() *gorm.DB {
-	return infrastructure.MySQL()
-}
-
-// RDB 获取 Redis 单例
-func (s *Service) RDB() *redis.Client {
-	return infrastructure.Redis()
-}
-
-// NATS 获取 NATS 单例
-func (s *Service) NATS() *nats.Conn {
-	return infrastructure.NATS()
-}
-
-// NatsClient 获取 NATS 包装客户端
-func (s *Service) NatsClient() *infrastructure.NatsClient {
-	return infrastructure.GetNatsClient()
-}
-
-// ES 获取 Elasticsearch 客户端
-func (s *Service) ES() *elasticsearch.Client {
-	return infrastructure.ES()
-}
-
-// Mongo 获取 MongoDB 客户端
-func (s *Service) Mongo() *mongo.Client {
-	return infrastructure.Mongo()
-}
-
-// MongoDB 获取 MongoDB 默认数据库
-func (s *Service) MongoDB() *mongo.Database {
-	return infrastructure.MongoDatabase()
-}
-
-// tenant 返回按 company_id 过滤的查询会话，实现 SaaS 多租户隔离
-func (s *Service) tenant(op Operator) *gorm.DB {
-	return s.DB().Where("company_id = ?", op.CompanyID)
-}
+// tenant 按 company_id 过滤的查询会话已下沉到 repository 的 Repo.tenant，service 不再持有 DB 句柄。
 
 func round2(f float64) float64 {
 	return math.Round(f*100) / 100
@@ -159,7 +120,7 @@ func (s *Service) writeOrderLog(orderID int64, action string, from, to interface
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
 	}
-	return s.DB().Create(&log).Error
+	return s.OrderRepo.CreateLog(&log)
 }
 
 func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action string, from, to interface{}, content string, op Operator) error {
@@ -172,5 +133,5 @@ func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action string, fro
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
 	}
-	return tx.Create(&log).Error
+	return s.OrderRepo.WithTx(tx).CreateLog(&log)
 }

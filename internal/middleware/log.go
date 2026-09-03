@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +50,7 @@ func (m *Middlewares) OperationLog() gin.HandlerFunc {
 			Action:   c.GetHeader("X-Action"),
 			Method:   method,
 			Path:     c.Request.URL.Path,
-			Params:   c.Request.URL.RawQuery,
+			Params:   sanitizeQuery(c.Request.URL),
 			IP:       c.ClientIP(),
 			Status:   1,
 			Duration: dur,
@@ -59,4 +61,22 @@ func (m *Middlewares) OperationLog() gin.HandlerFunc {
 		// 异步写入，失败不影响主流程
 		infrastructure.MySQL().Create(&log)
 	}
+}
+
+// sanitizeQuery 序列化请求查询串并剔除敏感参数。
+// 认证支持 ?token=（auth.go），若原样记录 URL.RawQuery 会把 JWT 写入审计库，
+// 这里统一做脱敏：任何含 token/secret/password/sign 的查询参数一律不落库。
+func sanitizeQuery(u *url.URL) string {
+	q := u.Query()
+	if len(q) == 0 {
+		return ""
+	}
+	for k := range q {
+		lower := strings.ToLower(k)
+		if strings.Contains(lower, "token") || strings.Contains(lower, "secret") ||
+			strings.Contains(lower, "password") || strings.Contains(lower, "sign") {
+			q.Del(k)
+		}
+	}
+	return q.Encode()
 }

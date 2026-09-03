@@ -2,9 +2,9 @@ package repository
 
 import (
 	"gorm.io/gorm"
+
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
-	"photography-server/internal/presentation/dto"
 )
 
 type CustomerRepo struct {
@@ -57,21 +57,29 @@ func (r *CustomerRepo) Delete(companyID, customerID int64) error {
 	return r.tenant(companyID).Delete(&model.Customer{}, customerID).Error
 }
 
-func (r *CustomerRepo) GetStats(companyID int64) (*dto.CustomerStatsResp, error) {
-	var resp dto.CustomerStatsResp
+// CustomerStats 客户统计（仓储自持的领域结构，避免反向依赖 presentation/dto）
+type CustomerStats struct {
+	Total  int64
+	Active int64
+	GoldUp int64
+}
+
+// GetStats 客户统计：总数 / 活跃数 / 黄金及以上等级数
+func (r *CustomerRepo) GetStats(companyID int64) (*CustomerStats, error) {
+	var st CustomerStats
 	q := r.tenant(companyID)
 
-	if err := q.Model(&model.Customer{}).Count(&resp.Total).Error; err != nil {
+	if err := q.Model(&model.Customer{}).Count(&st.Total).Error; err != nil {
 		return nil, err
 	}
 
-	if err := q.Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusActive).Count(&resp.Active).Error; err != nil {
+	if err := q.Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusActive).Count(&st.Active).Error; err != nil {
 		return nil, err
 	}
 
-	if err := q.Model(&model.Customer{}).Where("level IN ?", []enum.CustomerLevel{enum.CustomerLevelGold, enum.CustomerLevelPlatinum, enum.CustomerLevelDiamond}).Count(&resp.GoldUp).Error; err != nil {
+	if err := q.Model(&model.Customer{}).Where("level IN ?", []enum.CustomerLevel{enum.CustomerLevelGold, enum.CustomerLevelPlatinum, enum.CustomerLevelDiamond}).Count(&st.GoldUp).Error; err != nil {
 		return nil, err
 	}
 
-	return &resp, nil
+	return &st, nil
 }

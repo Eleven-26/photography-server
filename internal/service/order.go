@@ -10,6 +10,7 @@ import (
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
+	"photography-server/internal/repository"
 )
 
 // orderAllowedTransitions 定义允许的订单状态流转
@@ -80,8 +81,8 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 		PaymentStatus:  enum.PaymentStatusPending,
 	}
 
-	err = s.DB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&o).Error; err != nil {
+	err = repository.Tx(func(tx *gorm.DB) error {
+		if err := s.OrderRepo.WithTx(tx).Create(&o); err != nil {
 			return err
 		}
 
@@ -110,7 +111,7 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 			Photographer:   req.Photographer,
 			Status:         enum.BlockStatusLocked,
 		}
-		if err := tx.Create(&block).Error; err != nil {
+		if err := s.CalendarRepo.WithTx(tx).Create(&block); err != nil {
 			return err
 		}
 

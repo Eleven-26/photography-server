@@ -10,6 +10,7 @@ import (
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
+	"photography-server/internal/repository"
 )
 
 func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
@@ -56,7 +57,7 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 		ApplyBy:    op.UserID,
 		ApplyName:  op.Username,
 	}
-	if err := s.DB().Create(&rf).Error; err != nil {
+	if err := s.OrderRepo.CreateRefund(&rf); err != nil {
 		return nil, err
 	}
 	return &rf, nil
@@ -77,7 +78,7 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 		status = enum.RefundStatusApproved
 	}
 
-	return s.DB().Transaction(func(tx *gorm.DB) error {
+	return repository.Tx(func(tx *gorm.DB) error {
 		// 1. 更新退款单状态（CAS：仅当仍为“申请中”时生效，防并发重复审核）
 		ok, err := s.OrderRepo.WithTx(tx).AuditRefundApplying(op.CompanyID, id, map[string]interface{}{
 			"status":       status,

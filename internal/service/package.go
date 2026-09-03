@@ -41,7 +41,7 @@ func (s *Service) CreatePackage(op Operator, req dto.PackageReq) (*model.Package
 		Status:         enum.PackageStatusDraft,
 		Version:        1,
 	}
-	if err := s.DB().Create(&p).Error; err != nil {
+	if err := s.PackageRepo.Create(&p); err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -90,7 +90,7 @@ func (s *Service) PublishPackage(op Operator, id int64) error {
 		newP.Status = enum.PackageStatusActive
 		newP.CreatedBy = op.UserID
 		newP.UpdatedBy = op.UserID
-		if err := s.DB().Create(&newP).Error; err != nil {
+		if err := s.PackageRepo.Create(&newP); err != nil {
 			return err
 		}
 		return s.PackageRepo.Update(op.CompanyID, id, map[string]interface{}{

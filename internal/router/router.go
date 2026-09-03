@@ -46,6 +46,11 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	registerCommon(app, ctl)
 	registerCommon(h5, ctl)
 
+	// 调试路由：仅非 release（dev/test）环境注册，生产环境不暴露基础设施操作能力
+	if cfg.App.Mode != "release" {
+		registerDebug(api, ctl)
+	}
+
 	return engine
 }
 
@@ -185,8 +190,12 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	// 上传
 	up := g.Group("/upload")
 	up.POST("/file", ctl.UploadFile)
+}
 
-	// 测试（Redis / NATS / ES 示例，生产可去掉）
+// registerDebug 注册基础设施调试路由（Redis / NATS / ES / Mongo 连通性与读写实验）。
+// 仅由 New 在非 release 环境调用；这些处理器直连 infrastructure 单例（调试控制台），
+// 不经过 service 层，也未挂业务鉴权——禁止在生产环境启用。
+func registerDebug(g *gin.RouterGroup, ctl *controller.Controller) {
 	t := g.Group("/test")
 	t.POST("/redis/ping", ctl.RedisPing)
 	t.POST("/redis/set", ctl.RedisSet)

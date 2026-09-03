@@ -38,6 +38,11 @@ func (r *CalendarRepo) GetByID(companyID, blockID int64) (*model.CalendarBlock, 
 	return &b, nil
 }
 
+// Create 创建档期锁（company_id 由调用方在 model 上填充）
+func (r *CalendarRepo) Create(b *model.CalendarBlock) error {
+	return r.conn().Create(b).Error
+}
+
 func (r *CalendarRepo) Update(companyID, blockID int64, updates map[string]interface{}) error {
 	return r.tenant(companyID).Model(&model.CalendarBlock{}).Where("id = ?", blockID).Updates(updates).Error
 }

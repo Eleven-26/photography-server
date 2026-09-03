@@ -55,7 +55,7 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 		Size:     int64(len(data)),
 		UploadBy: op.UserID,
 	}
-	if err := s.tenant(op).Create(&u).Error; err != nil {
+	if err := s.UploadRepo.Create(&u); err != nil {
 		return nil, err
 	}
 	return &UploadResult{URL: url, FileName: fileName, FileType: enum.UploadTypeName(fileType), Size: int64(len(data))}, nil

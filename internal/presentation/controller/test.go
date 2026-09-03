@@ -18,6 +18,11 @@ import (
 	"photography-server/internal/response"
 )
 
+// 注意：本文件是 dev/test 环境专用的「基础设施调试控制台」。
+// 所有处理器直连 infrastructure 单例（Redis/NATS/ES/Mongo），不经过 service 层，
+// 也未挂业务鉴权。路由注册由 router.registerDebug 负责，且仅非 release 环境生效；
+// 请勿在本文件新增任何业务逻辑或将其暴露到生产环境。
+
 // ======================== Redis 示例 ========================
 
 type redisSetReq struct {
@@ -34,13 +39,13 @@ func (h *Controller) RedisSet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.RDB() == nil {
+	if infrastructure.Redis() == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
 	ttl := time.Duration(req.TTL) * time.Second
-	if err := h.Svc.RDB().Set(ctx, req.Key, req.Value, ttl).Err(); err != nil {
+	if err := infrastructure.Redis().Set(ctx, req.Key, req.Value, ttl).Err(); err != nil {
 		response.Fail(c, errs.Internal("redis set 失败: "+err.Error()))
 		return
 	}
@@ -59,12 +64,12 @@ func (h *Controller) RedisGet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.RDB() == nil {
+	if infrastructure.Redis() == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
-	val, err := h.Svc.RDB().Get(ctx, req.Key).Result()
+	val, err := infrastructure.Redis().Get(ctx, req.Key).Result()
 	if err != nil {
 		response.Fail(c, errs.Internal("redis get 失败: "+err.Error()))
 		return
@@ -80,12 +85,12 @@ func (h *Controller) RedisDel(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.RDB() == nil {
+	if infrastructure.Redis() == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
-	n, err := h.Svc.RDB().Del(ctx, req.Key).Result()
+	n, err := infrastructure.Redis().Del(ctx, req.Key).Result()
 	if err != nil {
 		response.Fail(c, errs.Internal("redis del 失败: "+err.Error()))
 		return
@@ -96,13 +101,13 @@ func (h *Controller) RedisDel(c *gin.Context) {
 // RedisPing 测试 Redis 连通性
 // POST /test/redis/ping
 func (h *Controller) RedisPing(c *gin.Context) {
-	if h.Svc.RDB() == nil {
+	if infrastructure.Redis() == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := h.Svc.RDB().Ping(ctx).Err(); err != nil {
+	if err := infrastructure.Redis().Ping(ctx).Err(); err != nil {
 		response.Fail(c, errs.Internal("redis ping 失败: "+err.Error()))
 		return
 	}
@@ -124,11 +129,11 @@ func (h *Controller) NATSPub(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.NatsClient() == nil {
+	if infrastructure.GetNatsClient() == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	if err := h.Svc.NatsClient().Publish(req.Subject, []byte(req.Msg)); err != nil {
+	if err := infrastructure.GetNatsClient().Publish(req.Subject, []byte(req.Msg)); err != nil {
 		response.Fail(c, errs.Internal("nats pub 失败: "+err.Error()))
 		return
 	}
@@ -143,7 +148,7 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	client := h.Svc.NatsClient()
+	client := infrastructure.GetNatsClient()
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
@@ -175,11 +180,11 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if h.Svc.NatsClient() == nil {
+	if infrastructure.GetNatsClient() == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	data, err := h.Svc.NatsClient().Request(req.Subject, []byte(req.Msg), 3*time.Second)
+	data, err := infrastructure.GetNatsClient().Request(req.Subject, []byte(req.Msg), 3*time.Second)
 	if err != nil {
 		response.Fail(c, errs.Internal("nats request 超时或失败: "+err.Error()))
 		return
@@ -190,12 +195,12 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 // NATSStatus 检查 NATS 连接状态
 // POST /test/nats/status
 func (h *Controller) NATSStatus(c *gin.Context) {
-	client := h.Svc.NatsClient()
+	client := infrastructure.GetNatsClient()
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	nc := h.Svc.NATS()
+	nc := infrastructure.NATS()
 	status := "disconnected"
 	if nc.IsConnected() {
 		status = "connected"
@@ -217,7 +222,7 @@ func (h *Controller) NATSPubPull(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	client := h.Svc.NatsClient()
+	client := infrastructure.GetNatsClient()
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
@@ -249,11 +254,11 @@ func (h *Controller) Test(c *gin.Context) {
 // ESStatus 检查 ES 连接状态
 // POST /test/es/status
 func (h *Controller) ESStatus(c *gin.Context) {
-	if h.Svc.ES() == nil {
+	if infrastructure.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
-	res, err := h.Svc.ES().Info()
+	res, err := infrastructure.ES().Info()
 	if err != nil {
 		response.Fail(c, errs.Internal("elasticsearch info 失败: "+err.Error()))
 		return
@@ -273,7 +278,7 @@ type esIndexReq struct {
 // ESIndex 创建文档
 // POST /test/es/index
 func (h *Controller) ESIndex(c *gin.Context) {
-	if h.Svc.ES() == nil {
+	if infrastructure.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -283,7 +288,7 @@ func (h *Controller) ESIndex(c *gin.Context) {
 		return
 	}
 	data, _ := json.Marshal(req.Body)
-	res, err := h.Svc.ES().API.Index(req.Index, bytes.NewReader(data))
+	res, err := infrastructure.ES().API.Index(req.Index, bytes.NewReader(data))
 	if err != nil {
 		response.Fail(c, errs.Internal("es index 失败: "+err.Error()))
 		return
@@ -306,7 +311,7 @@ type esSearchReq struct {
 // 注意：Elasticsearch 7.0+ 已移除 _all 字段，不能再对其做 match 查询。
 // 默认对 title/content 做多字段匹配，也可通过 fields 参数指定字段。
 func (h *Controller) ESSearch(c *gin.Context) {
-	if h.Svc.ES() == nil {
+	if infrastructure.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -335,9 +340,9 @@ func (h *Controller) ESSearch(c *gin.Context) {
 		return
 	}
 
-	res, err := h.Svc.ES().API.Search(
-		h.Svc.ES().API.Search.WithIndex(req.Index),
-		h.Svc.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
+	res, err := infrastructure.ES().API.Search(
+		infrastructure.ES().API.Search.WithIndex(req.Index),
+		infrastructure.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		response.Fail(c, errs.Internal("es search 失败: "+err.Error()))
@@ -359,7 +364,7 @@ type esListReq struct {
 // ESList 查询所有文档（match_all）
 // POST /test/es/list
 func (h *Controller) ESList(c *gin.Context) {
-	if h.Svc.ES() == nil {
+	if infrastructure.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -393,9 +398,9 @@ func (h *Controller) ESList(c *gin.Context) {
 		return
 	}
 
-	res, err := h.Svc.ES().API.Search(
-		h.Svc.ES().API.Search.WithIndex(req.Index),
-		h.Svc.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
+	res, err := infrastructure.ES().API.Search(
+		infrastructure.ES().API.Search.WithIndex(req.Index),
+		infrastructure.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		response.Fail(c, errs.Internal("es list 失败: "+err.Error()))
@@ -416,7 +421,7 @@ type esDeleteReq struct {
 // ESDelete 删除文档
 // POST /test/es/delete
 func (h *Controller) ESDelete(c *gin.Context) {
-	if h.Svc.ES() == nil {
+	if infrastructure.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -425,7 +430,7 @@ func (h *Controller) ESDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	res, err := h.Svc.ES().API.Delete(req.Index, req.ID)
+	res, err := infrastructure.ES().API.Delete(req.Index, req.ID)
 	if err != nil {
 		response.Fail(c, errs.Internal("es delete 失败: "+err.Error()))
 		return
@@ -448,7 +453,7 @@ func (h *Controller) MongoStatus(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := h.Svc.Mongo().Ping(ctx, nil); err != nil {
+	if err := infrastructure.Mongo().Ping(ctx, nil); err != nil {
 		response.Fail(c, errs.Internal("mongodb ping 失败: "+err.Error()))
 		return
 	}
@@ -474,7 +479,7 @@ func (h *Controller) MongoInsert(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := h.Svc.MongoDB().Collection(req.Collection).InsertOne(ctx, req.Doc)
+	res, err := infrastructure.MongoDatabase().Collection(req.Collection).InsertOne(ctx, req.Doc)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo insert 失败: "+err.Error()))
 		return
@@ -505,7 +510,7 @@ func (h *Controller) MongoInsertMany(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := h.Svc.MongoDB().Collection(req.Collection).InsertMany(ctx, docs)
+	res, err := infrastructure.MongoDatabase().Collection(req.Collection).InsertMany(ctx, docs)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo insert-many 失败: "+err.Error()))
 		return
@@ -542,7 +547,7 @@ func (h *Controller) MongoFind(c *gin.Context) {
 	if filter == nil {
 		filter = bson.M{}
 	}
-	coll := h.Svc.MongoDB().Collection(req.Collection)
+	coll := infrastructure.MongoDatabase().Collection(req.Collection)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -596,7 +601,7 @@ func (h *Controller) MongoFindOne(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var doc map[string]interface{}
-	err := h.Svc.MongoDB().Collection(req.Collection).FindOne(ctx, req.Filter).Decode(&doc)
+	err := infrastructure.MongoDatabase().Collection(req.Collection).FindOne(ctx, req.Filter).Decode(&doc)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo find-one 失败: "+err.Error()))
 		return
@@ -624,7 +629,7 @@ func (h *Controller) MongoUpdate(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := h.Svc.MongoDB().Collection(req.Collection).UpdateOne(ctx, req.Filter, req.Update)
+	res, err := infrastructure.MongoDatabase().Collection(req.Collection).UpdateOne(ctx, req.Filter, req.Update)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo update 失败: "+err.Error()))
 		return
@@ -655,7 +660,7 @@ func (h *Controller) MongoDelete(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := h.Svc.MongoDB().Collection(req.Collection).DeleteMany(ctx, req.Filter)
+	res, err := infrastructure.MongoDatabase().Collection(req.Collection).DeleteMany(ctx, req.Filter)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo delete 失败: "+err.Error()))
 		return
@@ -687,7 +692,7 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := h.Svc.MongoDB().Collection(req.Collection).DeleteOne(ctx, bson.M{"_id": oid})
+	res, err := infrastructure.MongoDatabase().Collection(req.Collection).DeleteOne(ctx, bson.M{"_id": oid})
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo delete-by-id 失败: "+err.Error()))
 		return

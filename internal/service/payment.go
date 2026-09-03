@@ -10,6 +10,7 @@ import (
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
+	"photography-server/internal/repository"
 )
 
 func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
@@ -38,7 +39,7 @@ func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreat
 		Status:     enum.PaymentStatusPending,
 	}
 
-	if err := s.DB().Create(&p).Error; err != nil {
+	if err := s.OrderRepo.CreatePayment(&p); err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -53,7 +54,7 @@ func (s *Service) ConfirmPayment(op Operator, id int64) error {
 		return errs.BadRequest(common.ErrPaymentConfirmed)
 	}
 
-	return s.DB().Transaction(func(tx *gorm.DB) error {
+	return repository.Tx(func(tx *gorm.DB) error {
 		now := time.Now().Format("2006-01-02 15:04:05")
 
 		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认）

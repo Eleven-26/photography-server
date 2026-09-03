@@ -41,7 +41,7 @@ func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, e
 		OwnerID:     orDefaultInt64(req.OwnerID, op.UserID),
 		Status:      enum.LeadStatusPending,
 	}
-	if err := s.DB().Create(&l).Error; err != nil {
+	if err := s.LeadRepo.Create(&l); err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -99,7 +99,7 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 		Source:  l.Source,
 		Status:  enum.CustomerStatusPotential,
 	}
-	if err := s.DB().Create(&c).Error; err != nil {
+	if err := s.CustomerRepo.Create(&c); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq)
 		OwnerID:     op.UserID,
 		Status:      enum.QuoteStatusSent,
 	}
-	if err := s.DB().Create(&q).Error; err != nil {
+	if err := s.LeadRepo.CreateQuote(&q); err != nil {
 		return nil, err
 	}
 

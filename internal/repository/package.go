@@ -53,12 +53,10 @@ func (r *PackageRepo) GetByID(companyID, id int64) (*model.Package, error) {
 	return &p, nil
 }
 
-// Create 创建套餐（支持外部事务）
-func (r *PackageRepo) Create(tx *gorm.DB, p *model.Package) error {
-	if tx != nil {
-		return tx.Create(p).Error
-	}
-	return r.tenant(p.CompanyID).Create(p).Error
+// Create 创建套餐（company_id 由调用方在 model 上填充；
+// 事务内请使用 WithTx(tx).Create(...) 复用事务连接）
+func (r *PackageRepo) Create(p *model.Package) error {
+	return r.conn().Create(p).Error
 }
 
 // Update 更新套餐

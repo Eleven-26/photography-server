@@ -15,10 +15,17 @@ type Repo struct {
 }
 
 // WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将共用该连接。
-// 用法：在 service 的 s.DB().Transaction(func(tx *gorm.DB) error {...}) 回调内，
+// 用法：在 repository.Tx(func(tx *gorm.DB) error {...}) 回调内，
 // 用 repo.WithTx(tx).Xxx(...) 替代 repo.Xxx(...)。
 func (r *Repo) WithTx(tx *gorm.DB) *Repo {
 	return &Repo{db: tx}
+}
+
+// Tx 开启一个数据库事务，是业务层开启事务的唯一入口（service 不再持有 DB 句柄）。
+// 回调内所有写操作必须使用 repo.WithTx(tx).Xxx(...) 透传同一连接，
+// 保证跨多张表的写入原子性（任一步返回 error 则整体回滚）。
+func Tx(fn func(tx *gorm.DB) error) error {
+	return infrastructure.MySQL().Transaction(fn)
 }
 
 // conn 返回当前查询应使用的连接：事务连接优先，否则回落到全局单例

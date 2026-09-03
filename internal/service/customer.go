@@ -40,7 +40,7 @@ func (s *Service) CreateCustomer(op Operator, req dto.CustomerCreateReq) (*model
 		Remark:   req.Remark,
 		Avatar:   req.Avatar,
 	}
-	if err := s.DB().Create(&c).Error; err != nil {
+	if err := s.CustomerRepo.Create(&c); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -73,5 +73,14 @@ func (s *Service) DeleteCustomer(op Operator, id int64) error {
 }
 
 func (s *Service) GetCustomerStats(op Operator) (*dto.CustomerStatsResp, error) {
-	return s.CustomerRepo.GetStats(op.CompanyID)
+	st, err := s.CustomerRepo.GetStats(op.CompanyID)
+	if err != nil {
+		return nil, err
+	}
+	// repository 返回自持结构，service 负责映射为对外 dto
+	return &dto.CustomerStatsResp{
+		Total:  st.Total,
+		Active: st.Active,
+		GoldUp: st.GoldUp,
+	}, nil
 }

@@ -25,7 +25,7 @@ func (s *Service) CreateDelivery(op Operator, orderID int64) (*model.Delivery, e
 		CustomerName: o.CustomerName,
 		Stage:        enum.DeliveryStagePendingSamples,
 	}
-	if err := s.DB().Create(&d).Error; err != nil {
+	if err := s.DeliveryRepo.Create(&d); err != nil {
 		return nil, err
 	}
 	return &d, nil

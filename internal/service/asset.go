@@ -37,7 +37,7 @@ func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset
 		Location:     req.Location,
 		Status:       enum.AssetStatusDraft,
 	}
-	if err := s.DB().Create(&a).Error; err != nil {
+	if err := s.AssetRepo.Create(&a); err != nil {
 		return nil, err
 	}
 	return &a, nil

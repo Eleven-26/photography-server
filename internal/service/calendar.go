@@ -30,7 +30,7 @@ func (s *Service) BlockCalendar(op Operator, req dto.CalendarBlockReq) (*model.C
 		Remark:         req.Remark,
 		Status:         enum.BlockStatusLocked,
 	}
-	if err := s.DB().Create(&block).Error; err != nil {
+	if err := s.CalendarRepo.Create(&block); err != nil {
 		return nil, err
 	}
 	return &block, nil
