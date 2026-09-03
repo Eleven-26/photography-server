@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -28,7 +29,7 @@ func (s *Service) CreatePayment(op Operator, orderID int64, req dto.PaymentCreat
 			CompanyID: op.CompanyID,
 		},
 		OrderID:    orderID,
-		Code:       genCode("PM"),
+		Code:       domain.GenCode("PM"),
 		CustomerID: o.CustomerID,
 		Type:       req.Type,
 		Amount:     req.Amount,

@@ -2,6 +2,7 @@ package service
 
 import (
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -26,7 +27,7 @@ func (s *Service) CreateCustomer(op Operator, req dto.CustomerCreateReq) (*model
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:     genCode("CU"),
+		Code:     domain.GenCode("CU"),
 		StoreID:  orDefaultInt64(req.StoreID, op.StoreID),
 		Name:     req.Name,
 		Mobile:   req.Mobile,

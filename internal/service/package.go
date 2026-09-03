@@ -2,6 +2,7 @@ package service
 
 import (
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -26,14 +27,14 @@ func (s *Service) CreatePackage(op Operator, req dto.PackageReq) (*model.Package
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:           genCode("PK"),
+		Code:           domain.GenCode("PK"),
 		StoreID:        orDefaultInt64(req.StoreID, op.StoreID),
 		Name:           req.Name,
 		Cover:          req.Cover,
 		Category:       req.Category,
 		BasePrice:      req.BasePrice,
 		DepositRate:    req.DepositRate,
-		DepositAmt:     round2(req.BasePrice * req.DepositRate / 100),
+		DepositAmt:     domain.Round2(req.BasePrice * req.DepositRate / 100),
 		PhotosIncluded: req.PhotosIncluded,
 		ShootHours:     req.ShootHours,
 		ContentDesc:    req.ContentDesc,
@@ -61,7 +62,7 @@ func (s *Service) UpdatePackage(op Operator, id int64, req dto.PackageReq) error
 		"category":         req.Category,
 		"base_price":       req.BasePrice,
 		"deposit_rate":     req.DepositRate,
-		"deposit_amt":      round2(req.BasePrice * req.DepositRate / 100),
+		"deposit_amt":      domain.Round2(req.BasePrice * req.DepositRate / 100),
 		"photos_included":  req.PhotosIncluded,
 		"shoot_hours":      req.ShootHours,
 		"content_desc":     req.ContentDesc,
@@ -84,7 +85,7 @@ func (s *Service) PublishPackage(op Operator, id int64) error {
 	if count > 0 {
 		newP := *p
 		newP.ID = 0
-		newP.Code = genCode("PK")
+		newP.Code = domain.GenCode("PK")
 		newP.Version = p.Version + 1
 		newP.BaseVersion = p.Version
 		newP.Status = enum.PackageStatusActive

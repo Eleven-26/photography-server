@@ -2,6 +2,7 @@ package service
 
 import (
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -26,7 +27,7 @@ func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:         genCode("WK"),
+		Code:         domain.GenCode("WK"),
 		Title:        req.Title,
 		Category:     req.Category,
 		Cover:        req.Cover,

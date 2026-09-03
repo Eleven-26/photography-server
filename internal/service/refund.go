@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -36,8 +37,8 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 	}
 	shootTime, _ := time.Parse("2006-01-02", shootDate)
 	hoursBeforeShoot := time.Until(shootTime).Hours()
-	ratio, rule := refundRatio(shootDate, time.Duration(hoursBeforeShoot)*time.Hour)
-	refundAmt := round2(amount * ratio)
+	ratio, rule := domain.RefundRatio(time.Duration(hoursBeforeShoot) * time.Hour)
+	refundAmt := domain.Round2(amount * ratio)
 	if refundAmt <= 0 {
 		return nil, errs.BadRequest(common.ErrRefundNoTime)
 	}
@@ -48,7 +49,7 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 			CompanyID: op.CompanyID,
 		},
 		OrderID:    orderID,
-		Code:       genCode("RF"),
+		Code:       domain.GenCode("RF"),
 		CustomerID: o.CustomerID,
 		Amount:     refundAmt,
 		Reason:     req.Reason,

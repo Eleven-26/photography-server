@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -33,7 +34,7 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, errs.Internal("")
 	}
-	name := genCode("UP") + ext
+	name := domain.GenCode("UP") + ext
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return nil, errs.Internal("")

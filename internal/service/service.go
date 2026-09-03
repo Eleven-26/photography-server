@@ -2,9 +2,6 @@ package service
 
 import (
 	"fmt"
-	"math"
-	"math/rand"
-	"time"
 
 	"gorm.io/gorm"
 
@@ -64,10 +61,7 @@ func New(uploadDir string) *Service {
 }
 
 // tenant 按 company_id 过滤的查询会话已下沉到 repository 的 Repo.tenant，service 不再持有 DB 句柄。
-
-func round2(f float64) float64 {
-	return math.Round(f*100) / 100
-}
+// 通用纯函数（金额取整/业务编码/退款比例/订单状态机）已下沉到 internal/domain，service 不再重复实现。
 
 func strPtr(s string) *string {
 	if s == "" {
@@ -88,26 +82,6 @@ func orDefaultInt64(v, def int64) int64 {
 		return def
 	}
 	return v
-}
-
-// genCode 生成业务编号，如 SL-260817-1234
-func genCode(prefix string) string {
-	return fmt.Sprintf("%s-%s-%04d", prefix, time.Now().Format("060102"), rand.Intn(10000))
-}
-
-// refundRatio 根据拍摄时间距现在的时长计算退款比例
-// 规则：>=72小时 全额退款；>=48小时 退80%；>=24小时 退50%；<24小时 不退
-func refundRatio(shootDate string, hoursBeforeShoot time.Duration) (float64, string) {
-	switch {
-	case hoursBeforeShoot >= 72*time.Hour:
-		return 1.0, "shoot_gt_72h"
-	case hoursBeforeShoot >= 48*time.Hour:
-		return 0.8, "shoot_48_72h"
-	case hoursBeforeShoot >= 24*time.Hour:
-		return 0.5, "shoot_24_48h"
-	default:
-		return 0, "shoot_lt_24h"
-	}
 }
 
 func (s *Service) writeOrderLog(orderID int64, action string, from, to interface{}, content string, op Operator) error {

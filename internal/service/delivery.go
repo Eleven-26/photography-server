@@ -2,6 +2,7 @@ package service
 
 import (
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -19,7 +20,7 @@ func (s *Service) CreateDelivery(op Operator, orderID int64) (*model.Delivery, e
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:         genCode("DV"),
+		Code:         domain.GenCode("DV"),
 		OrderID:      orderID,
 		CustomerID:   o.CustomerID,
 		CustomerName: o.CustomerName,

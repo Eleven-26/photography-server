@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
@@ -28,7 +29,7 @@ func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, e
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:        genCode("LD"),
+		Code:        domain.GenCode("LD"),
 		StoreID:     op.StoreID,
 		Name:        req.Name,
 		Mobile:      req.Mobile,
@@ -92,7 +93,7 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:    genCode("CU"),
+		Code:    domain.GenCode("CU"),
 		StoreID: l.StoreID,
 		Name:    l.Name,
 		Mobile:  l.Mobile,
@@ -127,7 +128,7 @@ func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq)
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:        genCode("QT"),
+		Code:        domain.GenCode("QT"),
 		LeadID:      leadID,
 		CustomerID:  l.CustomerID,
 		PackageID:   req.PackageID,

@@ -6,23 +6,13 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/common"
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
-
-// orderAllowedTransitions 定义允许的订单状态流转
-var orderAllowedTransitions = map[enum.OrderStatus][]enum.OrderStatus{
-	enum.OrderStatusPendingDeposit:  {enum.OrderStatusPendingShoot, enum.OrderStatusCancelled},
-	enum.OrderStatusPendingShoot:    {enum.OrderStatusShooting, enum.OrderStatusCancelled},
-	enum.OrderStatusShooting:        {enum.OrderStatusRetouching, enum.OrderStatusCancelled},
-	enum.OrderStatusRetouching:      {enum.OrderStatusPendingDelivery, enum.OrderStatusCancelled},
-	enum.OrderStatusPendingDelivery: {enum.OrderStatusCompleted, enum.OrderStatusCancelled},
-	enum.OrderStatusCompleted:       {},
-	enum.OrderStatusCancelled:       {},
-}
 
 func (s *Service) ListOrders(op Operator, page, pageSize int, status string, customerID int64) ([]model.Order, int64, error) {
 	return s.OrderRepo.List(op.CompanyID, page, pageSize, status, customerID)
@@ -58,7 +48,7 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
 			CompanyID: op.CompanyID,
 		},
-		Code:           genCode("SL"),
+		Code:           domain.GenCode("SL"),
 		StoreID:        op.StoreID,
 		CustomerID:     req.CustomerID,
 		QuoteID:        req.QuoteID,
@@ -67,9 +57,9 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 		PackageVersion: pkg.Version,
 		BasePrice:      pkg.BasePrice,
 		AddonAmount:    req.AddonAmount,
-		DepositAmt:     round2(pkg.BasePrice * pkg.DepositRate / 100),
-		FinalAmt:       round2(pkg.BasePrice - pkg.BasePrice*pkg.DepositRate/100 + req.AddonAmount),
-		TotalAmt:       round2(pkg.BasePrice + req.AddonAmount),
+		DepositAmt:     domain.Round2(pkg.BasePrice * pkg.DepositRate / 100),
+		FinalAmt:       domain.Round2(pkg.BasePrice - pkg.BasePrice*pkg.DepositRate/100 + req.AddonAmount),
+		TotalAmt:       domain.Round2(pkg.BasePrice + req.AddonAmount),
 		ShootDate:      strPtr(req.ShootDate),
 		ShootTime:      req.ShootTime,
 		ShootAddress:   req.ShootAddress,
@@ -160,15 +150,7 @@ func (s *Service) ChangeOrderStatus(op Operator, id int64, to enum.OrderStatus, 
 		return errs.NotFound(common.ErrOrderNotFound)
 	}
 	from := o.Status
-	allowed := orderAllowedTransitions[from]
-	found := false
-	for _, a := range allowed {
-		if a == to {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !domain.OrderCanTransit(from, to) {
 		return errs.BadRequest(common.ErrOrderStatusInvalid)
 	}
 
