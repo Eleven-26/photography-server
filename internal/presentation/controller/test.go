@@ -293,12 +293,15 @@ func (h *Controller) ESIndex(c *gin.Context) {
 }
 
 type esSearchReq struct {
-	Index string `json:"index" binding:"required"`
-	Query string `json:"query" binding:"required"`
+	Index  string   `json:"index" binding:"required"`
+	Query  string   `json:"query" binding:"required"`
+	Fields []string `json:"fields"` // 可选，指定要搜索的字段；为空时使用默认字段列表
 }
 
 // ESSearch 搜索文档
 // POST /test/es/search
+// 注意：Elasticsearch 7.0+ 已移除 _all 字段，不能再对其做 match 查询。
+// 默认对 title/content 做多字段匹配，也可通过 fields 参数指定字段。
 func (h *Controller) ESSearch(c *gin.Context) {
 	if h.Svc.ES() == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
@@ -309,13 +312,90 @@ func (h *Controller) ESSearch(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	query := `{"query":{"match":{"_all":"` + req.Query + `"}}}`
+
+	fields := req.Fields
+	if len(fields) == 0 {
+		fields = []string{"title", "content"}
+	}
+
+	queryBody := map[string]interface{}{
+		"query": map[string]interface{}{
+			"multi_match": map[string]interface{}{
+				"query":  req.Query,
+				"fields": fields,
+			},
+		},
+	}
+	queryBytes, err := json.Marshal(queryBody)
+	if err != nil {
+		response.Fail(c, errs.Internal("构造查询失败: "+err.Error()))
+		return
+	}
+
 	res, err := h.Svc.ES().API.Search(
 		h.Svc.ES().API.Search.WithIndex(req.Index),
-		h.Svc.ES().API.Search.WithBody(bytes.NewReader([]byte(query))),
+		h.Svc.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		response.Fail(c, errs.Internal("es search 失败: "+err.Error()))
+		return
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	var result map[string]interface{}
+	json.Unmarshal(body, &result)
+	response.OK(c, result)
+}
+
+type esListReq struct {
+	Index    string `json:"index" binding:"required"`
+	Page     int    `json:"page"`      // 页码，从 1 开始，默认 1
+	PageSize int    `json:"page_size"` // 每页条数，默认 10
+}
+
+// ESList 查询所有文档（match_all）
+// POST /test/es/list
+func (h *Controller) ESList(c *gin.Context) {
+	if h.Svc.ES() == nil {
+		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		return
+	}
+	var req esListReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
+	// 页码换算成 ES 的 from 偏移量
+	from := (req.Page - 1) * req.PageSize
+
+	queryBody := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_all": map[string]interface{}{},
+		},
+		"size": req.PageSize,
+		"from": from,
+		"sort": []map[string]interface{}{
+			{"_score": map[string]interface{}{"order": "desc"}},
+		},
+	}
+	queryBytes, err := json.Marshal(queryBody)
+	if err != nil {
+		response.Fail(c, errs.Internal("构造查询失败: "+err.Error()))
+		return
+	}
+
+	res, err := h.Svc.ES().API.Search(
+		h.Svc.ES().API.Search.WithIndex(req.Index),
+		h.Svc.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
+	)
+	if err != nil {
+		response.Fail(c, errs.Internal("es list 失败: "+err.Error()))
 		return
 	}
 	defer res.Body.Close()

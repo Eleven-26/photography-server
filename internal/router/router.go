@@ -200,6 +200,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/es/status", ctl.ESStatus)
 	t.POST("/es/index", ctl.ESIndex)
 	t.POST("/es/search", ctl.ESSearch)
+	t.POST("/es/list", ctl.ESList)
 	t.POST("/es/delete", ctl.ESDelete)
 
 	t.POST("/test", ctl.Test)
