@@ -1,15 +1,24 @@
 package repository
 
 import (
+	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
 
-type CalendarRepo struct{}
+type CalendarRepo struct {
+	Repo
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将复用该连接，
+// 保证跨多张表的写入原子性（失败自动回滚）。
+func (r *CalendarRepo) WithTx(tx *gorm.DB) *CalendarRepo {
+	return &CalendarRepo{Repo: Repo{db: tx}}
+}
 
 func NewCalendarRepo() *CalendarRepo { return &CalendarRepo{} }
 
 func (r *CalendarRepo) List(companyID int64, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 	if startDate != "" && endDate != "" {
 		q = q.Where("date BETWEEN ? AND ?", startDate, endDate)
 	}
@@ -23,19 +32,19 @@ func (r *CalendarRepo) List(companyID int64, startDate, endDate string, photogra
 
 func (r *CalendarRepo) GetByID(companyID, blockID int64) (*model.CalendarBlock, error) {
 	var b model.CalendarBlock
-	if err := tenant(companyID).First(&b, blockID).Error; err != nil {
+	if err := r.tenant(companyID).First(&b, blockID).Error; err != nil {
 		return nil, err
 	}
 	return &b, nil
 }
 
 func (r *CalendarRepo) Update(companyID, blockID int64, updates map[string]interface{}) error {
-	return tenant(companyID).Model(&model.CalendarBlock{}).Where("id = ?", blockID).Updates(updates).Error
+	return r.tenant(companyID).Model(&model.CalendarBlock{}).Where("id = ?", blockID).Updates(updates).Error
 }
 
 func (r *CalendarRepo) CountByPhotographer(companyID int64, photographerID int64, date string) (int64, error) {
 	var count int64
-	err := tenant(companyID).Model(&model.CalendarBlock{}).
+	err := r.tenant(companyID).Model(&model.CalendarBlock{}).
 		Where("photographer_id = ? AND date = ?", photographerID, date).
 		Count(&count).Error
 	return count, err

@@ -7,9 +7,31 @@ import (
 	"photography-server/internal/infrastructure"
 )
 
+// Repo 是所有 repository 的公共底座：持有可选的连接句柄。
+// 默认（db == nil）时使用全局 MySQL 单例；调用 WithTx 绑定事务后，
+// 该副本上的所有方法都会复用同一事务连接，保证业务原子性。
+type Repo struct {
+	db *gorm.DB
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将共用该连接。
+// 用法：在 service 的 s.DB().Transaction(func(tx *gorm.DB) error {...}) 回调内，
+// 用 repo.WithTx(tx).Xxx(...) 替代 repo.Xxx(...)。
+func (r *Repo) WithTx(tx *gorm.DB) *Repo {
+	return &Repo{db: tx}
+}
+
+// conn 返回当前查询应使用的连接：事务连接优先，否则回落到全局单例
+func (r *Repo) conn() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	return infrastructure.MySQL()
+}
+
 // tenant 返回按 company_id 过滤的查询会话，实现 SaaS 多租户隔离
-func tenant(companyID int64) *gorm.DB {
-	return infrastructure.MySQL().Where("company_id = ?", companyID)
+func (r *Repo) tenant(companyID int64) *gorm.DB {
+	return r.conn().Where("company_id = ?", companyID)
 }
 
 // normalizePage 校正分页参数

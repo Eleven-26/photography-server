@@ -78,26 +78,42 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 	}
 
 	return s.DB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&rf).Updates(map[string]interface{}{
+		// 1. 更新退款单状态（CAS：仅当仍为“申请中”时生效，防并发重复审核）
+		ok, err := s.OrderRepo.WithTx(tx).AuditRefundApplying(op.CompanyID, id, map[string]interface{}{
 			"status":       status,
 			"audit_by":     op.UserID,
 			"audit_at":     now,
 			"audit_remark": remark,
-		}).Error; err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if !ok {
+			return errs.BadRequest(common.ErrRefundProcessed)
 		}
 
 		if approved {
-			if err := tx.Model(&model.Order{}).Where("id = ?", rf.OrderID).Updates(map[string]interface{}{
+			// 2. 事务内锁定读取订单，避免并发审核导致退款金额重复累加
+			if _, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(op.CompanyID, rf.OrderID); err != nil {
+				return errs.NotFound(common.ErrOrderNotFound)
+			}
+			// 3. 累加订单已退金额（带租户过滤，同一事务连接）
+			if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, rf.OrderID, map[string]interface{}{
 				"refund_amt":     gorm.Expr("refund_amt + ?", rf.Amount),
 				"payment_status": enum.PaymentStatusRefunded,
-			}).Error; err != nil {
+			}); err != nil {
 				return err
 			}
-			tx.Model(&rf).Update("refund_at", now)
-			s.writeOrderLog(rf.OrderID, "refund_approved", 0, enum.RefundStatusApproved, "退款审核通过", op)
+			if err := s.OrderRepo.WithTx(tx).UpdateRefund(op.CompanyID, id, map[string]interface{}{"refund_at": now}); err != nil {
+				return err
+			}
+			if err := s.writeOrderLogTx(tx, rf.OrderID, "refund_approved", 0, enum.RefundStatusApproved, "退款审核通过", op); err != nil {
+				return err
+			}
 		} else {
-			s.writeOrderLog(rf.OrderID, "refund_rejected", 0, enum.RefundStatusRejected, "退款审核驳回: "+remark, op)
+			if err := s.writeOrderLogTx(tx, rf.OrderID, "refund_rejected", 0, enum.RefundStatusRejected, "退款审核驳回: "+remark, op); err != nil {
+				return err
+			}
 		}
 
 		return nil

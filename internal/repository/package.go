@@ -2,11 +2,18 @@ package repository
 
 import (
 	"gorm.io/gorm"
-
 	"photography-server/internal/model"
 )
 
-type PackageRepo struct{}
+type PackageRepo struct {
+	Repo
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将复用该连接，
+// 保证跨多张表的写入原子性（失败自动回滚）。
+func (r *PackageRepo) WithTx(tx *gorm.DB) *PackageRepo {
+	return &PackageRepo{Repo: Repo{db: tx}}
+}
 
 func NewPackageRepo() *PackageRepo {
 	return &PackageRepo{}
@@ -14,7 +21,7 @@ func NewPackageRepo() *PackageRepo {
 
 // List 套餐列表（分页 + 关键字 + 状态 + 类别筛选）
 func (r *PackageRepo) List(companyID int64, page, pageSize int, keyword, status, category string) ([]model.Package, int64, error) {
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR code LIKE ?", kw, kw)
@@ -40,7 +47,7 @@ func (r *PackageRepo) List(companyID int64, page, pageSize int, keyword, status,
 // GetByID 根据 ID 查询套餐
 func (r *PackageRepo) GetByID(companyID, id int64) (*model.Package, error) {
 	var p model.Package
-	if err := tenant(companyID).First(&p, id).Error; err != nil {
+	if err := r.tenant(companyID).First(&p, id).Error; err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -51,22 +58,22 @@ func (r *PackageRepo) Create(tx *gorm.DB, p *model.Package) error {
 	if tx != nil {
 		return tx.Create(p).Error
 	}
-	return tenant(p.CompanyID).Create(p).Error
+	return r.tenant(p.CompanyID).Create(p).Error
 }
 
 // Update 更新套餐
 func (r *PackageRepo) Update(companyID, id int64, updates map[string]interface{}) error {
-	return tenant(companyID).Model(&model.Package{}).Where("id = ?", id).Updates(updates).Error
+	return r.tenant(companyID).Model(&model.Package{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // Delete 删除套餐
 func (r *PackageRepo) Delete(companyID, id int64) error {
-	return tenant(companyID).Delete(&model.Package{}, id).Error
+	return r.tenant(companyID).Delete(&model.Package{}, id).Error
 }
 
 // CountOrdersByPackage 统计引用该套餐的订单数
 func (r *PackageRepo) CountOrdersByPackage(companyID, packageID int64) (int64, error) {
 	var count int64
-	err := tenant(companyID).Model(&model.Order{}).Where("package_id = ?", packageID).Count(&count).Error
+	err := r.tenant(companyID).Model(&model.Order{}).Where("package_id = ?", packageID).Count(&count).Error
 	return count, err
 }

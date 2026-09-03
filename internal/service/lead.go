@@ -117,8 +117,10 @@ func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq)
 		return nil, errs.NotFound(common.ErrLeadNotFound)
 	}
 
-	var pkg model.Package
-	s.DB().Where("id = ?", req.PackageID).First(&pkg)
+	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+	if err != nil {
+		return nil, errs.NotFound(common.ErrPackageNotFound)
+	}
 
 	q := model.Quote{
 		TenantBase: model.TenantBase{

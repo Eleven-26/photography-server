@@ -1,10 +1,19 @@
 package repository
 
 import (
+	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
 
-type LeadRepo struct{}
+type LeadRepo struct {
+	Repo
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将复用该连接，
+// 保证跨多张表的写入原子性（失败自动回滚）。
+func (r *LeadRepo) WithTx(tx *gorm.DB) *LeadRepo {
+	return &LeadRepo{Repo: Repo{db: tx}}
+}
 
 func NewLeadRepo() *LeadRepo {
 	return &LeadRepo{}
@@ -12,7 +21,7 @@ func NewLeadRepo() *LeadRepo {
 
 // List 线索列表（分页 + 关键字 + 状态 + 负责人筛选）
 func (r *LeadRepo) List(companyID int64, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
@@ -38,7 +47,7 @@ func (r *LeadRepo) List(companyID int64, page, pageSize int, keyword, status str
 // GetByID 根据 ID 查询线索
 func (r *LeadRepo) GetByID(companyID, id int64) (*model.Lead, error) {
 	var l model.Lead
-	if err := tenant(companyID).First(&l, id).Error; err != nil {
+	if err := r.tenant(companyID).First(&l, id).Error; err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -46,23 +55,23 @@ func (r *LeadRepo) GetByID(companyID, id int64) (*model.Lead, error) {
 
 // Create 创建线索
 func (r *LeadRepo) Create(l *model.Lead) error {
-	return tenant(l.CompanyID).Create(l).Error
+	return r.tenant(l.CompanyID).Create(l).Error
 }
 
 // Update 更新线索
 func (r *LeadRepo) Update(companyID, id int64, updates map[string]interface{}) error {
-	return tenant(companyID).Model(&model.Lead{}).Where("id = ?", id).Updates(updates).Error
+	return r.tenant(companyID).Model(&model.Lead{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // Delete 删除线索
 func (r *LeadRepo) Delete(companyID, id int64) error {
-	return tenant(companyID).Delete(&model.Lead{}, id).Error
+	return r.tenant(companyID).Delete(&model.Lead{}, id).Error
 }
 
 // GetByMobile 根据手机号查询线索
 func (r *LeadRepo) GetByMobile(companyID int64, mobile string) (*model.Lead, error) {
 	var l model.Lead
-	if err := tenant(companyID).Where("mobile = ?", mobile).First(&l).Error; err != nil {
+	if err := r.tenant(companyID).Where("mobile = ?", mobile).First(&l).Error; err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -73,7 +82,7 @@ func (r *LeadRepo) GetByMobile(companyID int64, mobile string) (*model.Lead, err
 // GetQuoteByID 根据 ID 查询报价单
 func (r *LeadRepo) GetQuoteByID(companyID, id int64) (*model.Quote, error) {
 	var q model.Quote
-	if err := tenant(companyID).First(&q, id).Error; err != nil {
+	if err := r.tenant(companyID).First(&q, id).Error; err != nil {
 		return nil, err
 	}
 	return &q, nil
@@ -81,17 +90,17 @@ func (r *LeadRepo) GetQuoteByID(companyID, id int64) (*model.Quote, error) {
 
 // CreateQuote 创建报价单
 func (r *LeadRepo) CreateQuote(q *model.Quote) error {
-	return tenant(q.CompanyID).Create(q).Error
+	return r.tenant(q.CompanyID).Create(q).Error
 }
 
 // ListQuotesByLead 查询线索下的报价单列表
 func (r *LeadRepo) ListQuotesByLead(companyID, leadID int64) ([]model.Quote, error) {
 	var list []model.Quote
-	err := tenant(companyID).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
+	err := r.tenant(companyID).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
 	return list, err
 }
 
 // UpdateQuote 更新报价单
 func (r *LeadRepo) UpdateQuote(companyID, id int64, updates map[string]interface{}) error {
-	return tenant(companyID).Model(&model.Quote{}).Where("id = ?", id).Updates(updates).Error
+	return r.tenant(companyID).Model(&model.Quote{}).Where("id = ?", id).Updates(updates).Error
 }

@@ -47,8 +47,8 @@ func (s *Service) GetOrderDetail(op Operator, id int64) (*dto.OrderDetail, error
 }
 
 func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order, error) {
-	var pkg model.Package
-	if err := s.DB().Where("id = ?", req.PackageID).First(&pkg).Error; err != nil {
+	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+	if err != nil {
 		return nil, errs.NotFound(common.ErrPackageNotFound)
 	}
 
@@ -80,14 +80,18 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 		PaymentStatus:  enum.PaymentStatusPending,
 	}
 
-	err := s.DB().Transaction(func(tx *gorm.DB) error {
+	err = s.DB().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&o).Error; err != nil {
 			return err
 		}
 
 		if req.CustomerID > 0 {
-			s.DB().Model(&model.Customer{}).Where("id = ?", req.CustomerID).
-				Updates(map[string]interface{}{"order_count": gorm.Expr("order_count + 1"), "total_amount": gorm.Expr("total_amount + ?", o.TotalAmt)})
+			if err := s.CustomerRepo.WithTx(tx).Update(op.CompanyID, req.CustomerID, map[string]interface{}{
+				"order_count":  gorm.Expr("order_count + 1"),
+				"total_amount": gorm.Expr("total_amount + ?", o.TotalAmt),
+			}); err != nil {
+				return err
+			}
 		}
 
 		block := model.CalendarBlock{
@@ -111,10 +115,14 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 		}
 
 		if req.LeadID > 0 {
-			s.LeadRepo.Update(op.CompanyID, req.LeadID, map[string]interface{}{"status": enum.LeadStatusConfirmed})
+			if err := s.LeadRepo.WithTx(tx).Update(op.CompanyID, req.LeadID, map[string]interface{}{"status": enum.LeadStatusConfirmed}); err != nil {
+				return err
+			}
 		}
 		if req.QuoteID > 0 {
-			s.LeadRepo.UpdateQuote(op.CompanyID, req.QuoteID, map[string]interface{}{"status": enum.QuoteStatusConverted})
+			if err := s.LeadRepo.WithTx(tx).UpdateQuote(op.CompanyID, req.QuoteID, map[string]interface{}{"status": enum.QuoteStatusConverted}); err != nil {
+				return err
+			}
 		}
 
 		return s.writeOrderLogTx(tx, o.ID, "create_order", 0, enum.OrderStatusPendingDeposit,

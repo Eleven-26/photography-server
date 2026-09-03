@@ -55,32 +55,51 @@ func (s *Service) ConfirmPayment(op Operator, id int64) error {
 
 	return s.DB().Transaction(func(tx *gorm.DB) error {
 		now := time.Now().Format("2006-01-02 15:04:05")
-		if err := tx.Model(&p).Updates(map[string]interface{}{
+
+		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认）
+		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(op.CompanyID, p.OrderID)
+		if err != nil {
+			return errs.NotFound(common.ErrOrderNotFound)
+		}
+
+		// 2. 收款记录置为已确认（CAS：仅当仍为待核验时生效，防并发重复确认）
+		ok, err := s.OrderRepo.WithTx(tx).ConfirmPaymentPending(op.CompanyID, id, map[string]interface{}{
 			"status":        enum.PaymentStatusConfirmed,
 			"operator_id":   op.UserID,
 			"operator_name": op.Username,
-		}).Error; err != nil {
+		})
+		if err != nil {
 			return err
 		}
+		if !ok {
+			return errs.BadRequest(common.ErrPaymentConfirmed)
+		}
 
-		if err := tx.Model(&model.Order{}).Where("id = ?", p.OrderID).Updates(map[string]interface{}{
+		// 3. 累加订单已收金额（带租户过滤，同一事务连接）
+		if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, p.OrderID, map[string]interface{}{
 			"paid_amt":       gorm.Expr("paid_amt + ?", p.Amount),
 			"payment_status": enum.PaymentStatusConfirmed,
-		}).Error; err != nil {
+		}); err != nil {
 			return err
 		}
 
-		o, _ := s.OrderRepo.GetByID(op.CompanyID, p.OrderID)
+		// 4. 状态流转：定金支付后进入待拍摄；尾款结清后订单完成
 		if p.Type == "deposit" && o.Status == enum.OrderStatusPendingDeposit {
-			if err := s.OrderRepo.Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": enum.OrderStatusPendingShoot}); err != nil {
+			if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": enum.OrderStatusPendingShoot}); err != nil {
 				return err
 			}
-			s.writeOrderLog(p.OrderID, "pay_deposit", 0, enum.OrderStatusPendingShoot, "定金支付确认", op)
+			if err := s.writeOrderLogTx(tx, p.OrderID, "pay_deposit", 0, enum.OrderStatusPendingShoot, "定金支付确认", op); err != nil {
+				return err
+			}
 		}
 		if (p.Type == "final" || p.Type == "addon") && o.Status == enum.OrderStatusPendingDelivery {
 			if o.PaidAmt+p.Amount >= o.TotalAmt {
-				s.OrderRepo.Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": enum.OrderStatusCompleted, "finished_at": now})
-				s.writeOrderLog(p.OrderID, "pay_final", enum.OrderStatusPendingDelivery, enum.OrderStatusCompleted, "尾款支付确认，订单完成", op)
+				if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, p.OrderID, map[string]interface{}{"status": enum.OrderStatusCompleted, "finished_at": now}); err != nil {
+					return err
+				}
+				if err := s.writeOrderLogTx(tx, p.OrderID, "pay_final", enum.OrderStatusPendingDelivery, enum.OrderStatusCompleted, "尾款支付确认，订单完成", op); err != nil {
+					return err
+				}
 			}
 		}
 

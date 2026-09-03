@@ -1,13 +1,21 @@
 package repository
 
 import (
-	"time"
-
+	"gorm.io/gorm"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
+	"time"
 )
 
-type DashboardRepo struct{}
+type DashboardRepo struct {
+	Repo
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将复用该连接，
+// 保证跨多张表的写入原子性（失败自动回滚）。
+func (r *DashboardRepo) WithTx(tx *gorm.DB) *DashboardRepo {
+	return &DashboardRepo{Repo: Repo{db: tx}}
+}
 
 func NewDashboardRepo() *DashboardRepo { return &DashboardRepo{} }
 
@@ -23,7 +31,7 @@ type Overview struct {
 
 func (r *DashboardRepo) GetOverview(companyID, userID int64) (*Overview, error) {
 	var ov Overview
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 
 	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusPendingDeposit)).Count(&ov.PendingDeposit)
 	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusRetouching)).Count(&ov.PendingRetouch)
@@ -41,6 +49,6 @@ func (r *DashboardRepo) GetOverview(companyID, userID int64) (*Overview, error) 
 
 func (r *DashboardRepo) GetCalendarBlocks(companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {
 	var list []model.CalendarBlock
-	err := tenant(companyID).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
+	err := r.tenant(companyID).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
 	return list, err
 }

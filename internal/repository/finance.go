@@ -1,13 +1,21 @@
 package repository
 
 import (
-	"time"
-
+	"gorm.io/gorm"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
+	"time"
 )
 
-type FinanceRepo struct{}
+type FinanceRepo struct {
+	Repo
+}
+
+// WithTx 返回绑定到指定事务连接的副本，事务内的所有写操作将复用该连接，
+// 保证跨多张表的写入原子性（失败自动回滚）。
+func (r *FinanceRepo) WithTx(tx *gorm.DB) *FinanceRepo {
+	return &FinanceRepo{Repo: Repo{db: tx}}
+}
 
 func NewFinanceRepo() *FinanceRepo { return &FinanceRepo{} }
 
@@ -21,7 +29,7 @@ type Summary struct {
 
 func (r *FinanceRepo) GetSummary(companyID int64, start, end string) (*Summary, error) {
 	var s Summary
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 
 	q.Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
@@ -43,7 +51,7 @@ func (r *FinanceRepo) GetSummary(companyID int64, start, end string) (*Summary, 
 }
 
 func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
-	q := tenant(companyID)
+	q := r.tenant(companyID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	} else {
@@ -62,7 +70,7 @@ func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, status s
 }
 
 func (r *FinanceRepo) ListRefunds(companyID int64, page, pageSize int) ([]model.OrderRefund, int64, error) {
-	q := tenant(companyID).Where("status = ?", int(enum.RefundStatusDone))
+	q := r.tenant(companyID).Where("status = ?", int(enum.RefundStatusDone))
 	var total int64
 	if err := q.Model(&model.OrderRefund{}).Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -84,7 +92,7 @@ func (r *FinanceRepo) GetMonthlyStats(companyID int64, year int) ([]MonthlyStat,
 	var rows []row
 	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Format("2006-01-02")
 	end := time.Date(year, 12, 31, 23, 59, 59, 0, time.Local).Format("2006-01-02 15:04:05")
-	tenant(companyID).Model(&model.OrderPayment{}).
+	r.tenant(companyID).Model(&model.OrderPayment{}).
 		Select("MONTH(paid_at) as month, COALESCE(SUM(amount),0) as income").
 		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
 		Group("MONTH(paid_at)").Scan(&rows)
