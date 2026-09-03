@@ -196,3 +196,63 @@ func TestGetByID_TenantFiltered(t *testing.T) {
 		t.Errorf("unmet sql expectations: %v", err)
 	}
 }
+
+// TestGetByIDForUpdate_RowLock 验证资金操作前置的"事务内行锁读"：
+// 必须携带 company_id 过滤 + 软删除条件 + 行级锁（FOR UPDATE），
+// 缺失任一条件（尤其 FOR UPDATE）都会使本测试失败。
+func TestGetByIDForUpdate_RowLock(t *testing.T) {
+	repo, mock := newMockRepo(t)
+
+	selectSQL := "SELECT * FROM `biz_order` WHERE company_id = ? AND `biz_order`.`id` = ? AND `biz_order`.`deleted` = ? ORDER BY `biz_order`.`id` LIMIT ? FOR UPDATE"
+	mock.ExpectQuery(regexp.QuoteMeta(selectSQL)).
+		WithArgs(1001, 42, 0, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "company_id", "status"}).
+			AddRow(42, 1001, enum.OrderStatusPendingDeposit))
+
+	o, err := repo.GetByIDForUpdate(1001, 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if o == nil || o.ID != 42 {
+		t.Errorf("GetByIDForUpdate returned unexpected order: %+v", o)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet sql expectations: %v", err)
+	}
+}
+
+// TestGetByIDForUpdate_TxContext 行锁读必须在事务连接内发生才有意义：
+// 通过 WithTx 绑定后，FOR UPDATE 查询与后续写共享同一事务连接。
+func TestGetByIDForUpdate_TxContext(t *testing.T) {
+	repo, mock := newMockRepo(t)
+
+	mock.ExpectBegin()
+	tx := repo.conn().Begin()
+	if tx.Error != nil {
+		t.Fatalf("begin failed: %v", tx.Error)
+	}
+
+	selectSQL := "SELECT * FROM `biz_order` WHERE company_id = ? AND `biz_order`.`id` = ? AND `biz_order`.`deleted` = ? ORDER BY `biz_order`.`id` LIMIT ? FOR UPDATE"
+	mock.ExpectQuery(regexp.QuoteMeta(selectSQL)).
+		WithArgs(1001, 42, 0, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "company_id", "status"}).
+			AddRow(42, 1001, enum.OrderStatusPendingDeposit))
+
+	repoTx := repo.WithTx(tx)
+	o, err := repoTx.GetByIDForUpdate(1001, 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if o == nil || o.ID != 42 {
+		t.Errorf("GetByIDForUpdate returned unexpected order: %+v", o)
+	}
+
+	mock.ExpectCommit()
+	if err := tx.Commit().Error; err != nil {
+		t.Fatalf("commit failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet sql expectations: %v", err)
+	}
+}
+
