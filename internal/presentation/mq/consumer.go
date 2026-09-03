@@ -2,6 +2,7 @@ package mq
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -14,12 +15,24 @@ type Consumer struct {
 	nc       *nats.Conn
 	js       nats.JetStreamContext
 	subs     []*nats.Subscription
-	pullSubs []*nats.Subscription
+	pullSubs []*pullSub
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
+}
+
+// pullSub 封装 Pull 订阅及其处理函数
+type pullSub struct {
+	sub     *nats.Subscription
+	handler nats.MsgHandler
 }
 
 // New 创建消费者实例
 func New(nc *nats.Conn) *Consumer {
-	c := &Consumer{nc: nc, subs: make([]*nats.Subscription, 0)}
+	c := &Consumer{
+		nc:     nc,
+		subs:   make([]*nats.Subscription, 0),
+		stopCh: make(chan struct{}),
+	}
 	if nc != nil {
 		js, err := nc.JetStream()
 		if err != nil {
@@ -31,7 +44,7 @@ func New(nc *nats.Conn) *Consumer {
 	return c
 }
 
-// Start 启动所有消费者（Push + Pull）
+// Start 启动所有消费者
 func (c *Consumer) Start() {
 	if c.nc == nil {
 		logger.Warnf("nats not connected, consumer skipped")
@@ -43,43 +56,39 @@ func (c *Consumer) Start() {
 	c.subscribe("order.status.change", handleOrderStatusChange)
 	c.subscribe("notification.push", handleNotificationPush)
 
-	// ===== JetStream Push 消费（服务启动一次，自动接收） =====
+	// ===== JetStream Push 消费（回调自动处理） =====
 	c.jsSubscribe("photography.test.persistent", handleTestPersistent)
 	c.jsSubscribe("photography.order.created.persistent", handleOrderCreatedPersistent)
 	c.jsSubscribe("photography.payment.callback.persistent", handlePaymentCallbackPersistent)
 
-	// ===== JetStream Pull 消费（按需拉取） =====
+	// ===== JetStream Pull 消费（循环拉取） =====
 	c.jsPullSubscribe("photography.test.pull", handleTestPull)
 	c.jsPullSubscribe("photography.order.pull", handleOrderPull)
+
+	// 启动 Pull 消费循环
+	c.startPullLoop()
 
 	logger.Infof("nats consumers started, push: %d, pull: %d", len(c.subs), len(c.pullSubs))
 }
 
 // Stop 停止所有订阅
 func (c *Consumer) Stop() {
+	close(c.stopCh)
+	c.wg.Wait()
+
 	for _, sub := range c.subs {
 		if sub.IsValid() {
 			sub.Unsubscribe()
 		}
 	}
-	for _, sub := range c.pullSubs {
-		if sub.IsValid() {
-			sub.Unsubscribe()
+	for _, ps := range c.pullSubs {
+		if ps.sub.IsValid() {
+			ps.sub.Unsubscribe()
 		}
 	}
 	c.subs = nil
 	c.pullSubs = nil
 	logger.Infof("nats consumers stopped")
-}
-
-// PullMessages 拉取 Pull 订阅的消息（外部调用）
-func (c *Consumer) PullMessages(subject string, batchSize int) ([]*nats.Msg, error) {
-	for _, sub := range c.pullSubs {
-		if sub.Subject == subject {
-			return sub.Fetch(batchSize)
-		}
-	}
-	return nil, nats.ErrBadSubscription
 }
 
 // ======================== 订阅方法 ========================
@@ -95,8 +104,7 @@ func (c *Consumer) subscribe(subject string, handler nats.MsgHandler) {
 	logger.Infof("nats subscribed: %s", subject)
 }
 
-// jsSubscribe JetStream Push 订阅（服务启动后自动接收消息）
-// 服务只需启动一次，后续有消息自动推送
+// jsSubscribe JetStream Push 订阅（回调自动处理，服务启动一次即可）
 func (c *Consumer) jsSubscribe(subject string, handler nats.MsgHandler) {
 	if c.js == nil {
 		logger.Warnf("jetStream not available, skip push subscribe [%s]", subject)
@@ -118,7 +126,7 @@ func (c *Consumer) jsSubscribe(subject string, handler nats.MsgHandler) {
 	logger.Infof("jetStream push subscribed: %s (durable: %s)", subject, durable)
 }
 
-// jsPullSubscribe JetStream Pull 订阅（按需拉取消息）
+// jsPullSubscribe JetStream Pull 订阅（注册到列表，由 startPullLoop 循环拉取）
 func (c *Consumer) jsPullSubscribe(subject string, handler nats.MsgHandler) {
 	if c.js == nil {
 		logger.Warnf("jetStream not available, skip pull subscribe [%s]", subject)
@@ -134,8 +142,45 @@ func (c *Consumer) jsPullSubscribe(subject string, handler nats.MsgHandler) {
 		logger.Errorf("jetStream pull subscribe [%s] failed: %v", subject, err)
 		return
 	}
-	c.pullSubs = append(c.pullSubs, sub)
+	c.pullSubs = append(c.pullSubs, &pullSub{sub: sub, handler: handler})
 	logger.Infof("jetStream pull subscribed: %s (durable: %s)", subject, durable)
+}
+
+// startPullLoop 启动 Pull 消费循环（每秒拉取一次）
+func (c *Consumer) startPullLoop() {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case <-ticker.C:
+				for _, ps := range c.pullSubs {
+					c.fetchMessages(ps)
+				}
+			}
+		}
+	}()
+}
+
+// fetchMessages 拉取并处理一批消息
+func (c *Consumer) fetchMessages(ps *pullSub) {
+	msgs, err := ps.sub.Fetch(10, nats.MaxWait(500*time.Millisecond))
+	if err != nil {
+		// 超时是正常的，说明没有新消息
+		if err == nats.ErrTimeout {
+			return
+		}
+		logger.Errorf("pull fetch [%s] failed: %v", ps.sub.Subject, err)
+		return
+	}
+	for _, msg := range msgs {
+		ps.handler(msg)
+	}
 }
 
 func durableName(subject string) string {
