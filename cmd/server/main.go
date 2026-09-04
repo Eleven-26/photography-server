@@ -68,6 +68,11 @@ func main() {
 	if err := infrastructure.InitXxlJob(cfg); err != nil {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
 	}
+
+	// SkyWalking 链路追踪：enable=false 或 OAP 不可达时仅告警，不影响启动
+	if err := infrastructure.InitSkyWalking(&cfg.SkyWalking); err != nil {
+		logger.Warnf("skywalking not available, skipping: %v", err)
+	}
 	if executor := infrastructure.XxlExecutor(); executor != nil {
 		job.Register(executor)
 		infrastructure.RunXxlJob()
@@ -105,4 +110,5 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Errorf("shutdown error: %v", err)
 	}
+	infrastructure.CloseSkyWalking()
 }

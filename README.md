@@ -11,9 +11,10 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
+- **链路追踪**：SkyWalking（go2sky gRPC 上报 OAP，gin 中间件自动埋点）
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
-- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / 后端 / 前端）
+- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / 后端 / 前端）
 
 ## 目录结构
 
@@ -35,7 +36,7 @@ photography-server
 │   ├── config              # 配置加载（多环境合并 + 环境变量展开）
 │   ├── domain              # 领域纯函数（订单状态机 / 退款比例 / 编号生成 / 金额取整）
 │   ├── enum                # 业务枚举（int 状态位）
-│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB）
+│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/SkyWalking）
 │   ├── middleware          # CORS / JWT 认证 / 请求日志 / Recovery / 操作审计
 │   ├── model               # 数据模型（统一 5 固定字段 + company_id 多租户）
 │   ├── pkg                 # 基础能力包
@@ -126,6 +127,9 @@ docker compose up -d --build
 | xxl-job-admin | 9100 | 任务调度中心 |
 | elasticsearch | 9200 | 搜索引擎 |
 | mongo | 27017 | 文档数据库 |
+| skywalking-oap | 11800 / 12800 | 链路追踪后端（agent 上报 / 查询） |
+| skywalking-ui | 9080 | 链路追踪 UI |
+| skywalking-banyandb | 17912 / 17913 | 链路追踪存储 |
 
 后端容器内通过 `APP_*` 环境变量注入连接信息（见 `docker-compose.yml`），数据源均指向 compose 服务名。
 
@@ -146,6 +150,7 @@ docker compose up -d --build
 | NATS | `/test/nats/status` `/pub` `/pub-persistent` `/pub-pull` `/request` |
 | Elasticsearch | `/test/es/status` `/index` `/search` `/list` `/delete` |
 | MongoDB | `/test/mongo/status` `/insert` `/insert-many` `/find` `/find-one` `/update` `/delete` `/delete-by-id` |
+| SkyWalking | `/test/skywalking/status` `/trace`（在请求链路下创建子 span 验证上报，数据到 UI 查看） |
 
 ## 单元测试
 

@@ -120,6 +120,69 @@ services:
     networks:
       - backend-net
 
+  # SkyWalking 链路追踪：BanyanDB（存储） + OAP（后端） + UI（经典版）
+  # 版本说明：10.2.0 起 H2 存储被永久移除，故必须搭配 BanyanDB；
+  # 11.0 起经典 UI 被 Horizon UI 取代（需额外 horizon.yaml 与登录配置），此处 pin 10.2.0 保持开箱即用。
+  skywalking-banyandb:
+    image: apache/skywalking-banyandb:${SW_BDB_VERSION:-0.8.0}
+    container_name: photography-skywalking-banyandb
+    ports:
+      - "${SW_BDB_PORT:-17912}:17912"        # OAP 数据读写
+      - "${SW_BDB_HTTP_PORT:-17913}:17913"   # 监控/管理
+    volumes:
+      - ${SW_BDB_DATA_DIR:-./skywalking/banyandb/data}:/data
+    command: standalone --stream-root-path /data/stream --measure-root-path /data/measure
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -nz 127.0.0.1 17912"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  skywalking-oap:
+    image: apache/skywalking-oap-server:${SW_OAP_VERSION:-10.2.0}
+    container_name: photography-skywalking-oap
+    depends_on:
+      skywalking-banyandb:
+        condition: service_healthy
+    environment:
+      - SW_STORAGE=banyandb
+      - SW_STORAGE_BANYANDB_TARGETS=skywalking-banyandb:17912
+      - SW_HEALTH_CHECKER=default
+      - JAVA_OPTS=${SW_OAP_JAVA_OPTS:--Xms512m -Xmx512m}
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "${SW_OAP_GRPC_PORT:-11800}:11800"   # agent gRPC 上报（go2sky 连这里）
+      - "${SW_OAP_QUERY_PORT:-12800}:12800"  # REST/GraphQL 查询（UI 用）
+    healthcheck:
+      # 新版 OAP 镜像无 curl，用 bash 内置 /dev/tcp 探测
+      test: ["CMD", "bash", "-c", "cat /dev/tcp/127.0.0.1/12800"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  skywalking-ui:
+    image: apache/skywalking-ui:${SW_UI_VERSION:-10.2.0}
+    container_name: photography-skywalking-ui
+    depends_on:
+      skywalking-oap:
+        condition: service_healthy
+    environment:
+      - SW_OAP_ADDRESS=http://skywalking-oap:12800
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "${SW_UI_PORT:-9080}:8080"
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   # 后端服务
   backend:
     build:
@@ -139,6 +202,8 @@ services:
       elasticsearch:
         condition: service_healthy
       mongo:
+        condition: service_started
+      skywalking-oap:
         condition: service_started
     environment:
       APP_MODE: ${APP_MODE:-release}
@@ -170,6 +235,10 @@ services:
       APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
       APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
       APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
+      APP_SKYWALKING_ENABLE: ${APP_SKYWALKING_ENABLE:-false}
+      APP_SKYWALKING_OAP_ADDR: ${APP_SKYWALKING_OAP_ADDR:-skywalking-oap:11800}
+      APP_SKYWALKING_SERVICE: ${APP_SKYWALKING_SERVICE:-photography-server}
+      APP_SKYWALKING_INSTANCE: ${APP_SKYWALKING_INSTANCE:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

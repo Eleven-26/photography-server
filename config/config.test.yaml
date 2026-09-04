@@ -55,3 +55,9 @@ elasticsearch:
     - http://test-es:9200
   username: ""
   password: ""
+
+skywalking:
+  enable: true
+  oap_addr: test-skywalking-oap:11800
+  service: photography-server
+  instance: ""

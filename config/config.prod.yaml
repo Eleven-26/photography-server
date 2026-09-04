@@ -62,3 +62,9 @@ elasticsearch:
     - ${APP_ES_URL:-http://elasticsearch:9200}
   username: ${APP_ES_USERNAME:-}
   password: ${APP_ES_PASSWORD:-}
+
+skywalking:
+  enable: ${APP_SKYWALKING_ENABLE:-false}
+  oap_addr: ${APP_SKYWALKING_OAP_ADDR:-skywalking-oap:11800}
+  service: ${APP_SKYWALKING_SERVICE:-photography-server}
+  instance: ${APP_SKYWALKING_INSTANCE:-}

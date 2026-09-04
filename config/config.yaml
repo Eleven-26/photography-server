@@ -61,3 +61,10 @@ elasticsearch:
     - http://127.0.0.1:9200
   username: ""
   password: ""
+
+# SkyWalking 链路追踪（go2sky gRPC 上报 OAP；OAP 未启动时仅告警，不影响服务）
+skywalking:
+  enable: true
+  oap_addr: 127.0.0.1:11800
+  service: photography-server
+  instance: "" # 留空默认取主机名

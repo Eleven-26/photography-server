@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"photography-server/internal/enum"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -698,4 +699,69 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"deleted_count": res.DeletedCount})
+}
+
+// ======================== SkyWalking 示例 ========================
+
+// SkyWalkingStatus 检查 SkyWalking 追踪状态
+// POST /test/skywalking/status
+func (h *Controller) SkyWalkingStatus(c *gin.Context) {
+	if !infrastructure.SkyWalkingEnabled() {
+		response.Fail(c, errs.Internal("skywalking 未启用（enable=false 或初始化失败）"))
+		return
+	}
+	response.OK(c, gin.H{
+		"status": "enabled",
+		"hint":   "tracer 已初始化，span 经 gRPC 异步上报 OAP；请到 SkyWalking UI 查看链路数据",
+	})
+}
+
+type skywalkingTraceReq struct {
+	Operation string `json:"operation"` // 自定义 span 操作名，默认 debug/manual-span
+	SleepMs   int    `json:"sleep_ms"`  // 模拟业务耗时（毫秒），默认 50，上限 5000
+}
+
+// SkyWalkingTrace 在当前请求链路（entry span）下创建一段子 span，用于验证上报链路。
+// 前置条件：skywalking.enable=true 且 OAP 可达；请求本身已被 trace 中间件覆盖。
+// POST /test/skywalking/trace
+func (h *Controller) SkyWalkingTrace(c *gin.Context) {
+	tracer := infrastructure.SkyWalking()
+	if tracer == nil {
+		response.Fail(c, errs.Internal("skywalking 未启用"))
+		return
+	}
+	var req skywalkingTraceReq
+	// body 可选：允许空请求体，解析失败仅当非 EOF 才报错
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		response.Fail(c, errs.BadRequest("参数解析失败: "+err.Error()))
+		return
+	}
+	if req.Operation == "" {
+		req.Operation = "debug/manual-span"
+	}
+	if req.SleepMs <= 0 {
+		req.SleepMs = 50
+	}
+	if req.SleepMs > 5000 {
+		req.SleepMs = 5000
+	}
+
+	// 在 gin 中间件注入的 entry span 上下文下创建子 span，形成完整调用链
+	span, _, err := tracer.CreateLocalSpan(c.Request.Context())
+	if err != nil {
+		response.Fail(c, errs.Internal("创建 span 失败: "+err.Error()))
+		return
+	}
+	defer span.End()
+	span.SetOperationName(req.Operation)
+	span.Tag("debug", "true")
+
+	time.Sleep(time.Duration(req.SleepMs) * time.Millisecond)
+	span.Tag("sleep_ms", strconv.Itoa(req.SleepMs))
+
+	response.OK(c, gin.H{
+		"operation": req.Operation,
+		"sleep_ms":  req.SleepMs,
+		"hint":      "子 span 已结束并进入上报队列；请到 SkyWalking UI 的 Trace 页查看（service 见配置 skywalking.service）",
+	})
 }

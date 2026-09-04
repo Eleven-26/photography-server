@@ -18,6 +18,10 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 
 	engine := gin.New()
 	engine.Use(middleware.CORS(), middleware.Recovery(), middleware.RequestLog())
+	// SkyWalking 链路追踪：tracer 未启用时返回 nil，请求路径零影响
+	if tm := middleware.SkyWalkingTrace(engine); tm != nil {
+		engine.Use(tm)
+	}
 
 	ctl := controller.New(svc, cfg)
 	middleware.Init(cfg)
@@ -219,6 +223,8 @@ func registerDebug(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/mongo/update", ctl.MongoUpdate)
 	t.POST("/mongo/delete", ctl.MongoDelete)
 	t.POST("/mongo/delete-by-id", ctl.MongoDeleteByID)
+	t.POST("/skywalking/status", ctl.SkyWalkingStatus)
+	t.POST("/skywalking/trace", ctl.SkyWalkingTrace)
 
 	t.POST("/test", ctl.Test)
 }

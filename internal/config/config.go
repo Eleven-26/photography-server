@@ -10,16 +10,17 @@ import (
 )
 
 type Config struct {
-	App    App    `mapstructure:"app"`
-	JWT    JWT    `mapstructure:"jwt"`
-	DB     DB     `mapstructure:"db"`
-	Redis  Redis  `mapstructure:"redis"`
-	NATS   NATS   `mapstructure:"nats"`
-	Mongo  Mongo  `mapstructure:"mongodb"`
-	Log    Log    `mapstructure:"log"`
-	Upload Upload `mapstructure:"upload"`
-	XxlJob XxlJob `mapstructure:"xxljob"`
-	ES     ES     `mapstructure:"elasticsearch"`
+	App        App        `mapstructure:"app"`
+	JWT        JWT        `mapstructure:"jwt"`
+	DB         DB         `mapstructure:"db"`
+	Redis      Redis      `mapstructure:"redis"`
+	NATS       NATS       `mapstructure:"nats"`
+	Mongo      Mongo      `mapstructure:"mongodb"`
+	Log        Log        `mapstructure:"log"`
+	Upload     Upload     `mapstructure:"upload"`
+	XxlJob     XxlJob     `mapstructure:"xxljob"`
+	ES         ES         `mapstructure:"elasticsearch"`
+	SkyWalking SkyWalking `mapstructure:"skywalking"`
 }
 
 type ES struct {
@@ -27,6 +28,14 @@ type ES struct {
 	Urls     []string `mapstructure:"urls"`
 	Username string   `mapstructure:"username"`
 	Password string   `mapstructure:"password"`
+}
+
+// SkyWalking 链路追踪配置：go2sky gRPC 上报 OAP（默认 11800）
+type SkyWalking struct {
+	Enable   bool   `mapstructure:"enable"`   // 总开关；false 时不创建 tracer，中间件跳过挂载
+	OapAddr  string `mapstructure:"oap_addr"` // OAP gRPC 地址，如 127.0.0.1:11800
+	Service  string `mapstructure:"service"`  // SkyWalking 中的服务名
+	Instance string `mapstructure:"instance"` // 实例名，留空默认取主机名
 }
 
 type XxlJob struct {
