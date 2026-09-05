@@ -13,6 +13,8 @@ import (
 )
 
 // RequestLog 请求日志中间件
+// 注意：须注册在 SkyWalkingTrace 之前也能取到 trace_id ——
+// 日志在 c.Next() 之后输出，此时链路中间件已执行完，span 已注入请求上下文。
 func RequestLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -20,8 +22,12 @@ func RequestLog() gin.HandlerFunc {
 		dur := time.Since(start).Milliseconds()
 		status := c.Writer.Status()
 		op := GetOperator(c)
-		logger.Infof("%s %s -> %d (%dms) user=%d company=%d",
-			c.Request.Method, c.Request.URL.Path, status, dur, op.UserID, op.CompanyID)
+		tid := CurrentTraceID(c)
+		if tid == "" {
+			tid = "-"
+		}
+		logger.Infof("%s %s -> %d (%dms) trace=%s user=%d company=%d",
+			c.Request.Method, c.Request.URL.Path, status, dur, tid, op.UserID, op.CompanyID)
 	}
 }
 
@@ -58,8 +64,12 @@ func (m *Middlewares) OperationLog() gin.HandlerFunc {
 		if c.Writer.Status() >= 400 {
 			log.Status = 0
 		}
-		// 异步写入，失败不影响主流程
-		infrastructure.MySQL().Create(&log)
+		// 同步写入：透传请求 ctx（WithContext）使该条 SQL 的 span 挂在当前 HTTP 请求链路下，
+		// 而不是以独立 trace 入库 —— 与 repository 层 ctx 贯穿的约定保持一致。
+		// gin 请求处理链未结束时 Request.Context() 仍有效，可直接复用。
+		if err := infrastructure.MySQL().WithContext(c.Request.Context()).Create(&log).Error; err != nil {
+			logger.Warnf("operation log write failed: %v", err)
+		}
 	}
 }
 
