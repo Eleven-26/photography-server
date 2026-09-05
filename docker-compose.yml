@@ -133,7 +133,7 @@ services:
       - "${SW_BDB_HTTP_PORT:-17913}:17913"   # 监控/管理
     volumes:
       - ${SW_BDB_DATA_DIR:-./skywalking/banyandb/data}:/data
-    command: standalone --stream-root-path /data/stream --measure-root-path /data/measure
+    command: standalone --observability-modes=native --stream-root-path /data/stream --measure-root-path /data/measure
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -nz 127.0.0.1 17912"]
       interval: 10s
@@ -154,12 +154,18 @@ services:
       - SW_STORAGE=banyandb
       - SW_STORAGE_BANYANDB_TARGETS=skywalking-banyandb:17912
       - SW_HEALTH_CHECKER=default
+      # 必启：OTLP traces handler 内部把 OTLP span 转为 Zipkin 格式，依赖 receiver-zipkin 模块
+      # （默认 application.yml 里 receiver-zipkin/query-zipkin 均为禁用，不开启则 OTLP 链路上报被拒：
+      #   ModuleNotFoundRuntimeException: receiver-zipkin missing → collector 侧 Unknown 永久错误丢数据）
+      - SW_RECEIVER_ZIPKIN=default
+      - SW_QUERY_ZIPKIN=default
       - JAVA_OPTS=${SW_OAP_JAVA_OPTS:--Xms512m -Xmx512m}
       - TZ=${TZ:-Asia/Shanghai}
     ports:
       - "${SW_OAP_GRPC_PORT:-11800}:11800"   # agent/OTLP gRPC 上报（otel-collector 连这里）
       - "${SW_OAP_QUERY_PORT:-12800}:12800"  # REST/GraphQL 查询（Horizon UI 用）
       - "${SW_OAP_ADMIN_PORT:-17128}:17128"  # admin（Horizon UI 写 API 用）
+      - "${SW_OAP_ZIPKIN_PORT:-9412}:9412"   # Zipkin 查询 API（OTLP 链路以 Zipkin 格式存储，/zipkin/api/v2/*；宿主机调试用，栈内 UI 走容器网络不依赖此映射）
     healthcheck:
       # 新版 OAP 镜像无 curl，用 bash 内置 /dev/tcp 探测
       test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/12800"]
@@ -178,7 +184,7 @@ services:
       skywalking-oap:
         condition: service_started
     volumes:
-      - ${OTEL_CONFIG_FILE:-./config/otel-collector.yaml}:/etc/otelcol/config.yaml:ro
+      - ${OTEL_CONFIG_FILE:-./otelcol/otel-collector.yaml}:/etc/otelcol/config.yaml:ro
     command: ["--config=/etc/otelcol/config.yaml"]
     ports:
       - "${OTEL_GRPC_PORT:-4317}:4317"   # 应用 OTLP gRPC 上报入口
@@ -195,7 +201,7 @@ services:
         condition: service_healthy
     volumes:
       # Horizon UI 的 OAP 地址与登录用户只从该文件读取（无 env 注入入口），必须挂载
-      - ${SW_UI_CONFIG_FILE:-./config/horizon.yaml}:/app/horizon.yaml:ro
+      - ${SW_UI_CONFIG_FILE:-./horizon/horizon.yaml}:/app/horizon.yaml:ro
     ports:
       - "${SW_UI_PORT:-9080}:8081"   # Horizon 容器内监听 8081
     restart: unless-stopped

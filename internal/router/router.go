@@ -21,6 +21,8 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	// SkyWalking 链路追踪（OTel → otel-collector → SkyWalking OAP）：未启用时返回 nil，请求路径零影响
 	if tm := middleware.SkyWalkingTrace(cfg.SkyWalking.Service); tm != nil {
 		engine.Use(tm)
+		// 把 entry span 的 trace_id 回写响应头 X-Trace-Id，便于日志/UI 检索；需注册在 otelgin 之后
+		engine.Use(middleware.TraceID())
 	}
 
 	ctl := controller.New(svc, cfg)

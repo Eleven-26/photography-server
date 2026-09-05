@@ -1,0 +1,31 @@
+# OpenTelemetry Collector（0.157.0）
+# 职责：接收应用侧 OTLP 上报，转发给 SkyWalking OAP（OTLP receiver 与 agent gRPC 共享 11800 端口）
+# 数据流：应用 --OTLP:4317 --> 本服务 --OTLP:11800 --> skywalking-oap --> banyandb
+
+# -------目前docker-compose使用，后面得修改
+
+receivers:
+  otlp:
+    protocols:
+      grpc: # 接收 OTLP/gRPC 数据（默认端口 4317）
+        endpoint: 0.0.0.0:4317    # 必须显式绑定 0.0.0.0：0.157.0 默认只听容器内 127.0.0.1，
+      http: # Docker 端口映射的流量到不了 loopback，宿主机应用会 connection refused
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlp_grpc/skywalking: # 0.157.0 起 otlp 别名弃用，改用 otlp_grpc
+    endpoint: "skywalking-oap:11800" # SkyWalking OAP 的 gRPC 地址，编排时同网络用容器名
+    tls:
+      insecure: true                    # 内网环境关闭 TLS
+
+service:
+  pipelines:
+    traces: # 链路追踪管道
+      receivers: [ otlp ]
+      exporters: [ otlp_grpc/skywalking ]
+    metrics: # 指标管道
+      receivers: [ otlp ]
+      exporters: [ otlp_grpc/skywalking ]
+    logs: # 日志管道
+      receivers: [ otlp ]
+      exporters: [ otlp_grpc/skywalking ]

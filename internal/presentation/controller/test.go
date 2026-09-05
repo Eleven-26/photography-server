@@ -704,7 +704,16 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 
 // ======================== SkyWalking 链路追踪示例 ========================
 
-// SkyWalkingStatus 检查 SkyWalking 追踪状态
+// currentTraceID 从请求上下文取 entry span 的 trace_id（otelgin 中间件注入）。
+// 追踪未启用或 span 无效时返回空串。
+func currentTraceID(c *gin.Context) string {
+	if sc := trace.SpanContextFromContext(c.Request.Context()); sc.IsValid() {
+		return sc.TraceID().String()
+	}
+	return ""
+}
+
+// SkyWalkingStatus 检查 SkyWalking 追踪状态，并回传当前请求的 trace_id 便于 UI 检索
 // POST /test/skywalking/status
 func (h *Controller) SkyWalkingStatus(c *gin.Context) {
 	if !infrastructure.SkyWalkingEnabled() {
@@ -712,8 +721,9 @@ func (h *Controller) SkyWalkingStatus(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{
-		"status": "enabled",
-		"hint":   "tracer 已初始化，span 经 OTLP 上报 otel-collector 并转发 SkyWalking OAP；请到 SkyWalking UI 查看链路数据",
+		"status":   "enabled",
+		"trace_id": currentTraceID(c),
+		"hint":     "tracer 已初始化，span 经 OTLP 上报 otel-collector 并转发 SkyWalking OAP；用本响应的 trace_id 到 SkyWalking UI 的 Trace 页检索该链路",
 	})
 }
 
@@ -760,6 +770,7 @@ func (h *Controller) SkyWalkingTrace(c *gin.Context) {
 	response.OK(c, gin.H{
 		"operation": req.Operation,
 		"sleep_ms":  req.SleepMs,
-		"hint":      "子 span 已结束并进入上报队列；请到 SkyWalking UI 的 Trace 页查看（service 见配置 skywalking.service）",
+		"trace_id":  currentTraceID(c), // 子 span 与 entry span 同一 trace，可直接到 UI 检索
+		"hint":      "子 span 已结束并进入上报队列；用 trace_id 到 SkyWalking UI 的 Trace 页查询（service 见配置 skywalking.service）",
 	})
 }
