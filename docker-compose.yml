@@ -184,7 +184,7 @@ services:
       skywalking-oap:
         condition: service_started
     volumes:
-      - ${OTEL_CONFIG_FILE:-./otelcol/otel-collector.yaml}:/etc/otelcol/config.yaml:ro
+      - ${OTEL_CONFIG_FILE:-./openTelemetry-collector/config.yaml}:/etc/otelcol/config.yaml:ro
     command: ["--config=/etc/otelcol/config.yaml"]
     ports:
       - "${OTEL_GRPC_PORT:-4317}:4317"   # 应用 OTLP gRPC 上报入口

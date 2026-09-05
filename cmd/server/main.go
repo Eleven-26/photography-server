@@ -39,6 +39,13 @@ func main() {
 	logger.Init(cfg.Log.Level)
 	logger.Infof("running profile: %s", cfg.App.Profile)
 
+	// SkyWalking 链路追踪：OTel SDK → otel-collector → SkyWalking OAP；未启用时跳过，collector 不可达不影响启动。
+	// 注意：必须先于 InitMySQL —— GORM 的 OTel 插件在安装时捕获全局 TracerProvider，
+	// 顺序颠倒会导致 SQL span 走 noop provider，永远不产生数据。
+	if err := infrastructure.InitSkyWalking(&cfg.SkyWalking); err != nil {
+		logger.Warnf("skywalking not available, skipping: %v", err)
+	}
+
 	if err := infrastructure.InitMySQL(cfg); err != nil {
 		panic(fmt.Sprintf("连接数据库失败: %v", err))
 	}
@@ -67,11 +74,6 @@ func main() {
 
 	if err := infrastructure.InitXxlJob(cfg); err != nil {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
-	}
-
-	// SkyWalking 链路追踪：OTel SDK → otel-collector → SkyWalking OAP；未启用时跳过，collector 不可达不影响启动
-	if err := infrastructure.InitSkyWalking(&cfg.SkyWalking); err != nil {
-		logger.Warnf("skywalking not available, skipping: %v", err)
 	}
 	if executor := infrastructure.XxlExecutor(); executor != nil {
 		job.Register(executor)

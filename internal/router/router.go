@@ -23,6 +23,8 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 		engine.Use(tm)
 		// 把 entry span 的 trace_id 回写响应头 X-Trace-Id，便于日志/UI 检索；需注册在 otelgin 之后
 		engine.Use(middleware.TraceID())
+		// 把请求参数（query/JSON body）追加到 entry span 属性；需在 otelgin 之后、业务处理器之前
+		engine.Use(middleware.TraceParams())
 	}
 
 	ctl := controller.New(svc, cfg)

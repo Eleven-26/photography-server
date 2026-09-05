@@ -730,9 +730,12 @@ func (h *Controller) SkyWalkingStatus(c *gin.Context) {
 type skywalkingTraceReq struct {
 	Operation string `json:"operation"` // 自定义 span 操作名，默认 debug/manual-span
 	SleepMs   int    `json:"sleep_ms"`  // 模拟业务耗时（毫秒），默认 50，上限 5000
+	WithDB    bool   `json:"with_db"`   // 为 true 时执行一条带参数的 SQL，用于验证 db span 埋点
 }
 
 // SkyWalkingTrace 在当前请求链路（entry span）下创建一段子 span，用于验证上报链路。
+// with_db=true 时追加执行一条带参数的 SQL（gorm OTel 插件产生 client span），
+// UI 中可同时看到请求参数（http.query / http.request.body）与 SQL 语句（db.query.text）。
 // 前置条件：skywalking.enable=true 且 otel-collector → OAP 链路可达；请求本身已被 trace 中间件覆盖。
 // POST /test/skywalking/trace
 func (h *Controller) SkyWalkingTrace(c *gin.Context) {
@@ -765,12 +768,29 @@ func (h *Controller) SkyWalkingTrace(c *gin.Context) {
 	defer span.End()
 
 	time.Sleep(time.Duration(req.SleepMs) * time.Millisecond)
-	_ = ctx // 上下文可继续传递给下游调用以串联 span
+
+	dbProbe := ""
+	if req.WithDB {
+		// 带参数的 SQL：gorm 插件经 Dialector.Explain 填充参数后记录；
+		// ctx 显式透传给 gorm（WithContext），保证 db span 挂到本请求链路而非独立 trace
+		if db := infrastructure.MySQL(); db != nil {
+			var marker string
+			err := db.WithContext(ctx).Raw("SELECT ? AS trace_marker", fmt.Sprintf("verify-%d", req.SleepMs)).Row().Scan(&marker)
+			if err != nil {
+				dbProbe = "sql failed: " + err.Error()
+			} else {
+				dbProbe = marker
+			}
+		} else {
+			dbProbe = "mysql singleton not ready"
+		}
+	}
 
 	response.OK(c, gin.H{
 		"operation": req.Operation,
 		"sleep_ms":  req.SleepMs,
 		"trace_id":  currentTraceID(c), // 子 span 与 entry span 同一 trace，可直接到 UI 检索
+		"db_probe":  dbProbe,           // with_db=true 时的 SQL 执行结果（验证参数填充）
 		"hint":      "子 span 已结束并进入上报队列；用 trace_id 到 SkyWalking UI 的 Trace 页查询（service 见配置 skywalking.service）",
 	})
 }
