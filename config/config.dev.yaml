@@ -58,6 +58,6 @@ elasticsearch:
 
 skywalking:
   enable: true
-  oap_addr: 127.0.0.1:11800
+  endpoint: 127.0.0.1:4317 # otel-collector OTLP gRPC 地址
   service: photography-server
   instance: ""

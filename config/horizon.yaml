@@ -1,0 +1,32 @@
+# Horizon UI 配置（容器内挂载为 /app/horizon.yaml）
+# 重要：Horizon UI 的 OAP 地址与登录用户只能从这里读取（无对应环境变量可注入），
+# 支持环境变量插值 ${VAR:default} 与热重载。容器内监听 8081（由 compose 映射到宿主机）。
+
+# -------目前docker-compose使用，后面得修改
+
+oap:
+  # OAP 查询端口（GraphQL，默认 12800）与 admin 端口（UI 写 API 依赖，默认 17128）
+  queryUrl: "${HORIZON_OAP_QUERY_URL:http://skywalking-oap:12800}"
+  adminUrl: "${HORIZON_OAP_ADMIN_URL:http://skywalking-oap:17128}"
+  timeoutMs: 15000
+
+auth:
+  backend: local
+  local:
+    users:
+      - username: skywalking
+        # 下方为空密码("") 的 argon2id hash —— 官方 quickstart 默认值，仅用于首次登录验证！
+        # 上线前务必换成自己的密码 hash（Argon2id）：
+        #   docker run --rm --entrypoint node apache/skywalking-ui:horizon-1.0.0 \
+        #     -e 'require("/app/node_modules/argon2").hash("你的新密码").then(console.log)'
+        # 注意 hash 含 $ 字符，YAML 中必须用单引号包裹。
+        passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$ulwTy/981LUpNFfSAjmKAg$lpp0WRYPoiGDoWA3Lg2e+CvCffIHE0TDEUsQMnjcwsU'
+        roles: [admin]
+
+rbac:
+  enabled: true
+
+session:
+  ttlMinutes: 60
+  # 若 UI 部署在 HTTPS 反代之后，改为 true
+  cookieSecure: false

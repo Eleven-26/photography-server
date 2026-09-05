@@ -62,9 +62,10 @@ elasticsearch:
   username: ""
   password: ""
 
-# SkyWalking 链路追踪（go2sky gRPC 上报 OAP；OAP 未启动时仅告警，不影响服务）
+# SkyWalking 链路追踪方案（OTel SDK 经 OTLP 上报 otel-collector，由其转发 SkyWalking OAP；
+# collector/OAP 不可达时仅后台重试，不影响服务）
 skywalking:
   enable: true
-  oap_addr: 127.0.0.1:11800
+  endpoint: 127.0.0.1:4317 # otel-collector OTLP gRPC 地址
   service: photography-server
   instance: "" # 留空默认取主机名

@@ -31,11 +31,14 @@ type ES struct {
 	Password string   `mapstructure:"password"`
 }
 
-// SkyWalking 链路追踪配置：go2sky gRPC 上报 OAP（默认 11800）
+// SkyWalking SkyWalking 链路追踪方案配置：OpenTelemetry SDK 经 OTLP gRPC 上报 otel-collector，
+// 由 collector 转发 SkyWalking OAP（OAP 的 OTLP receiver 与 agent gRPC 共享 11800 端口）
+// 命名说明：配置段以方案名（skywalking）命名，与后续新增的其他链路追踪方案
+// （如 otel+Jaeger，独立配置段 jaeger:）相互区分
 type SkyWalking struct {
-	Enable   bool   `mapstructure:"enable"`   // 总开关；false 时不创建 tracer，中间件跳过挂载
-	OapAddr  string `mapstructure:"oap_addr"` // OAP gRPC 地址，如 127.0.0.1:11800
-	Service  string `mapstructure:"service"`  // SkyWalking 中的服务名
+	Enable   bool   `mapstructure:"enable"`
+	Endpoint string `mapstructure:"endpoint"` // OTLP gRPC endpoint，如 otel-collector:4317
+	Service  string `mapstructure:"service"`
 	Instance string `mapstructure:"instance"` // 实例名，留空默认取主机名
 }
 

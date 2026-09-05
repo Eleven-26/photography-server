@@ -120,11 +120,13 @@ services:
     networks:
       - backend-net
 
-  # SkyWalking 链路追踪：BanyanDB（存储） + OAP（后端） + UI（经典版）
-  # 版本说明：10.2.0 起 H2 存储被永久移除，故必须搭配 BanyanDB；
-  # 11.0 起经典 UI 被 Horizon UI 取代（需额外 horizon.yaml 与登录配置），此处 pin 10.2.0 保持开箱即用。
+  # 链路追踪：BanyanDB（存储） + OAP（后端） + OTel Collector（采集转发） + Horizon UI
+  # 数据流：backend --OTLP:4317--> otel-collector --OTLP:11800--> OAP --> BanyanDB
+  # 版本说明：OAP 11.0.0 配套 BanyanDB 0.11.0；11.0 起官方 UI 为 Horizon 版
+  # （apache/skywalking-ui:horizon-*，容器内监听 8081，配置只认挂载的 horizon.yaml）；
+  # OAP 的 17128 为 admin 端口，Horizon UI 的写 API 依赖它。
   skywalking-banyandb:
-    image: apache/skywalking-banyandb:${SW_BDB_VERSION:-0.8.0}
+    image: apache/skywalking-banyandb:${SW_BDB_VERSION:-0.11.0}
     container_name: photography-skywalking-banyandb
     ports:
       - "${SW_BDB_PORT:-17912}:17912"        # OAP 数据读写
@@ -143,7 +145,7 @@ services:
       - backend-net
 
   skywalking-oap:
-    image: apache/skywalking-oap-server:${SW_OAP_VERSION:-10.2.0}
+    image: apache/skywalking-oap-server:${SW_OAP_VERSION:-11.0.0}
     container_name: photography-skywalking-oap
     depends_on:
       skywalking-banyandb:
@@ -155,11 +157,12 @@ services:
       - JAVA_OPTS=${SW_OAP_JAVA_OPTS:--Xms512m -Xmx512m}
       - TZ=${TZ:-Asia/Shanghai}
     ports:
-      - "${SW_OAP_GRPC_PORT:-11800}:11800"   # agent gRPC 上报（go2sky 连这里）
-      - "${SW_OAP_QUERY_PORT:-12800}:12800"  # REST/GraphQL 查询（UI 用）
+      - "${SW_OAP_GRPC_PORT:-11800}:11800"   # agent/OTLP gRPC 上报（otel-collector 连这里）
+      - "${SW_OAP_QUERY_PORT:-12800}:12800"  # REST/GraphQL 查询（Horizon UI 用）
+      - "${SW_OAP_ADMIN_PORT:-17128}:17128"  # admin（Horizon UI 写 API 用）
     healthcheck:
       # 新版 OAP 镜像无 curl，用 bash 内置 /dev/tcp 探测
-      test: ["CMD", "bash", "-c", "cat /dev/tcp/127.0.0.1/12800"]
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/12800"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -168,17 +171,33 @@ services:
     networks:
       - backend-net
 
+  otel-collector:
+    image: otel/opentelemetry-collector:${OTEL_COLLECTOR_VERSION:-0.157.0}
+    container_name: photography-otel-collector
+    depends_on:
+      skywalking-oap:
+        condition: service_started
+    volumes:
+      - ${OTEL_CONFIG_FILE:-./config/otel-collector.yaml}:/etc/otelcol/config.yaml:ro
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"   # 应用 OTLP gRPC 上报入口
+      - "${OTEL_HTTP_PORT:-4318}:4318"   # 应用 OTLP HTTP 上报入口
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   skywalking-ui:
-    image: apache/skywalking-ui:${SW_UI_VERSION:-10.2.0}
+    image: apache/skywalking-ui:${SW_UI_VERSION:-horizon-1.0.0}
     container_name: photography-skywalking-ui
     depends_on:
       skywalking-oap:
         condition: service_healthy
-    environment:
-      - SW_OAP_ADDRESS=http://skywalking-oap:12800
-      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      # Horizon UI 的 OAP 地址与登录用户只从该文件读取（无 env 注入入口），必须挂载
+      - ${SW_UI_CONFIG_FILE:-./config/horizon.yaml}:/app/horizon.yaml:ro
     ports:
-      - "${SW_UI_PORT:-9080}:8080"
+      - "${SW_UI_PORT:-9080}:8081"   # Horizon 容器内监听 8081
     restart: unless-stopped
     networks:
       - backend-net
@@ -202,6 +221,8 @@ services:
       elasticsearch:
         condition: service_healthy
       mongo:
+        condition: service_started
+      otel-collector:
         condition: service_started
       skywalking-oap:
         condition: service_started
@@ -236,7 +257,7 @@ services:
       APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
       APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
       APP_SKYWALKING_ENABLE: ${APP_SKYWALKING_ENABLE:-false}
-      APP_SKYWALKING_OAP_ADDR: ${APP_SKYWALKING_OAP_ADDR:-skywalking-oap:11800}
+      APP_SKYWALKING_ENDPOINT: ${APP_SKYWALKING_ENDPOINT:-otel-collector:4317}
       APP_SKYWALKING_SERVICE: ${APP_SKYWALKING_SERVICE:-photography-server}
       APP_SKYWALKING_INSTANCE: ${APP_SKYWALKING_INSTANCE:-}
     ports:

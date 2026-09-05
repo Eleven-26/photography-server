@@ -18,8 +18,8 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 
 	engine := gin.New()
 	engine.Use(middleware.CORS(), middleware.Recovery(), middleware.RequestLog())
-	// SkyWalking 链路追踪：tracer 未启用时返回 nil，请求路径零影响
-	if tm := middleware.SkyWalkingTrace(engine); tm != nil {
+	// SkyWalking 链路追踪（OTel → otel-collector → SkyWalking OAP）：未启用时返回 nil，请求路径零影响
+	if tm := middleware.SkyWalkingTrace(cfg.SkyWalking.Service); tm != nil {
 		engine.Use(tm)
 	}
 

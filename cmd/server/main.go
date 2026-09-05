@@ -69,7 +69,7 @@ func main() {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
 	}
 
-	// SkyWalking 链路追踪：enable=false 或 OAP 不可达时仅告警，不影响启动
+	// SkyWalking 链路追踪：OTel SDK → otel-collector → SkyWalking OAP；未启用时跳过，collector 不可达不影响启动
 	if err := infrastructure.InitSkyWalking(&cfg.SkyWalking); err != nil {
 		logger.Warnf("skywalking not available, skipping: %v", err)
 	}
@@ -110,5 +110,5 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Errorf("shutdown error: %v", err)
 	}
-	infrastructure.CloseSkyWalking()
+	infrastructure.CloseSkyWalking(ctx)
 }

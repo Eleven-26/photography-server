@@ -67,6 +67,6 @@ elasticsearch:
 
 skywalking:
   enable: false # APP_SKYWALKING_ENABLE
-  oap_addr: skywalking-oap:11800 # APP_SKYWALKING_OAP_ADDR
+  endpoint: otel-collector:4317 # APP_SKYWALKING_ENDPOINT，otel-collector OTLP gRPC
   service: photography-server # APP_SKYWALKING_SERVICE
   instance: "" # APP_SKYWALKING_INSTANCE，留空默认取主机名

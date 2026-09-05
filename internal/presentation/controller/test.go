@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"io"
 	"photography-server/internal/enum"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"photography-server/internal/infrastructure"
 	"photography-server/internal/pkg/errs"
@@ -701,7 +702,7 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 	response.OK(c, gin.H{"deleted_count": res.DeletedCount})
 }
 
-// ======================== SkyWalking 示例 ========================
+// ======================== SkyWalking 链路追踪示例 ========================
 
 // SkyWalkingStatus 检查 SkyWalking 追踪状态
 // POST /test/skywalking/status
@@ -712,7 +713,7 @@ func (h *Controller) SkyWalkingStatus(c *gin.Context) {
 	}
 	response.OK(c, gin.H{
 		"status": "enabled",
-		"hint":   "tracer 已初始化，span 经 gRPC 异步上报 OAP；请到 SkyWalking UI 查看链路数据",
+		"hint":   "tracer 已初始化，span 经 OTLP 上报 otel-collector 并转发 SkyWalking OAP；请到 SkyWalking UI 查看链路数据",
 	})
 }
 
@@ -722,10 +723,10 @@ type skywalkingTraceReq struct {
 }
 
 // SkyWalkingTrace 在当前请求链路（entry span）下创建一段子 span，用于验证上报链路。
-// 前置条件：skywalking.enable=true 且 OAP 可达；请求本身已被 trace 中间件覆盖。
+// 前置条件：skywalking.enable=true 且 otel-collector → OAP 链路可达；请求本身已被 trace 中间件覆盖。
 // POST /test/skywalking/trace
 func (h *Controller) SkyWalkingTrace(c *gin.Context) {
-	tracer := infrastructure.SkyWalking()
+	tracer := infrastructure.SkyWalkingTracer()
 	if tracer == nil {
 		response.Fail(c, errs.Internal("skywalking 未启用"))
 		return
@@ -746,18 +747,15 @@ func (h *Controller) SkyWalkingTrace(c *gin.Context) {
 		req.SleepMs = 5000
 	}
 
-	// 在 gin 中间件注入的 entry span 上下文下创建子 span，形成完整调用链
-	span, _, err := tracer.CreateLocalSpan(c.Request.Context())
-	if err != nil {
-		response.Fail(c, errs.Internal("创建 span 失败: "+err.Error()))
-		return
-	}
+	// 在 otelgin 注入的 entry span 上下文下创建子 span，形成完整调用链
+	ctx, span := tracer.Start(c.Request.Context(), req.Operation, trace.WithAttributes(
+		attribute.Bool("debug", true),
+		attribute.Int("sleep_ms", req.SleepMs),
+	))
 	defer span.End()
-	span.SetOperationName(req.Operation)
-	span.Tag("debug", "true")
 
 	time.Sleep(time.Duration(req.SleepMs) * time.Millisecond)
-	span.Tag("sleep_ms", strconv.Itoa(req.SleepMs))
+	_ = ctx // 上下文可继续传递给下游调用以串联 span
 
 	response.OK(c, gin.H{
 		"operation": req.Operation,

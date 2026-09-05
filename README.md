@@ -11,7 +11,7 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
-- **链路追踪**：SkyWalking（go2sky gRPC 上报 OAP，gin 中间件自动埋点）
+- **链路追踪**：OpenTelemetry SDK（OTLP 上报 otel-collector，转发 SkyWalking OAP 11 + BanyanDB + Horizon UI；otelgin 中间件自动埋点）
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
 - **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / 后端 / 前端）
