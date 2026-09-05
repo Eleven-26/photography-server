@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"context"
+	"time"
+
 	"gorm.io/gorm"
+
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
-	"time"
 )
 
 type DashboardRepo struct {
@@ -29,9 +32,10 @@ type Overview struct {
 	UnreadNotify    int64   `json:"unread_notify"`
 }
 
-func (r *DashboardRepo) GetOverview(companyID, userID int64) (*Overview, error) {
+// GetOverview 聚合多条统计 SQL。ctx 透传后所有 Count 均挂到当前请求链路。
+func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64) (*Overview, error) {
 	var ov Overview
-	q := r.tenant(companyID)
+	q := r.tenant(companyID).WithContext(ctx)
 
 	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusPendingDeposit)).Count(&ov.PendingDeposit)
 	q.Model(&model.Order{}).Where("status = ?", int(enum.OrderStatusRetouching)).Count(&ov.PendingRetouch)
@@ -47,8 +51,8 @@ func (r *DashboardRepo) GetOverview(companyID, userID int64) (*Overview, error) 
 	return &ov, nil
 }
 
-func (r *DashboardRepo) GetCalendarBlocks(companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {
+func (r *DashboardRepo) GetCalendarBlocks(ctx context.Context, companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {
 	var list []model.CalendarBlock
-	err := r.tenant(companyID).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
 	return list, err
 }

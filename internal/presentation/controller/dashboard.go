@@ -9,7 +9,7 @@ import (
 
 func (h *Controller) DashboardOverview(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	ov, err := h.Svc.Overview(op)
+	ov, err := h.Svc.Overview(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return

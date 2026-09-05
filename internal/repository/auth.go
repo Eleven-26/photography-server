@@ -1,9 +1,12 @@
 package repository
 
 import (
-	"gorm.io/gorm"
-	"photography-server/internal/model"
+	"context"
 	"time"
+
+	"gorm.io/gorm"
+
+	"photography-server/internal/model"
 )
 
 type AuthRepo struct {
@@ -18,30 +21,31 @@ func (r *AuthRepo) WithTx(tx *gorm.DB) *AuthRepo {
 
 func NewAuthRepo() *AuthRepo { return &AuthRepo{} }
 
-func (r *AuthRepo) GetByUsername(username string) (*model.SysUser, error) {
+// GetByUsername 按用户名查用户（登录用）。ctx 透传请求上下文：SQL span 挂到当前链路、支持超时取消。
+func (r *AuthRepo) GetByUsername(ctx context.Context, username string) (*model.SysUser, error) {
 	var u model.SysUser
-	if err := r.conn().Where("username = ?", username).First(&u).Error; err != nil {
+	if err := r.conn().WithContext(ctx).Where("username = ?", username).First(&u).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *AuthRepo) GetByID(companyID, userID int64) (*model.SysUser, error) {
+func (r *AuthRepo) GetByID(ctx context.Context, companyID, userID int64) (*model.SysUser, error) {
 	var u model.SysUser
-	if err := r.tenant(companyID).First(&u, userID).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&u, userID).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *AuthRepo) UpdateLoginInfo(userID int64, ip string) error {
+func (r *AuthRepo) UpdateLoginInfo(ctx context.Context, userID int64, ip string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return r.conn().Model(&model.SysUser{}).Where("id = ?", userID).Updates(map[string]interface{}{
+	return r.conn().WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"last_login_at": now,
 		"last_login_ip": ip,
 	}).Error
 }
 
-func (r *AuthRepo) UpdatePassword(userID int64, hash string) error {
-	return r.conn().Model(&model.SysUser{}).Where("id = ?", userID).Update("password", hash).Error
+func (r *AuthRepo) UpdatePassword(ctx context.Context, userID int64, hash string) error {
+	return r.conn().WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).Update("password", hash).Error
 }

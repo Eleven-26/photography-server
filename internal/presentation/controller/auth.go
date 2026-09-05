@@ -15,7 +15,7 @@ func (h *Controller) Login(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	resp, err := h.Svc.Login(h.Cfg.JWT.Secret, h.Cfg.JWT.Issuer, h.Cfg.JWT.ExpireHours, req, c.ClientIP())
+	resp, err := h.Svc.Login(c.Request.Context(), h.Cfg.JWT.Secret, h.Cfg.JWT.Issuer, h.Cfg.JWT.ExpireHours, req, c.ClientIP())
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -26,7 +26,7 @@ func (h *Controller) Login(c *gin.Context) {
 // Profile 当前登录用户信息
 func (h *Controller) Profile(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	u, err := h.Svc.Profile(op)
+	u, err := h.Svc.Profile(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -42,7 +42,7 @@ func (h *Controller) ChangePassword(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ChangePassword(op, req.OldPassword, req.NewPassword); err != nil {
+	if err := h.Svc.ChangePassword(c.Request.Context(), op, req.OldPassword, req.NewPassword); err != nil {
 		response.Fail(c, err)
 		return
 	}

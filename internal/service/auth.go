@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"photography-server/internal/model"
@@ -9,8 +11,9 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) Login(secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
-	u, err := s.AuthRepo.GetByUsername(req.Username)
+// Login 登录。ctx 由 controller 传入（c.Request.Context()），透传给 repo 使 SQL 挂到当前链路。
+func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
+	u, err := s.AuthRepo.GetByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
@@ -32,13 +35,13 @@ func (s *Service) Login(secret, issuer string, expireHours int, req dto.LoginReq
 		return nil, errs.Internal("")
 	}
 
-	s.AuthRepo.UpdateLoginInfo(u.ID, ip)
+	s.AuthRepo.UpdateLoginInfo(ctx, u.ID, ip)
 	u.Password = ""
 	return &dto.LoginResp{Token: token, User: *u}, nil
 }
 
-func (s *Service) Profile(op Operator) (*model.SysUser, error) {
-	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
+func (s *Service) Profile(ctx context.Context, op Operator) (*model.SysUser, error) {
+	u, err := s.AuthRepo.GetByID(ctx, op.CompanyID, op.UserID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrUserNotFound)
 	}
@@ -46,8 +49,8 @@ func (s *Service) Profile(op Operator) (*model.SysUser, error) {
 	return u, nil
 }
 
-func (s *Service) ChangePassword(op Operator, oldPwd, newPwd string) error {
-	u, err := s.AuthRepo.GetByID(op.CompanyID, op.UserID)
+func (s *Service) ChangePassword(ctx context.Context, op Operator, oldPwd, newPwd string) error {
+	u, err := s.AuthRepo.GetByID(ctx, op.CompanyID, op.UserID)
 	if err != nil {
 		return errs.NotFound(errs.ErrUserNotFound)
 	}
@@ -58,5 +61,5 @@ func (s *Service) ChangePassword(op Operator, oldPwd, newPwd string) error {
 	if err != nil {
 		return errs.Internal("")
 	}
-	return s.AuthRepo.UpdatePassword(op.UserID, string(hash))
+	return s.AuthRepo.UpdatePassword(ctx, op.UserID, string(hash))
 }
