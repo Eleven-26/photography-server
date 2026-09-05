@@ -105,6 +105,9 @@ make docker-up / docker-down / docker-build
 ```
 把photography-server的 .env.example 复制出来改成 .env（value要改成真实值）
 把photography-server的 docker-compose.yml 复制出来
+把photography-server/config的 horizon.example.yaml 复制出来改成 horizon.yaml，存放位置根据docker-composer的配置存放
+把photography-server/config的 otel-collector.example.yaml 复制出来改成 config.yaml，存放位置根据docker-composer的配置存放
+把photography-server/config的 nats.example.conf 复制出来改成 nats.conf，存放位置根据docker-composer的配置存放
 
 目录结构
 pro
