@@ -20,7 +20,7 @@ func (h *Controller) DashboardOverview(c *gin.Context) {
 func (h *Controller) NotificationList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListNotifications(op, page, pageSize, queryStr(c, "unread") == "1")
+	list, total, err := h.Svc.ListNotifications(c.Request.Context(), op, page, pageSize, queryStr(c, "unread") == "1")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -30,7 +30,7 @@ func (h *Controller) NotificationList(c *gin.Context) {
 
 func (h *Controller) NotificationUnreadCount(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	count, err := h.Svc.UnreadNotificationCount(op)
+	count, err := h.Svc.UnreadNotificationCount(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -45,7 +45,7 @@ func (h *Controller) NotificationRead(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.MarkNotificationRead(op, id); err != nil {
+	if err := h.Svc.MarkNotificationRead(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -54,7 +54,7 @@ func (h *Controller) NotificationRead(c *gin.Context) {
 
 func (h *Controller) NotificationReadAll(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	if err := h.Svc.MarkAllNotificationsRead(op); err != nil {
+	if err := h.Svc.MarkAllNotificationsRead(c.Request.Context(), op); err != nil {
 		response.Fail(c, err)
 		return
 	}

@@ -14,7 +14,7 @@ func (h *Controller) UserList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	storeID, _ := strconv.ParseInt(c.Query("store_id"), 10, 64)
-	list, total, err := h.Svc.ListUsers(op, page, pageSize, queryStr(c, "keyword"), storeID)
+	list, total, err := h.Svc.ListUsers(c.Request.Context(), op, page, pageSize, queryStr(c, "keyword"), storeID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -29,7 +29,7 @@ func (h *Controller) UserCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreateUser(op, req); err != nil {
+	if err := h.Svc.CreateUser(c.Request.Context(), op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -48,7 +48,7 @@ func (h *Controller) UserUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateUser(op, id, req); err != nil {
+	if err := h.Svc.UpdateUser(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -62,7 +62,7 @@ func (h *Controller) UserDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeleteUser(op, id); err != nil {
+	if err := h.Svc.DeleteUser(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Controller) UserResetPassword(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ResetPassword(op, id, req.Password); err != nil {
+	if err := h.Svc.ResetPassword(c.Request.Context(), op, id, req.Password); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -90,7 +90,7 @@ func (h *Controller) UserResetPassword(c *gin.Context) {
 
 func (h *Controller) RoleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	list, err := h.Svc.ListRoles(op)
+	list, err := h.Svc.ListRoles(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -105,7 +105,7 @@ func (h *Controller) RoleCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreateRole(op, req); err != nil {
+	if err := h.Svc.CreateRole(c.Request.Context(), op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -124,7 +124,7 @@ func (h *Controller) RoleUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateRole(op, id, req); err != nil {
+	if err := h.Svc.UpdateRole(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -138,7 +138,7 @@ func (h *Controller) RoleDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeleteRole(op, id); err != nil {
+	if err := h.Svc.DeleteRole(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -147,7 +147,7 @@ func (h *Controller) RoleDelete(c *gin.Context) {
 
 func (h *Controller) StoreList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	list, err := h.Svc.ListStores(op)
+	list, err := h.Svc.ListStores(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -162,7 +162,7 @@ func (h *Controller) StoreCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreateStore(op, req); err != nil {
+	if err := h.Svc.CreateStore(c.Request.Context(), op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -181,7 +181,7 @@ func (h *Controller) StoreUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateStore(op, id, req); err != nil {
+	if err := h.Svc.UpdateStore(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -195,7 +195,7 @@ func (h *Controller) StoreDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeleteStore(op, id); err != nil {
+	if err := h.Svc.DeleteStore(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}

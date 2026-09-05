@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 
 	"photography-server/internal/model"
@@ -19,6 +21,6 @@ func (r *UploadRepo) WithTx(tx *gorm.DB) *UploadRepo {
 func NewUploadRepo() *UploadRepo { return &UploadRepo{} }
 
 // Create 记录上传文件（company_id 由调用方在 model 上填充）
-func (r *UploadRepo) Create(u *model.Upload) error {
-	return r.conn().Create(u).Error
+func (r *UploadRepo) Create(ctx context.Context, u *model.Upload) error {
+	return r.conn().WithContext(ctx).Create(u).Error
 }

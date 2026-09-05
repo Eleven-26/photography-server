@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"photography-server/internal/domain"
@@ -10,19 +11,19 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) ListLeads(op Operator, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
-	return s.LeadRepo.List(op.CompanyID, page, pageSize, keyword, status, ownerID)
+func (s *Service) ListLeads(ctx context.Context, op Operator, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
+	return s.LeadRepo.List(ctx, op.CompanyID, page, pageSize, keyword, status, ownerID)
 }
 
-func (s *Service) GetLeadDetail(op Operator, id int64) (*model.Lead, error) {
-	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
+func (s *Service) GetLeadDetail(ctx context.Context, op Operator, id int64) (*model.Lead, error) {
+	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 	return l, nil
 }
 
-func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, error) {
+func (s *Service) CreateLead(ctx context.Context, op Operator, req dto.LeadCreateReq) (*model.Lead, error) {
 	l := model.Lead{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -41,18 +42,18 @@ func (s *Service) CreateLead(op Operator, req dto.LeadCreateReq) (*model.Lead, e
 		OwnerID:     orDefaultInt64(req.OwnerID, op.UserID),
 		Status:      enum.LeadStatusPending,
 	}
-	if err := s.LeadRepo.Create(&l); err != nil {
+	if err := s.LeadRepo.Create(ctx, &l); err != nil {
 		return nil, err
 	}
 	return &l, nil
 }
 
-func (s *Service) UpdateLead(op Operator, id int64, req dto.LeadUpdateReq) error {
-	_, err := s.LeadRepo.GetByID(op.CompanyID, id)
+func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto.LeadUpdateReq) error {
+	_, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
 	}
-	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
+	return s.LeadRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"name":         req.Name,
 		"mobile":       req.Mobile,
 		"source":       req.Source,
@@ -67,13 +68,13 @@ func (s *Service) UpdateLead(op Operator, id int64, req dto.LeadUpdateReq) error
 	})
 }
 
-func (s *Service) FollowLead(op Operator, id int64, req dto.LeadFollowReq) error {
-	l, err := s.LeadRepo.GetByID(op.CompanyID, id)
+func (s *Service) FollowLead(ctx context.Context, op Operator, id int64, req dto.LeadFollowReq) error {
+	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.LeadRepo.Update(op.CompanyID, id, map[string]interface{}{
+	return s.LeadRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"follower":       l.Follower + 1,
 		"last_follow_at": now,
 		"next_follow_at": nil,
@@ -81,8 +82,8 @@ func (s *Service) FollowLead(op Operator, id int64, req dto.LeadFollowReq) error
 	})
 }
 
-func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Customer, error) {
-	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
+func (s *Service) ConvertLeadToCustomer(ctx context.Context, op Operator, leadID int64) (*model.Customer, error) {
+	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
@@ -99,11 +100,11 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 		Source:  l.Source,
 		Status:  enum.CustomerStatusPotential,
 	}
-	if err := s.CustomerRepo.Create(&c); err != nil {
+	if err := s.CustomerRepo.Create(ctx, &c); err != nil {
 		return nil, err
 	}
 
-	s.LeadRepo.Update(op.CompanyID, leadID, map[string]interface{}{
+	s.LeadRepo.Update(ctx, op.CompanyID, leadID, map[string]interface{}{
 		"customer_id": c.ID,
 		"status":      enum.LeadStatusConfirmed,
 	})
@@ -111,13 +112,13 @@ func (s *Service) ConvertLeadToCustomer(op Operator, leadID int64) (*model.Custo
 	return &c, nil
 }
 
-func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
-	l, err := s.LeadRepo.GetByID(op.CompanyID, leadID)
+func (s *Service) CreateQuote(ctx context.Context, op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
+	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 
-	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+	pkg, err := s.PackageRepo.GetByID(ctx, op.CompanyID, req.PackageID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
@@ -141,10 +142,10 @@ func (s *Service) CreateQuote(op Operator, leadID int64, req dto.QuoteCreateReq)
 		OwnerID:     op.UserID,
 		Status:      enum.QuoteStatusSent,
 	}
-	if err := s.LeadRepo.CreateQuote(&q); err != nil {
+	if err := s.LeadRepo.CreateQuote(ctx, &q); err != nil {
 		return nil, err
 	}
 
-	s.LeadRepo.Update(op.CompanyID, leadID, map[string]interface{}{"status": enum.LeadStatusQuoted})
+	s.LeadRepo.Update(ctx, op.CompanyID, leadID, map[string]interface{}{"status": enum.LeadStatusQuoted})
 	return &q, nil
 }

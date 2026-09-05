@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
@@ -44,12 +45,13 @@ const casRefundSQL = "UPDATE `biz_order_refund` SET `status`=?,`updated_at`=? WH
 // TestConfirmPaymentPending_Success CAS 命中：仅当收款记录仍为“待核验”时更新成功。
 func TestConfirmPaymentPending_Success(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	mock.ExpectExec(regexp.QuoteMeta(casPaymentSQL)).
 		WithArgs(enum.PaymentStatusConfirmed, sqlmock.AnyArg(), 1001, 55, enum.PaymentStatusPending, 0).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	ok, err := repo.ConfirmPaymentPending(1001, 55, map[string]interface{}{
+	ok, err := repo.ConfirmPaymentPending(ctx, 1001, 55, map[string]interface{}{
 		"status": enum.PaymentStatusConfirmed,
 	})
 	if err != nil {
@@ -66,12 +68,13 @@ func TestConfirmPaymentPending_Success(t *testing.T) {
 // TestConfirmPaymentPending_NoMatch CAS 未命中：记录已被并发处理（状态不再是待核验），返回 false。
 func TestConfirmPaymentPending_NoMatch(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	mock.ExpectExec(regexp.QuoteMeta(casPaymentSQL)).
 		WithArgs(enum.PaymentStatusConfirmed, sqlmock.AnyArg(), 1001, 55, enum.PaymentStatusPending, 0).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	ok, err := repo.ConfirmPaymentPending(1001, 55, map[string]interface{}{
+	ok, err := repo.ConfirmPaymentPending(ctx, 1001, 55, map[string]interface{}{
 		"status": enum.PaymentStatusConfirmed,
 	})
 	if err != nil {
@@ -85,12 +88,13 @@ func TestConfirmPaymentPending_NoMatch(t *testing.T) {
 // TestAuditRefundApplying CAS 语义同收款确认：退款单必须仍处于“申请中”才能审核。
 func TestAuditRefundApplying(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	mock.ExpectExec(regexp.QuoteMeta(casRefundSQL)).
 		WithArgs(enum.RefundStatusApproved, sqlmock.AnyArg(), 2002, 88, enum.RefundStatusApplying, 0).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	ok, err := repo.AuditRefundApplying(2002, 88, map[string]interface{}{
+	ok, err := repo.AuditRefundApplying(ctx, 2002, 88, map[string]interface{}{
 		"status": enum.RefundStatusApproved,
 	})
 	if err != nil {
@@ -108,6 +112,7 @@ func TestAuditRefundApplying(t *testing.T) {
 // 且事务回滚后写操作不落库（sqlmock 层面：未预期的 COMMIT 会报错）。
 func TestWithTx_Rollback(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 	companyID, paymentID := int64(1001), int64(55)
 
 	mock.ExpectBegin()
@@ -121,7 +126,7 @@ func TestWithTx_Rollback(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	repoTx := repo.WithTx(tx)
-	ok, err := repoTx.ConfirmPaymentPending(companyID, paymentID, map[string]interface{}{
+	ok, err := repoTx.ConfirmPaymentPending(ctx, companyID, paymentID, map[string]interface{}{
 		"status": enum.PaymentStatusConfirmed,
 	})
 	if err != nil {
@@ -143,6 +148,7 @@ func TestWithTx_Rollback(t *testing.T) {
 // TestWithTx_Commit 验证 WithTx 副本的写操作随事务一起提交（同一连接）。
 func TestWithTx_Commit(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 	companyID, refundID := int64(2002), int64(88)
 
 	mock.ExpectBegin()
@@ -156,7 +162,7 @@ func TestWithTx_Commit(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	repoTx := repo.WithTx(tx)
-	ok, err := repoTx.AuditRefundApplying(companyID, refundID, map[string]interface{}{
+	ok, err := repoTx.AuditRefundApplying(ctx, companyID, refundID, map[string]interface{}{
 		"status": enum.RefundStatusRejected,
 	})
 	if err != nil {
@@ -178,6 +184,7 @@ func TestWithTx_Commit(t *testing.T) {
 // TestGetByID_TenantFiltered 验证按主键查询自带 company_id 过滤与软删除条件（多租户隔离核心约束）。
 func TestGetByID_TenantFiltered(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	selectSQL := "SELECT * FROM `biz_order` WHERE company_id = ? AND `biz_order`.`id` = ? AND `biz_order`.`deleted` = ? ORDER BY `biz_order`.`id` LIMIT ?"
 	mock.ExpectQuery(regexp.QuoteMeta(selectSQL)).
@@ -185,7 +192,7 @@ func TestGetByID_TenantFiltered(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "company_id", "status"}).
 			AddRow(42, 1001, enum.OrderStatusPendingShoot))
 
-	o, err := repo.GetByID(1001, 42)
+	o, err := repo.GetByID(ctx, 1001, 42)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -202,6 +209,7 @@ func TestGetByID_TenantFiltered(t *testing.T) {
 // 缺失任一条件（尤其 FOR UPDATE）都会使本测试失败。
 func TestGetByIDForUpdate_RowLock(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	selectSQL := "SELECT * FROM `biz_order` WHERE company_id = ? AND `biz_order`.`id` = ? AND `biz_order`.`deleted` = ? ORDER BY `biz_order`.`id` LIMIT ? FOR UPDATE"
 	mock.ExpectQuery(regexp.QuoteMeta(selectSQL)).
@@ -209,7 +217,7 @@ func TestGetByIDForUpdate_RowLock(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "company_id", "status"}).
 			AddRow(42, 1001, enum.OrderStatusPendingDeposit))
 
-	o, err := repo.GetByIDForUpdate(1001, 42)
+	o, err := repo.GetByIDForUpdate(ctx, 1001, 42)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,6 +233,7 @@ func TestGetByIDForUpdate_RowLock(t *testing.T) {
 // 通过 WithTx 绑定后，FOR UPDATE 查询与后续写共享同一事务连接。
 func TestGetByIDForUpdate_TxContext(t *testing.T) {
 	repo, mock := newMockRepo(t)
+	ctx := context.Background()
 
 	mock.ExpectBegin()
 	tx := repo.conn().Begin()
@@ -239,7 +248,7 @@ func TestGetByIDForUpdate_TxContext(t *testing.T) {
 			AddRow(42, 1001, enum.OrderStatusPendingDeposit))
 
 	repoTx := repo.WithTx(tx)
-	o, err := repoTx.GetByIDForUpdate(1001, 42)
+	o, err := repoTx.GetByIDForUpdate(ctx, 1001, 42)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -255,4 +264,3 @@ func TestGetByIDForUpdate_TxContext(t *testing.T) {
 		t.Errorf("unmet sql expectations: %v", err)
 	}
 }
-

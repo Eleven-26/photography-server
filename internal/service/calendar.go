@@ -1,17 +1,19 @@
 package service
 
 import (
+	"context"
+
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) ListCalendar(op Operator, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
-	return s.CalendarRepo.List(op.CompanyID, startDate, endDate, photographerID)
+func (s *Service) ListCalendar(ctx context.Context, op Operator, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
+	return s.CalendarRepo.List(ctx, op.CompanyID, startDate, endDate, photographerID)
 }
 
-func (s *Service) BlockCalendar(op Operator, req dto.CalendarBlockReq) (*model.CalendarBlock, error) {
+func (s *Service) BlockCalendar(ctx context.Context, op Operator, req dto.CalendarBlockReq) (*model.CalendarBlock, error) {
 	block := model.CalendarBlock{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -29,18 +31,18 @@ func (s *Service) BlockCalendar(op Operator, req dto.CalendarBlockReq) (*model.C
 		Remark:         req.Remark,
 		Status:         enum.BlockStatusLocked,
 	}
-	if err := s.CalendarRepo.Create(&block); err != nil {
+	if err := s.CalendarRepo.Create(ctx, &block); err != nil {
 		return nil, err
 	}
 	return &block, nil
 }
 
-func (s *Service) CancelCalendarBlock(op Operator, id int64) error {
-	_, err := s.CalendarRepo.GetByID(op.CompanyID, id)
+func (s *Service) CancelCalendarBlock(ctx context.Context, op Operator, id int64) error {
+	_, err := s.CalendarRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrCalendarNotFound)
 	}
-	return s.CalendarRepo.Update(op.CompanyID, id, map[string]interface{}{
+	return s.CalendarRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"status": enum.BlockStatusCancelled, "updated_by": op.UserID,
 	})
 }

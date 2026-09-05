@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"photography-server/internal/model"
@@ -16,15 +17,15 @@ func monthRange(month string) (string, string) {
 	return month + "-01 00:00:00", month + "-31 23:59:59"
 }
 
-func (s *Service) FinanceSummary(op Operator, month string) (*repository.Summary, error) {
+func (s *Service) FinanceSummary(ctx context.Context, op Operator, month string) (*repository.Summary, error) {
 	start, end := monthRange(month)
-	return s.FinanceRepo.GetSummary(op.CompanyID, start, end)
+	return s.FinanceRepo.GetSummary(ctx, op.CompanyID, start, end)
 }
 
-func (s *Service) ListFinancePayments(op Operator, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
-	return s.FinanceRepo.ListPayments(op.CompanyID, page, pageSize, status)
+func (s *Service) ListFinancePayments(ctx context.Context, op Operator, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
+	return s.FinanceRepo.ListPayments(ctx, op.CompanyID, page, pageSize, status)
 }
 
-func (s *Service) ListFinanceRefunds(op Operator, page, pageSize int) ([]model.OrderRefund, int64, error) {
-	return s.FinanceRepo.ListRefunds(op.CompanyID, page, pageSize)
+func (s *Service) ListFinanceRefunds(ctx context.Context, op Operator, page, pageSize int) ([]model.OrderRefund, int64, error) {
+	return s.FinanceRepo.ListRefunds(ctx, op.CompanyID, page, pageSize)
 }

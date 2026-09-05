@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -13,8 +14,8 @@ import (
 	"photography-server/internal/repository"
 )
 
-func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
-	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
+func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
+	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
@@ -57,14 +58,14 @@ func (s *Service) CreateRefund(op Operator, orderID int64, req dto.RefundCreateR
 		ApplyBy:    op.UserID,
 		ApplyName:  op.Username,
 	}
-	if err := s.OrderRepo.CreateRefund(&rf); err != nil {
+	if err := s.OrderRepo.CreateRefund(ctx, &rf); err != nil {
 		return nil, err
 	}
 	return &rf, nil
 }
 
-func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark string) error {
-	rf, err := s.OrderRepo.GetRefundByID(op.CompanyID, id)
+func (s *Service) AuditRefund(ctx context.Context, op Operator, id int64, approved bool, remark string) error {
+	rf, err := s.OrderRepo.GetRefundByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrRefundNotFound)
 	}
@@ -80,7 +81,7 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 
 	return repository.Tx(func(tx *gorm.DB) error {
 		// 1. 更新退款单状态（CAS：仅当仍为“申请中”时生效，防并发重复审核）
-		ok, err := s.OrderRepo.WithTx(tx).AuditRefundApplying(op.CompanyID, id, map[string]interface{}{
+		ok, err := s.OrderRepo.WithTx(tx).AuditRefundApplying(ctx, op.CompanyID, id, map[string]interface{}{
 			"status":       status,
 			"audit_by":     op.UserID,
 			"audit_at":     now,
@@ -95,24 +96,24 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 
 		if approved {
 			// 2. 事务内锁定读取订单，避免并发审核导致退款金额重复累加
-			if _, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(op.CompanyID, rf.OrderID); err != nil {
+			if _, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(ctx, op.CompanyID, rf.OrderID); err != nil {
 				return errs.NotFound(errs.ErrOrderNotFound)
 			}
 			// 3. 累加订单已退金额（带租户过滤，同一事务连接）
-			if err := s.OrderRepo.WithTx(tx).Update(op.CompanyID, rf.OrderID, map[string]interface{}{
+			if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, rf.OrderID, map[string]interface{}{
 				"refund_amt":     gorm.Expr("refund_amt + ?", rf.Amount),
 				"payment_status": enum.PaymentStatusRefunded,
 			}); err != nil {
 				return err
 			}
-			if err := s.OrderRepo.WithTx(tx).UpdateRefund(op.CompanyID, id, map[string]interface{}{"refund_at": now}); err != nil {
+			if err := s.OrderRepo.WithTx(tx).UpdateRefund(ctx, op.CompanyID, id, map[string]interface{}{"refund_at": now}); err != nil {
 				return err
 			}
-			if err := s.writeOrderLogTx(tx, rf.OrderID, "refund_approved", 0, enum.RefundStatusApproved, "退款审核通过", op); err != nil {
+			if err := s.writeOrderLogTx(ctx, tx, rf.OrderID, "refund_approved", 0, enum.RefundStatusApproved, "退款审核通过", op); err != nil {
 				return err
 			}
 		} else {
-			if err := s.writeOrderLogTx(tx, rf.OrderID, "refund_rejected", 0, enum.RefundStatusRejected, "退款审核驳回: "+remark, op); err != nil {
+			if err := s.writeOrderLogTx(ctx, tx, rf.OrderID, "refund_rejected", 0, enum.RefundStatusRejected, "退款审核驳回: "+remark, op); err != nil {
 				return err
 			}
 		}
@@ -121,6 +122,6 @@ func (s *Service) AuditRefund(op Operator, id int64, approved bool, remark strin
 	})
 }
 
-func (s *Service) ListRefunds(op Operator, orderID int64) ([]model.OrderRefund, error) {
-	return s.OrderRepo.ListRefunds(op.CompanyID, orderID)
+func (s *Service) ListRefunds(ctx context.Context, op Operator, orderID int64) ([]model.OrderRefund, error) {
+	return s.OrderRepo.ListRefunds(ctx, op.CompanyID, orderID)
 }

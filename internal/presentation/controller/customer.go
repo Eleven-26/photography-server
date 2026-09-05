@@ -11,7 +11,7 @@ import (
 func (h *Controller) CustomerList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListCustomers(op, page, pageSize, queryStr(c, "keyword"))
+	list, total, err := h.Svc.ListCustomers(c.Request.Context(), op, page, pageSize, queryStr(c, "keyword"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -26,7 +26,7 @@ func (h *Controller) CustomerDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	detail, err := h.Svc.GetCustomer(op, id)
+	detail, err := h.Svc.GetCustomer(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -41,7 +41,7 @@ func (h *Controller) CustomerCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	customer, err := h.Svc.CreateCustomer(op, req)
+	customer, err := h.Svc.CreateCustomer(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -61,7 +61,7 @@ func (h *Controller) CustomerUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateCustomer(op, id, req); err != nil {
+	if err := h.Svc.UpdateCustomer(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -75,7 +75,7 @@ func (h *Controller) CustomerDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeleteCustomer(op, id); err != nil {
+	if err := h.Svc.DeleteCustomer(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -84,7 +84,7 @@ func (h *Controller) CustomerDelete(c *gin.Context) {
 
 func (h *Controller) CustomerStats(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	st, err := h.Svc.GetCustomerStats(op)
+	st, err := h.Svc.GetCustomerStats(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -101,7 +101,7 @@ func (h *Controller) CustomerOrders(c *gin.Context) {
 		return
 	}
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOrders(op, page, pageSize, "", id)
+	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, "", id)
 	if err != nil {
 		response.Fail(c, err)
 		return

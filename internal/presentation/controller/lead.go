@@ -14,7 +14,7 @@ func (h *Controller) LeadList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	ownerID, _ := strconv.ParseInt(c.Query("owner_id"), 10, 64)
-	list, total, err := h.Svc.ListLeads(op, page, pageSize,
+	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "keyword"), queryStr(c, "status"), ownerID)
 	if err != nil {
 		response.Fail(c, err)
@@ -30,7 +30,7 @@ func (h *Controller) LeadDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	lead, err := h.Svc.GetLeadDetail(op, id)
+	lead, err := h.Svc.GetLeadDetail(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -45,7 +45,7 @@ func (h *Controller) LeadCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	lead, err := h.Svc.CreateLead(op, req)
+	lead, err := h.Svc.CreateLead(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -65,7 +65,7 @@ func (h *Controller) LeadUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateLead(op, id, req); err != nil {
+	if err := h.Svc.UpdateLead(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -88,7 +88,7 @@ func (h *Controller) LeadFollow(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.FollowLead(op, id, req); err != nil {
+	if err := h.Svc.FollowLead(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -102,7 +102,7 @@ func (h *Controller) LeadConvert(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	customer, err := h.Svc.ConvertLeadToCustomer(op, id)
+	customer, err := h.Svc.ConvertLeadToCustomer(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -124,7 +124,7 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	quote, err := h.Svc.CreateQuote(op, id, req)
+	quote, err := h.Svc.CreateQuote(c.Request.Context(), op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return

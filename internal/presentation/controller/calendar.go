@@ -13,7 +13,7 @@ import (
 func (h *Controller) CalendarList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
-	list, err := h.Svc.ListCalendar(op, queryStr(c, "start_date"), queryStr(c, "end_date"), photographerID)
+	list, err := h.Svc.ListCalendar(c.Request.Context(), op, queryStr(c, "start_date"), queryStr(c, "end_date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -28,7 +28,7 @@ func (h *Controller) CalendarLock(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	block, err := h.Svc.BlockCalendar(op, req)
+	block, err := h.Svc.BlockCalendar(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -43,7 +43,7 @@ func (h *Controller) CalendarCancel(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CancelCalendarBlock(op, id); err != nil {
+	if err := h.Svc.CancelCalendarBlock(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}

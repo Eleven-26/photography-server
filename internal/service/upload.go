@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +21,7 @@ type UploadResult struct {
 }
 
 // UploadFile 保存上传文件到本地 uploads 目录并记录到 biz_upload
-func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID int64, fileName string, data []byte) (*UploadResult, error) {
+func (s *Service) UploadFile(ctx context.Context, op Operator, storeID int64, bizType string, bizID int64, fileName string, data []byte) (*UploadResult, error) {
 	ext := filepath.Ext(fileName)
 	if ext == "" {
 		ext = ".bin"
@@ -56,7 +57,7 @@ func (s *Service) UploadFile(op Operator, storeID int64, bizType string, bizID i
 		Size:     int64(len(data)),
 		UploadBy: op.UserID,
 	}
-	if err := s.UploadRepo.Create(&u); err != nil {
+	if err := s.UploadRepo.Create(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &UploadResult{URL: url, FileName: fileName, FileType: enum.UploadTypeName(fileType), Size: int64(len(data))}, nil

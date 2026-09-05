@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
@@ -20,8 +22,8 @@ func NewPackageRepo() *PackageRepo {
 }
 
 // List 套餐列表（分页 + 关键字 + 状态 + 类别筛选）
-func (r *PackageRepo) List(companyID int64, page, pageSize int, keyword, status, category string) ([]model.Package, int64, error) {
-	q := r.tenant(companyID)
+func (r *PackageRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, status, category string) ([]model.Package, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR code LIKE ?", kw, kw)
@@ -45,9 +47,9 @@ func (r *PackageRepo) List(companyID int64, page, pageSize int, keyword, status,
 }
 
 // GetByID 根据 ID 查询套餐
-func (r *PackageRepo) GetByID(companyID, id int64) (*model.Package, error) {
+func (r *PackageRepo) GetByID(ctx context.Context, companyID, id int64) (*model.Package, error) {
 	var p model.Package
-	if err := r.tenant(companyID).First(&p, id).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&p, id).Error; err != nil {
 		return nil, err
 	}
 	return &p, nil
@@ -55,23 +57,23 @@ func (r *PackageRepo) GetByID(companyID, id int64) (*model.Package, error) {
 
 // Create 创建套餐（company_id 由调用方在 model 上填充；
 // 事务内请使用 WithTx(tx).Create(...) 复用事务连接）
-func (r *PackageRepo) Create(p *model.Package) error {
-	return r.conn().Create(p).Error
+func (r *PackageRepo) Create(ctx context.Context, p *model.Package) error {
+	return r.conn().WithContext(ctx).Create(p).Error
 }
 
 // Update 更新套餐
-func (r *PackageRepo) Update(companyID, id int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.Package{}).Where("id = ?", id).Updates(updates).Error
+func (r *PackageRepo) Update(ctx context.Context, companyID, id int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.Package{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // Delete 删除套餐
-func (r *PackageRepo) Delete(companyID, id int64) error {
-	return r.tenant(companyID).Delete(&model.Package{}, id).Error
+func (r *PackageRepo) Delete(ctx context.Context, companyID, id int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.Package{}, id).Error
 }
 
 // CountOrdersByPackage 统计引用该套餐的订单数
-func (r *PackageRepo) CountOrdersByPackage(companyID, packageID int64) (int64, error) {
+func (r *PackageRepo) CountOrdersByPackage(ctx context.Context, companyID, packageID int64) (int64, error) {
 	var count int64
-	err := r.tenant(companyID).Model(&model.Order{}).Where("package_id = ?", packageID).Count(&count).Error
+	err := r.tenant(companyID).WithContext(ctx).Model(&model.Order{}).Where("package_id = ?", packageID).Count(&count).Error
 	return count, err
 }

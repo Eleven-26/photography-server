@@ -9,7 +9,7 @@ import (
 
 func (h *Controller) FinanceSummary(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	sum, err := h.Svc.FinanceSummary(op, queryStr(c, "month"))
+	sum, err := h.Svc.FinanceSummary(c.Request.Context(), op, queryStr(c, "month"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -20,7 +20,7 @@ func (h *Controller) FinanceSummary(c *gin.Context) {
 func (h *Controller) FinancePayments(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListFinancePayments(op, page, pageSize, queryStr(c, "status"))
+	list, total, err := h.Svc.ListFinancePayments(c.Request.Context(), op, page, pageSize, queryStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -31,7 +31,7 @@ func (h *Controller) FinancePayments(c *gin.Context) {
 func (h *Controller) FinanceRefunds(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListFinanceRefunds(op, page, pageSize)
+	list, total, err := h.Svc.ListFinanceRefunds(c.Request.Context(), op, page, pageSize)
 	if err != nil {
 		response.Fail(c, err)
 		return

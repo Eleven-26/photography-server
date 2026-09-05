@@ -33,7 +33,7 @@ func (h *Controller) UploadFile(c *gin.Context) {
 
 	storeID, _ := strconv.ParseInt(c.PostForm("store_id"), 10, 64)
 	bizID, _ := strconv.ParseInt(c.PostForm("biz_id"), 10, 64)
-	result, err := h.Svc.UploadFile(op, storeID, c.PostForm("biz_type"), bizID, header.Filename, buf)
+	result, err := h.Svc.UploadFile(c.Request.Context(), op, storeID, c.PostForm("biz_type"), bizID, header.Filename, buf)
 	if err != nil {
 		response.Fail(c, err)
 		return

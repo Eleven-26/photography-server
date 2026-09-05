@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -13,19 +14,19 @@ import (
 	"photography-server/internal/repository"
 )
 
-func (s *Service) ListOrders(op Operator, page, pageSize int, status string, customerID int64) ([]model.Order, int64, error) {
-	return s.OrderRepo.List(op.CompanyID, page, pageSize, status, customerID)
+func (s *Service) ListOrders(ctx context.Context, op Operator, page, pageSize int, status string, customerID int64) ([]model.Order, int64, error) {
+	return s.OrderRepo.List(ctx, op.CompanyID, page, pageSize, status, customerID)
 }
 
-func (s *Service) GetOrderDetail(op Operator, id int64) (*dto.OrderDetail, error) {
-	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*dto.OrderDetail, error) {
+	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
-	payments, _ := s.OrderRepo.ListPayments(op.CompanyID, id)
-	refunds, _ := s.OrderRepo.ListRefunds(op.CompanyID, id)
-	logs, _ := s.OrderRepo.ListLogs(op.CompanyID, id)
-	delivery, _ := s.DeliveryRepo.GetByOrderID(op.CompanyID, id)
+	payments, _ := s.OrderRepo.ListPayments(ctx, op.CompanyID, id)
+	refunds, _ := s.OrderRepo.ListRefunds(ctx, op.CompanyID, id)
+	logs, _ := s.OrderRepo.ListLogs(ctx, op.CompanyID, id)
+	delivery, _ := s.DeliveryRepo.GetByOrderID(ctx, op.CompanyID, id)
 
 	return &dto.OrderDetail{
 		Order:    o,
@@ -36,8 +37,8 @@ func (s *Service) GetOrderDetail(op Operator, id int64) (*dto.OrderDetail, error
 	}, nil
 }
 
-func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order, error) {
-	pkg, err := s.PackageRepo.GetByID(op.CompanyID, req.PackageID)
+func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCreateReq) (*model.Order, error) {
+	pkg, err := s.PackageRepo.GetByID(ctx, op.CompanyID, req.PackageID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
@@ -71,12 +72,12 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 	}
 
 	err = repository.Tx(func(tx *gorm.DB) error {
-		if err := s.OrderRepo.WithTx(tx).Create(&o); err != nil {
+		if err := s.OrderRepo.WithTx(tx).Create(ctx, &o); err != nil {
 			return err
 		}
 
 		if req.CustomerID > 0 {
-			if err := s.CustomerRepo.WithTx(tx).Update(op.CompanyID, req.CustomerID, map[string]interface{}{
+			if err := s.CustomerRepo.WithTx(tx).Update(ctx, op.CompanyID, req.CustomerID, map[string]interface{}{
 				"order_count":  gorm.Expr("order_count + 1"),
 				"total_amount": gorm.Expr("total_amount + ?", o.TotalAmt),
 			}); err != nil {
@@ -100,22 +101,22 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 			Photographer:   req.Photographer,
 			Status:         enum.BlockStatusLocked,
 		}
-		if err := s.CalendarRepo.WithTx(tx).Create(&block); err != nil {
+		if err := s.CalendarRepo.WithTx(tx).Create(ctx, &block); err != nil {
 			return err
 		}
 
 		if req.LeadID > 0 {
-			if err := s.LeadRepo.WithTx(tx).Update(op.CompanyID, req.LeadID, map[string]interface{}{"status": enum.LeadStatusConfirmed}); err != nil {
+			if err := s.LeadRepo.WithTx(tx).Update(ctx, op.CompanyID, req.LeadID, map[string]interface{}{"status": enum.LeadStatusConfirmed}); err != nil {
 				return err
 			}
 		}
 		if req.QuoteID > 0 {
-			if err := s.LeadRepo.WithTx(tx).UpdateQuote(op.CompanyID, req.QuoteID, map[string]interface{}{"status": enum.QuoteStatusConverted}); err != nil {
+			if err := s.LeadRepo.WithTx(tx).UpdateQuote(ctx, op.CompanyID, req.QuoteID, map[string]interface{}{"status": enum.QuoteStatusConverted}); err != nil {
 				return err
 			}
 		}
 
-		return s.writeOrderLogTx(tx, o.ID, "create_order", 0, enum.OrderStatusPendingDeposit,
+		return s.writeOrderLogTx(ctx, tx, o.ID, "create_order", 0, enum.OrderStatusPendingDeposit,
 			"创建订单", op)
 	})
 	if err != nil {
@@ -124,15 +125,15 @@ func (s *Service) CreateOrder(op Operator, req dto.OrderCreateReq) (*model.Order
 	return &o, nil
 }
 
-func (s *Service) UpdateOrder(op Operator, id int64, req dto.OrderUpdateReq) error {
-	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+func (s *Service) UpdateOrder(ctx context.Context, op Operator, id int64, req dto.OrderUpdateReq) error {
+	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
 		return errs.BadRequest(errs.ErrOrderCompleted)
 	}
-	return s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{
+	return s.OrderRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"shoot_date":      req.ShootDate,
 		"shoot_time":      req.ShootTime,
 		"shoot_address":   req.ShootAddress,
@@ -143,8 +144,8 @@ func (s *Service) UpdateOrder(op Operator, id int64, req dto.OrderUpdateReq) err
 	})
 }
 
-func (s *Service) ChangeOrderStatus(op Operator, id int64, to enum.OrderStatus, content string) error {
-	o, err := s.OrderRepo.GetByID(op.CompanyID, id)
+func (s *Service) ChangeOrderStatus(ctx context.Context, op Operator, id int64, to enum.OrderStatus, content string) error {
+	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrOrderNotFound)
 	}
@@ -153,21 +154,21 @@ func (s *Service) ChangeOrderStatus(op Operator, id int64, to enum.OrderStatus, 
 		return errs.BadRequest(errs.ErrOrderStatusInvalid)
 	}
 
-	if err := s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{"status": to, "updated_by": op.UserID}); err != nil {
+	if err := s.OrderRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{"status": to, "updated_by": op.UserID}); err != nil {
 		return err
 	}
 
 	if to == enum.OrderStatusCompleted {
 		now := time.Now().Format("2006-01-02 15:04:05")
-		s.OrderRepo.Update(op.CompanyID, id, map[string]interface{}{"finished_at": now})
+		s.OrderRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{"finished_at": now})
 	}
 	if to == enum.OrderStatusCancelled {
-		s.OrderRepo.UpdateCalendarBlockStatus(op.CompanyID, id, enum.BlockStatusCancelled)
+		s.OrderRepo.UpdateCalendarBlockStatus(ctx, op.CompanyID, id, enum.BlockStatusCancelled)
 	}
 
-	return s.writeOrderLog(id, "change_status", from, to, content, op)
+	return s.writeOrderLog(ctx, id, "change_status", from, to, content, op)
 }
 
-func (s *Service) CancelOrder(op Operator, id int64, reason string) error {
-	return s.ChangeOrderStatus(op, id, enum.OrderStatusCancelled, reason)
+func (s *Service) CancelOrder(ctx context.Context, op Operator, id int64, reason string) error {
+	return s.ChangeOrderStatus(ctx, op, id, enum.OrderStatusCancelled, reason)
 }

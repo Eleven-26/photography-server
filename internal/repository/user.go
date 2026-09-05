@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
@@ -17,8 +19,8 @@ func (r *UserRepo) WithTx(tx *gorm.DB) *UserRepo {
 
 func NewUserRepo() *UserRepo { return &UserRepo{} }
 
-func (r *UserRepo) List(companyID int64, page, pageSize int, keyword string, storeID int64) ([]model.SysUser, int64, error) {
-	q := r.tenant(companyID)
+func (r *UserRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword string, storeID int64) ([]model.SysUser, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("username LIKE ? OR nickname LIKE ? OR mobile LIKE ?", kw, kw, kw)
@@ -38,72 +40,72 @@ func (r *UserRepo) List(companyID int64, page, pageSize int, keyword string, sto
 	return list, total, nil
 }
 
-func (r *UserRepo) GetByID(companyID, userID int64) (*model.SysUser, error) {
+func (r *UserRepo) GetByID(ctx context.Context, companyID, userID int64) (*model.SysUser, error) {
 	var u model.SysUser
-	if err := r.tenant(companyID).First(&u, userID).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&u, userID).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *UserRepo) CountByUsername(companyID int64, username string) (int64, error) {
+func (r *UserRepo) CountByUsername(ctx context.Context, companyID int64, username string) (int64, error) {
 	var count int64
-	err := r.tenant(companyID).Model(&model.SysUser{}).Where("username = ?", username).Count(&count).Error
+	err := r.tenant(companyID).WithContext(ctx).Model(&model.SysUser{}).Where("username = ?", username).Count(&count).Error
 	return count, err
 }
 
-func (r *UserRepo) Create(u *model.SysUser) error {
-	return r.conn().Create(u).Error
+func (r *UserRepo) Create(ctx context.Context, u *model.SysUser) error {
+	return r.conn().WithContext(ctx).Create(u).Error
 }
 
-func (r *UserRepo) Update(companyID, userID int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.SysUser{}).Where("id = ?", userID).Updates(updates).Error
+func (r *UserRepo) Update(ctx context.Context, companyID, userID int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).Updates(updates).Error
 }
 
-func (r *UserRepo) Delete(companyID, userID int64) error {
-	return r.tenant(companyID).Delete(&model.SysUser{}, userID).Error
+func (r *UserRepo) Delete(ctx context.Context, companyID, userID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.SysUser{}, userID).Error
 }
 
-func (r *UserRepo) UpdatePassword(companyID, userID int64, hash string) error {
-	return r.tenant(companyID).Model(&model.SysUser{}).Where("id = ?", userID).Update("password", hash).Error
+func (r *UserRepo) UpdatePassword(ctx context.Context, companyID, userID int64, hash string) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).Update("password", hash).Error
 }
 
 // -------- 角色 --------
 
-func (r *UserRepo) ListRoles(companyID int64) ([]model.SysRole, error) {
+func (r *UserRepo) ListRoles(ctx context.Context, companyID int64) ([]model.SysRole, error) {
 	var list []model.SysRole
-	err := r.tenant(companyID).Order("id ASC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Order("id ASC").Find(&list).Error
 	return list, err
 }
 
-func (r *UserRepo) CreateRole(role *model.SysRole) error {
-	return r.conn().Create(role).Error
+func (r *UserRepo) CreateRole(ctx context.Context, role *model.SysRole) error {
+	return r.conn().WithContext(ctx).Create(role).Error
 }
 
-func (r *UserRepo) UpdateRole(companyID, roleID int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.SysRole{}).Where("id = ?", roleID).Updates(updates).Error
+func (r *UserRepo) UpdateRole(ctx context.Context, companyID, roleID int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysRole{}).Where("id = ?", roleID).Updates(updates).Error
 }
 
-func (r *UserRepo) DeleteRole(companyID, roleID int64) error {
-	return r.tenant(companyID).Delete(&model.SysRole{}, roleID).Error
+func (r *UserRepo) DeleteRole(ctx context.Context, companyID, roleID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.SysRole{}, roleID).Error
 }
 
 // -------- 门店 --------
 
-func (r *UserRepo) ListStores(companyID int64) ([]model.SysStore, error) {
+func (r *UserRepo) ListStores(ctx context.Context, companyID int64) ([]model.SysStore, error) {
 	var list []model.SysStore
-	err := r.tenant(companyID).Order("id ASC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Order("id ASC").Find(&list).Error
 	return list, err
 }
 
-func (r *UserRepo) CreateStore(store *model.SysStore) error {
-	return r.conn().Create(store).Error
+func (r *UserRepo) CreateStore(ctx context.Context, store *model.SysStore) error {
+	return r.conn().WithContext(ctx).Create(store).Error
 }
 
-func (r *UserRepo) UpdateStore(companyID, storeID int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.SysStore{}).Where("id = ?", storeID).Updates(updates).Error
+func (r *UserRepo) UpdateStore(ctx context.Context, companyID, storeID int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysStore{}).Where("id = ?", storeID).Updates(updates).Error
 }
 
-func (r *UserRepo) DeleteStore(companyID, storeID int64) error {
-	return r.tenant(companyID).Delete(&model.SysStore{}, storeID).Error
+func (r *UserRepo) DeleteStore(ctx context.Context, companyID, storeID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.SysStore{}, storeID).Error
 }

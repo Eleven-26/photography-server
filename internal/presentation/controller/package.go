@@ -11,7 +11,7 @@ import (
 func (h *Controller) PackageList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListPackages(op, page, pageSize,
+	list, total, err := h.Svc.ListPackages(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "keyword"), queryStr(c, "status"), queryStr(c, "category"))
 	if err != nil {
 		response.Fail(c, err)
@@ -27,7 +27,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	pkg, err := h.Svc.GetPackage(op, id)
+	pkg, err := h.Svc.GetPackage(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -42,7 +42,7 @@ func (h *Controller) PackageCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	pkg, err := h.Svc.CreatePackage(op, req)
+	pkg, err := h.Svc.CreatePackage(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *Controller) PackageUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdatePackage(op, id, req); err != nil {
+	if err := h.Svc.UpdatePackage(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -96,7 +96,7 @@ func (h *Controller) PackageDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeletePackage(op, id); err != nil {
+	if err := h.Svc.DeletePackage(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}

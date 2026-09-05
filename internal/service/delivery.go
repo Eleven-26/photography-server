@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -8,8 +10,8 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) CreateDelivery(op Operator, orderID int64) (*model.Delivery, error) {
-	o, err := s.OrderRepo.GetByID(op.CompanyID, orderID)
+func (s *Service) CreateDelivery(ctx context.Context, op Operator, orderID int64) (*model.Delivery, error) {
+	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
@@ -25,18 +27,18 @@ func (s *Service) CreateDelivery(op Operator, orderID int64) (*model.Delivery, e
 		CustomerName: o.CustomerName,
 		Stage:        enum.DeliveryStagePendingSamples,
 	}
-	if err := s.DeliveryRepo.Create(&d); err != nil {
+	if err := s.DeliveryRepo.Create(ctx, &d); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (s *Service) GetDeliveryByOrder(op Operator, orderID int64) (*model.Delivery, error) {
-	return s.DeliveryRepo.GetByOrderID(op.CompanyID, orderID)
+func (s *Service) GetDeliveryByOrder(ctx context.Context, op Operator, orderID int64) (*model.Delivery, error) {
+	return s.DeliveryRepo.GetByOrderID(ctx, op.CompanyID, orderID)
 }
 
-func (s *Service) UploadSamples(op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
-	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
+func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
+	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
@@ -58,19 +60,19 @@ func (s *Service) UploadSamples(op Operator, deliveryID int64, items []dto.Deliv
 			Filename:   item.Filename,
 			Size:       item.Size,
 		}
-		if err := s.DeliveryRepo.CreateItem(&di); err != nil {
+		if err := s.DeliveryRepo.CreateItem(ctx, &di); err != nil {
 			return err
 		}
 	}
 
-	return s.DeliveryRepo.Update(op.CompanyID, deliveryID, map[string]interface{}{
+	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":        enum.DeliveryStageSelecting,
 		"sample_count": len(items),
 	})
 }
 
-func (s *Service) SelectPhotos(op Operator, deliveryID int64, req dto.DeliverySelectReq) error {
-	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
+func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int64, req dto.DeliverySelectReq) error {
+	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
@@ -79,19 +81,19 @@ func (s *Service) SelectPhotos(op Operator, deliveryID int64, req dto.DeliverySe
 	}
 
 	for _, itemID := range req.ItemIDs {
-		s.DeliveryRepo.UpdateItemKind(op.CompanyID, itemID, "selected")
+		s.DeliveryRepo.UpdateItemKind(ctx, op.CompanyID, itemID, "selected")
 	}
 
 	now := "2006-01-02 15:04:05"
-	return s.DeliveryRepo.Update(op.CompanyID, deliveryID, map[string]interface{}{
+	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":          enum.DeliveryStageRetouching,
 		"selected_count": len(req.ItemIDs),
 		"selected_at":    now,
 	})
 }
 
-func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
-	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
+func (s *Service) UploadRetouched(ctx context.Context, op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
+	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
@@ -110,19 +112,19 @@ func (s *Service) UploadRetouched(op Operator, deliveryID int64, items []dto.Del
 			Filename:   item.Filename,
 			Size:       item.Size,
 		}
-		if err := s.DeliveryRepo.CreateItem(&di); err != nil {
+		if err := s.DeliveryRepo.CreateItem(ctx, &di); err != nil {
 			return err
 		}
 	}
 
-	return s.DeliveryRepo.Update(op.CompanyID, deliveryID, map[string]interface{}{
+	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":           enum.DeliveryStagePendingConfirm,
 		"retouched_count": len(items),
 	})
 }
 
-func (s *Service) ConfirmDelivered(op Operator, deliveryID int64) error {
-	d, err := s.DeliveryRepo.GetByID(op.CompanyID, deliveryID)
+func (s *Service) ConfirmDelivered(ctx context.Context, op Operator, deliveryID int64) error {
+	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
@@ -131,7 +133,7 @@ func (s *Service) ConfirmDelivered(op Operator, deliveryID int64) error {
 	}
 
 	now := "2006-01-02 15:04:05"
-	return s.DeliveryRepo.Update(op.CompanyID, deliveryID, map[string]interface{}{
+	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":        enum.DeliveryStageDelivered,
 		"delivered_at": now,
 	})

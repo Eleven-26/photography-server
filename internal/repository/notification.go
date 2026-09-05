@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
+
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 )
@@ -18,8 +21,8 @@ func (r *NotificationRepo) WithTx(tx *gorm.DB) *NotificationRepo {
 
 func NewNotificationRepo() *NotificationRepo { return &NotificationRepo{} }
 
-func (r *NotificationRepo) List(companyID, receiverID int64, page, pageSize int, onlyUnread bool) ([]model.SysNotification, int64, error) {
-	q := r.tenant(companyID).Where("receiver_id = ?", receiverID)
+func (r *NotificationRepo) List(ctx context.Context, companyID, receiverID int64, page, pageSize int, onlyUnread bool) ([]model.SysNotification, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx).Where("receiver_id = ?", receiverID)
 	if onlyUnread {
 		q = q.Where("is_read = ?", int(enum.NotificationUnread))
 	}
@@ -35,25 +38,25 @@ func (r *NotificationRepo) List(companyID, receiverID int64, page, pageSize int,
 	return list, total, nil
 }
 
-func (r *NotificationRepo) UnreadCount(companyID, receiverID int64) (int64, error) {
+func (r *NotificationRepo) UnreadCount(ctx context.Context, companyID, receiverID int64) (int64, error) {
 	var count int64
-	err := r.tenant(companyID).Model(&model.SysNotification{}).
+	err := r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).
 		Where("receiver_id = ? AND is_read = ?", receiverID, int(enum.NotificationUnread)).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *NotificationRepo) MarkRead(companyID, notificationID int64) error {
-	return r.tenant(companyID).Model(&model.SysNotification{}).Where("id = ?", notificationID).
+func (r *NotificationRepo) MarkRead(ctx context.Context, companyID, notificationID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).Where("id = ?", notificationID).
 		Update("is_read", int(enum.NotificationRead)).Error
 }
 
-func (r *NotificationRepo) MarkAllRead(companyID, receiverID int64) error {
-	return r.tenant(companyID).Model(&model.SysNotification{}).
+func (r *NotificationRepo) MarkAllRead(ctx context.Context, companyID, receiverID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).
 		Where("receiver_id = ? AND is_read = ?", receiverID, int(enum.NotificationUnread)).
 		Update("is_read", int(enum.NotificationRead)).Error
 }
 
-func (r *NotificationRepo) Create(n *model.SysNotification) error {
-	return r.conn().Create(n).Error
+func (r *NotificationRepo) Create(ctx context.Context, n *model.SysNotification) error {
+	return r.conn().WithContext(ctx).Create(n).Error
 }

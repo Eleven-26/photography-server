@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
@@ -8,19 +10,19 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-func (s *Service) ListAssets(op Operator, page, pageSize int, keyword, category, status string) ([]model.Asset, int64, error) {
-	return s.AssetRepo.List(op.CompanyID, page, pageSize, keyword, category, status)
+func (s *Service) ListAssets(ctx context.Context, op Operator, page, pageSize int, keyword, category, status string) ([]model.Asset, int64, error) {
+	return s.AssetRepo.List(ctx, op.CompanyID, page, pageSize, keyword, category, status)
 }
 
-func (s *Service) GetAsset(op Operator, id int64) (*model.Asset, error) {
-	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
+func (s *Service) GetAsset(ctx context.Context, op Operator, id int64) (*model.Asset, error) {
+	a, err := s.AssetRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrAssetNotFound)
 	}
 	return a, nil
 }
 
-func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset, error) {
+func (s *Service) CreateAsset(ctx context.Context, op Operator, req dto.AssetCreateReq) (*model.Asset, error) {
 	a := model.Asset{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -37,21 +39,21 @@ func (s *Service) CreateAsset(op Operator, req dto.AssetCreateReq) (*model.Asset
 		Location:     req.Location,
 		Status:       enum.AssetStatusDraft,
 	}
-	if err := s.AssetRepo.Create(&a); err != nil {
+	if err := s.AssetRepo.Create(ctx, &a); err != nil {
 		return nil, err
 	}
 	return &a, nil
 }
 
-func (s *Service) UpdateAsset(op Operator, id int64, req dto.AssetUpdateReq) error {
-	a, err := s.AssetRepo.GetByID(op.CompanyID, id)
+func (s *Service) UpdateAsset(ctx context.Context, op Operator, id int64, req dto.AssetUpdateReq) error {
+	a, err := s.AssetRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrAssetNotFound)
 	}
 	if a.Status == enum.AssetStatusPublished {
 		return errs.BadRequest(errs.ErrAssetNotFound)
 	}
-	return s.AssetRepo.Update(op.CompanyID, id, map[string]interface{}{
+	return s.AssetRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"title":        req.Title,
 		"category":     req.Category,
 		"cover":        req.Cover,
@@ -65,13 +67,13 @@ func (s *Service) UpdateAsset(op Operator, id int64, req dto.AssetUpdateReq) err
 	})
 }
 
-func (s *Service) PublishAsset(op Operator, id int64) error {
-	return s.AssetRepo.Update(op.CompanyID, id, map[string]interface{}{
+func (s *Service) PublishAsset(ctx context.Context, op Operator, id int64) error {
+	return s.AssetRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"status":     enum.AssetStatusPublished,
 		"updated_by": op.UserID,
 	})
 }
 
-func (s *Service) DeleteAsset(op Operator, id int64) error {
-	return s.AssetRepo.Delete(op.CompanyID, id)
+func (s *Service) DeleteAsset(ctx context.Context, op Operator, id int64) error {
+	return s.AssetRepo.Delete(ctx, op.CompanyID, id)
 }

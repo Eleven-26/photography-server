@@ -18,7 +18,7 @@ func (h *Controller) OrderCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	order, err := h.Svc.CreateOrder(op, req)
+	order, err := h.Svc.CreateOrder(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -30,7 +30,7 @@ func (h *Controller) OrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	customerID, _ := strconv.ParseInt(c.Query("customer_id"), 10, 64)
-	list, total, err := h.Svc.ListOrders(op, page, pageSize,
+	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "status"), customerID)
 	if err != nil {
 		response.Fail(c, err)
@@ -46,7 +46,7 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	detail, err := h.Svc.GetOrderDetail(op, id)
+	detail, err := h.Svc.GetOrderDetail(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -66,7 +66,7 @@ func (h *Controller) OrderUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateOrder(op, id, req); err != nil {
+	if err := h.Svc.UpdateOrder(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Controller) OrderStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ChangeOrderStatus(op, id, enum.OrderStatus(req.Status), req.Content); err != nil {
+	if err := h.Svc.ChangeOrderStatus(c.Request.Context(), op, id, enum.OrderStatus(req.Status), req.Content); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -107,7 +107,7 @@ func (h *Controller) OrderCancel(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CancelOrder(op, id, req.Reason); err != nil {
+	if err := h.Svc.CancelOrder(c.Request.Context(), op, id, req.Reason); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -121,7 +121,7 @@ func (h *Controller) OrderLogs(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	detail, err := h.Svc.GetOrderDetail(op, id)
+	detail, err := h.Svc.GetOrderDetail(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -143,7 +143,7 @@ func (h *Controller) PaymentCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	p, err := h.Svc.CreatePayment(op, id, req)
+	p, err := h.Svc.CreatePayment(c.Request.Context(), op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -158,7 +158,7 @@ func (h *Controller) PaymentList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	list, err := h.Svc.ListPayments(op, id)
+	list, err := h.Svc.ListPayments(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -173,7 +173,7 @@ func (h *Controller) PaymentConfirm(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ConfirmPayment(op, id); err != nil {
+	if err := h.Svc.ConfirmPayment(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -198,7 +198,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	r, err := h.Svc.CreateRefund(op, id, req)
+	r, err := h.Svc.CreateRefund(c.Request.Context(), op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -213,7 +213,7 @@ func (h *Controller) RefundList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	list, err := h.Svc.ListRefunds(op, id)
+	list, err := h.Svc.ListRefunds(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -236,7 +236,7 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AuditRefund(op, id, req.Approve, req.Remark); err != nil {
+	if err := h.Svc.AuditRefund(c.Request.Context(), op, id, req.Approve, req.Remark); err != nil {
 		response.Fail(c, err)
 		return
 	}

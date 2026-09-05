@@ -10,7 +10,7 @@ import (
 
 func (h *Controller) Workspace(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	w, err := h.Svc.Workspace(op)
+	w, err := h.Svc.Workspace(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -25,7 +25,7 @@ func (h *Controller) CompanyUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateCompany(op, req); err != nil {
+	if err := h.Svc.UpdateCompany(c.Request.Context(), op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -34,7 +34,7 @@ func (h *Controller) CompanyUpdate(c *gin.Context) {
 
 func (h *Controller) PaymentMethodList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	list, err := h.Svc.ListPaymentMethods(op)
+	list, err := h.Svc.ListPaymentMethods(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -49,7 +49,7 @@ func (h *Controller) PaymentMethodCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.CreatePaymentMethod(op, req); err != nil {
+	if err := h.Svc.CreatePaymentMethod(c.Request.Context(), op, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -68,7 +68,7 @@ func (h *Controller) PaymentMethodUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdatePaymentMethod(op, id, req); err != nil {
+	if err := h.Svc.UpdatePaymentMethod(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -82,7 +82,7 @@ func (h *Controller) PaymentMethodDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeletePaymentMethod(op, id); err != nil {
+	if err := h.Svc.DeletePaymentMethod(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -92,7 +92,7 @@ func (h *Controller) PaymentMethodDelete(c *gin.Context) {
 func (h *Controller) OperationLogList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOperationLogs(op, page, pageSize)
+	list, total, err := h.Svc.ListOperationLogs(c.Request.Context(), op, page, pageSize)
 	if err != nil {
 		response.Fail(c, err)
 		return

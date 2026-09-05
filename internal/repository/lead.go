@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
@@ -20,8 +22,8 @@ func NewLeadRepo() *LeadRepo {
 }
 
 // List 线索列表（分页 + 关键字 + 状态 + 负责人筛选）
-func (r *LeadRepo) List(companyID int64, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
-	q := r.tenant(companyID)
+func (r *LeadRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
@@ -45,33 +47,33 @@ func (r *LeadRepo) List(companyID int64, page, pageSize int, keyword, status str
 }
 
 // GetByID 根据 ID 查询线索
-func (r *LeadRepo) GetByID(companyID, id int64) (*model.Lead, error) {
+func (r *LeadRepo) GetByID(ctx context.Context, companyID, id int64) (*model.Lead, error) {
 	var l model.Lead
-	if err := r.tenant(companyID).First(&l, id).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&l, id).Error; err != nil {
 		return nil, err
 	}
 	return &l, nil
 }
 
 // Create 创建线索
-func (r *LeadRepo) Create(l *model.Lead) error {
-	return r.tenant(l.CompanyID).Create(l).Error
+func (r *LeadRepo) Create(ctx context.Context, l *model.Lead) error {
+	return r.tenant(l.CompanyID).WithContext(ctx).Create(l).Error
 }
 
 // Update 更新线索
-func (r *LeadRepo) Update(companyID, id int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.Lead{}).Where("id = ?", id).Updates(updates).Error
+func (r *LeadRepo) Update(ctx context.Context, companyID, id int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.Lead{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // Delete 删除线索
-func (r *LeadRepo) Delete(companyID, id int64) error {
-	return r.tenant(companyID).Delete(&model.Lead{}, id).Error
+func (r *LeadRepo) Delete(ctx context.Context, companyID, id int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.Lead{}, id).Error
 }
 
 // GetByMobile 根据手机号查询线索
-func (r *LeadRepo) GetByMobile(companyID int64, mobile string) (*model.Lead, error) {
+func (r *LeadRepo) GetByMobile(ctx context.Context, companyID int64, mobile string) (*model.Lead, error) {
 	var l model.Lead
-	if err := r.tenant(companyID).Where("mobile = ?", mobile).First(&l).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).Where("mobile = ?", mobile).First(&l).Error; err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -80,27 +82,27 @@ func (r *LeadRepo) GetByMobile(companyID int64, mobile string) (*model.Lead, err
 // -------- 报价单 --------
 
 // GetQuoteByID 根据 ID 查询报价单
-func (r *LeadRepo) GetQuoteByID(companyID, id int64) (*model.Quote, error) {
+func (r *LeadRepo) GetQuoteByID(ctx context.Context, companyID, id int64) (*model.Quote, error) {
 	var q model.Quote
-	if err := r.tenant(companyID).First(&q, id).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&q, id).Error; err != nil {
 		return nil, err
 	}
 	return &q, nil
 }
 
 // CreateQuote 创建报价单
-func (r *LeadRepo) CreateQuote(q *model.Quote) error {
-	return r.tenant(q.CompanyID).Create(q).Error
+func (r *LeadRepo) CreateQuote(ctx context.Context, q *model.Quote) error {
+	return r.tenant(q.CompanyID).WithContext(ctx).Create(q).Error
 }
 
 // ListQuotesByLead 查询线索下的报价单列表
-func (r *LeadRepo) ListQuotesByLead(companyID, leadID int64) ([]model.Quote, error) {
+func (r *LeadRepo) ListQuotesByLead(ctx context.Context, companyID, leadID int64) ([]model.Quote, error) {
 	var list []model.Quote
-	err := r.tenant(companyID).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
 	return list, err
 }
 
 // UpdateQuote 更新报价单
-func (r *LeadRepo) UpdateQuote(companyID, id int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.Quote{}).Where("id = ?", id).Updates(updates).Error
+func (r *LeadRepo) UpdateQuote(ctx context.Context, companyID, id int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.Quote{}).Where("id = ?", id).Updates(updates).Error
 }

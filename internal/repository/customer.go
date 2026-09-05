@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 
 	"photography-server/internal/enum"
@@ -19,8 +21,8 @@ func (r *CustomerRepo) WithTx(tx *gorm.DB) *CustomerRepo {
 
 func NewCustomerRepo() *CustomerRepo { return &CustomerRepo{} }
 
-func (r *CustomerRepo) List(companyID int64, page, pageSize int, keyword string) ([]model.Customer, int64, error) {
-	q := r.tenant(companyID)
+func (r *CustomerRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword string) ([]model.Customer, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
@@ -37,24 +39,24 @@ func (r *CustomerRepo) List(companyID int64, page, pageSize int, keyword string)
 	return list, total, nil
 }
 
-func (r *CustomerRepo) GetByID(companyID, customerID int64) (*model.Customer, error) {
+func (r *CustomerRepo) GetByID(ctx context.Context, companyID, customerID int64) (*model.Customer, error) {
 	var c model.Customer
-	if err := r.tenant(companyID).First(&c, customerID).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&c, customerID).Error; err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-func (r *CustomerRepo) Create(c *model.Customer) error {
-	return r.conn().Create(c).Error
+func (r *CustomerRepo) Create(ctx context.Context, c *model.Customer) error {
+	return r.conn().WithContext(ctx).Create(c).Error
 }
 
-func (r *CustomerRepo) Update(companyID, customerID int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.Customer{}).Where("id = ?", customerID).Updates(updates).Error
+func (r *CustomerRepo) Update(ctx context.Context, companyID, customerID int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.Customer{}).Where("id = ?", customerID).Updates(updates).Error
 }
 
-func (r *CustomerRepo) Delete(companyID, customerID int64) error {
-	return r.tenant(companyID).Delete(&model.Customer{}, customerID).Error
+func (r *CustomerRepo) Delete(ctx context.Context, companyID, customerID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.Customer{}, customerID).Error
 }
 
 // CustomerStats 客户统计（仓储自持的领域结构，避免反向依赖 presentation/dto）
@@ -65,9 +67,9 @@ type CustomerStats struct {
 }
 
 // GetStats 客户统计：总数 / 活跃数 / 黄金及以上等级数
-func (r *CustomerRepo) GetStats(companyID int64) (*CustomerStats, error) {
+func (r *CustomerRepo) GetStats(ctx context.Context, companyID int64) (*CustomerStats, error) {
 	var st CustomerStats
-	q := r.tenant(companyID)
+	q := r.tenant(companyID).WithContext(ctx)
 
 	if err := q.Model(&model.Customer{}).Count(&st.Total).Error; err != nil {
 		return nil, err

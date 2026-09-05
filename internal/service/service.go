@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -84,7 +85,7 @@ func orDefaultInt64(v, def int64) int64 {
 	return v
 }
 
-func (s *Service) writeOrderLog(orderID int64, action string, from, to interface{}, content string, op Operator) error {
+func (s *Service) writeOrderLog(ctx context.Context, orderID int64, action string, from, to interface{}, content string, op Operator) error {
 	log := model.OrderLog{
 		OrderID:      orderID,
 		Action:       action,
@@ -94,10 +95,10 @@ func (s *Service) writeOrderLog(orderID int64, action string, from, to interface
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
 	}
-	return s.OrderRepo.CreateLog(&log)
+	return s.OrderRepo.CreateLog(ctx, &log)
 }
 
-func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action string, from, to interface{}, content string, op Operator) error {
+func (s *Service) writeOrderLogTx(ctx context.Context, tx *gorm.DB, orderID int64, action string, from, to interface{}, content string, op Operator) error {
 	log := model.OrderLog{
 		OrderID:      orderID,
 		Action:       action,
@@ -107,5 +108,5 @@ func (s *Service) writeOrderLogTx(tx *gorm.DB, orderID int64, action string, fro
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
 	}
-	return s.OrderRepo.WithTx(tx).CreateLog(&log)
+	return s.OrderRepo.WithTx(tx).CreateLog(ctx, &log)
 }

@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"context"
+	"time"
+
 	"gorm.io/gorm"
+
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
-	"time"
 )
 
 type FinanceRepo struct {
@@ -27,9 +30,9 @@ type Summary struct {
 	PendingCount int64   `json:"pending_count"`
 }
 
-func (r *FinanceRepo) GetSummary(companyID int64, start, end string) (*Summary, error) {
+func (r *FinanceRepo) GetSummary(ctx context.Context, companyID int64, start, end string) (*Summary, error) {
 	var s Summary
-	q := r.tenant(companyID)
+	q := r.tenant(companyID).WithContext(ctx)
 
 	q.Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
@@ -50,8 +53,8 @@ func (r *FinanceRepo) GetSummary(companyID int64, start, end string) (*Summary, 
 	return &s, nil
 }
 
-func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
-	q := r.tenant(companyID)
+func (r *FinanceRepo) ListPayments(ctx context.Context, companyID int64, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	} else {
@@ -69,8 +72,8 @@ func (r *FinanceRepo) ListPayments(companyID int64, page, pageSize int, status s
 	return list, total, nil
 }
 
-func (r *FinanceRepo) ListRefunds(companyID int64, page, pageSize int) ([]model.OrderRefund, int64, error) {
-	q := r.tenant(companyID).Where("status = ?", int(enum.RefundStatusDone))
+func (r *FinanceRepo) ListRefunds(ctx context.Context, companyID int64, page, pageSize int) ([]model.OrderRefund, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx).Where("status = ?", int(enum.RefundStatusDone))
 	var total int64
 	if err := q.Model(&model.OrderRefund{}).Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -83,7 +86,7 @@ func (r *FinanceRepo) ListRefunds(companyID int64, page, pageSize int) ([]model.
 	return list, total, nil
 }
 
-func (r *FinanceRepo) GetMonthlyStats(companyID int64, year int) ([]MonthlyStat, error) {
+func (r *FinanceRepo) GetMonthlyStats(ctx context.Context, companyID int64, year int) ([]MonthlyStat, error) {
 	type row struct {
 		Month  int     `json:"month"`
 		Income float64 `json:"income"`
@@ -92,7 +95,7 @@ func (r *FinanceRepo) GetMonthlyStats(companyID int64, year int) ([]MonthlyStat,
 	var rows []row
 	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Format("2006-01-02")
 	end := time.Date(year, 12, 31, 23, 59, 59, 0, time.Local).Format("2006-01-02 15:04:05")
-	r.tenant(companyID).Model(&model.OrderPayment{}).
+	r.tenant(companyID).WithContext(ctx).Model(&model.OrderPayment{}).
 		Select("MONTH(paid_at) as month, COALESCE(SUM(amount),0) as income").
 		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
 		Group("MONTH(paid_at)").Scan(&rows)

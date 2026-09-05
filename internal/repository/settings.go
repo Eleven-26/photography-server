@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 	"photography-server/internal/model"
 )
@@ -20,67 +22,67 @@ func NewSettingsRepo() *SettingsRepo {
 }
 
 // GetCompany 获取公司信息
-func (r *SettingsRepo) GetCompany(companyID int64) (*model.SysCompany, error) {
+func (r *SettingsRepo) GetCompany(ctx context.Context, companyID int64) (*model.SysCompany, error) {
 	var c model.SysCompany
-	if err := r.conn().First(&c, companyID).Error; err != nil {
+	if err := r.conn().WithContext(ctx).First(&c, companyID).Error; err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
 // UpdateCompany 更新公司信息
-func (r *SettingsRepo) UpdateCompany(companyID int64, updates map[string]interface{}) error {
-	return r.conn().Model(&model.SysCompany{}).Where("id = ?", companyID).Updates(updates).Error
+func (r *SettingsRepo) UpdateCompany(ctx context.Context, companyID int64, updates map[string]interface{}) error {
+	return r.conn().WithContext(ctx).Model(&model.SysCompany{}).Where("id = ?", companyID).Updates(updates).Error
 }
 
 // ListStores 门店列表
-func (r *SettingsRepo) ListStores(companyID int64) ([]model.SysStore, error) {
+func (r *SettingsRepo) ListStores(ctx context.Context, companyID int64) ([]model.SysStore, error) {
 	var list []model.SysStore
-	err := r.tenant(companyID).Order("id ASC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Order("id ASC").Find(&list).Error
 	return list, err
 }
 
 // ListRoles 角色列表
-func (r *SettingsRepo) ListRoles(companyID int64) ([]model.SysRole, error) {
+func (r *SettingsRepo) ListRoles(ctx context.Context, companyID int64) ([]model.SysRole, error) {
 	var list []model.SysRole
-	err := r.tenant(companyID).Order("id ASC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Order("id ASC").Find(&list).Error
 	return list, err
 }
 
 // ListPaymentMethods 收款方式列表
-func (r *SettingsRepo) ListPaymentMethods(companyID int64) ([]model.PaymentMethod, error) {
+func (r *SettingsRepo) ListPaymentMethods(ctx context.Context, companyID int64) ([]model.PaymentMethod, error) {
 	var list []model.PaymentMethod
-	err := r.tenant(companyID).Order("sort ASC, id ASC").Find(&list).Error
+	err := r.tenant(companyID).WithContext(ctx).Order("sort ASC, id ASC").Find(&list).Error
 	return list, err
 }
 
 // GetPaymentMethodByID 根据 ID 查询收款方式
-func (r *SettingsRepo) GetPaymentMethodByID(companyID, id int64) (*model.PaymentMethod, error) {
+func (r *SettingsRepo) GetPaymentMethodByID(ctx context.Context, companyID, id int64) (*model.PaymentMethod, error) {
 	var m model.PaymentMethod
-	if err := r.tenant(companyID).First(&m, id).Error; err != nil {
+	if err := r.tenant(companyID).WithContext(ctx).First(&m, id).Error; err != nil {
 		return nil, err
 	}
 	return &m, nil
 }
 
 // CreatePaymentMethod 创建收款方式
-func (r *SettingsRepo) CreatePaymentMethod(m *model.PaymentMethod) error {
-	return r.tenant(m.CompanyID).Create(m).Error
+func (r *SettingsRepo) CreatePaymentMethod(ctx context.Context, m *model.PaymentMethod) error {
+	return r.tenant(m.CompanyID).WithContext(ctx).Create(m).Error
 }
 
 // UpdatePaymentMethod 更新收款方式
-func (r *SettingsRepo) UpdatePaymentMethod(companyID, id int64, updates map[string]interface{}) error {
-	return r.tenant(companyID).Model(&model.PaymentMethod{}).Where("id = ?", id).Updates(updates).Error
+func (r *SettingsRepo) UpdatePaymentMethod(ctx context.Context, companyID, id int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.PaymentMethod{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // DeletePaymentMethod 删除收款方式
-func (r *SettingsRepo) DeletePaymentMethod(companyID, id int64) error {
-	return r.tenant(companyID).Delete(&model.PaymentMethod{}, id).Error
+func (r *SettingsRepo) DeletePaymentMethod(ctx context.Context, companyID, id int64) error {
+	return r.tenant(companyID).WithContext(ctx).Delete(&model.PaymentMethod{}, id).Error
 }
 
 // ListOperationLogs 操作日志列表（分页）
-func (r *SettingsRepo) ListOperationLogs(companyID int64, page, pageSize int) ([]model.SysOperationLog, int64, error) {
-	q := r.tenant(companyID)
+func (r *SettingsRepo) ListOperationLogs(ctx context.Context, companyID int64, page, pageSize int) ([]model.SysOperationLog, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx)
 	var total int64
 	if err := q.Model(&model.SysOperationLog{}).Count(&total).Error; err != nil {
 		return nil, 0, err

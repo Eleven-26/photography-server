@@ -15,7 +15,7 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	d, err := h.Svc.GetDeliveryByOrder(op, id)
+	d, err := h.Svc.GetDeliveryByOrder(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -50,7 +50,7 @@ func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UploadSamples(op, id, req.Items); err != nil {
+	if err := h.Svc.UploadSamples(c.Request.Context(), op, id, req.Items); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -70,7 +70,7 @@ func (h *Controller) DeliverySelect(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.SelectPhotos(op, id, req); err != nil {
+	if err := h.Svc.SelectPhotos(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -92,7 +92,7 @@ func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UploadRetouched(op, id, req.Items); err != nil {
+	if err := h.Svc.UploadRetouched(c.Request.Context(), op, id, req.Items); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -106,7 +106,7 @@ func (h *Controller) DeliveryConfirm(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.ConfirmDelivered(op, id); err != nil {
+	if err := h.Svc.ConfirmDelivered(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}

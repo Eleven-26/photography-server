@@ -11,7 +11,7 @@ import (
 func (h *Controller) AssetList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListAssets(op, page, pageSize,
+	list, total, err := h.Svc.ListAssets(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "keyword"), queryStr(c, "category"), queryStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
@@ -27,7 +27,7 @@ func (h *Controller) AssetDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	a, err := h.Svc.GetAsset(op, id)
+	a, err := h.Svc.GetAsset(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -42,7 +42,7 @@ func (h *Controller) AssetCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	a, err := h.Svc.CreateAsset(op, req)
+	a, err := h.Svc.CreateAsset(c.Request.Context(), op, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *Controller) AssetUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.UpdateAsset(op, id, req); err != nil {
+	if err := h.Svc.UpdateAsset(c.Request.Context(), op, id, req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -76,7 +76,7 @@ func (h *Controller) AssetDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.DeleteAsset(op, id); err != nil {
+	if err := h.Svc.DeleteAsset(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
