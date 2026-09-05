@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -110,7 +111,8 @@ type Upload struct {
 }
 
 // Load 加载配置：基础配置 config.yaml + 环境覆盖 config.<profile>.yaml + APP_* 环境变量
-// 配置文件中的 ${VAR} 占位符会自动用同名环境变量展开。
+// 优先级：APP_* 环境变量 > config.<profile>.yaml > config.yaml（viper AutomaticEnv）
+// 注意：不做 ${VAR} 模板展开；Unmarshal 只能覆盖配置文件中已存在的 key，新增配置项需同步维护各 yaml。
 func Load(basePath, profile string) (*Config, error) {
 	if profile == "" {
 		profile = "dev"
@@ -118,15 +120,16 @@ func Load(basePath, profile string) (*Config, error) {
 	profile = strings.ToLower(profile)
 
 	v := viper.New()
-	v.SetConfigType("yaml")
-	if err := readConfigFile(v, basePath, false); err != nil {
+	v.SetConfigFile(basePath)
+	if err := v.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
 	// 环境专用配置覆盖基础配置
 	ppath := profilePath(basePath, profile)
 	if _, err := os.Stat(ppath); err == nil {
-		if err := readConfigFile(v, ppath, true); err != nil {
+		v.SetConfigFile(ppath)
+		if err := v.MergeInConfig(); err != nil {
 			return nil, err
 		}
 	}
@@ -153,20 +156,27 @@ func Load(basePath, profile string) (*Config, error) {
 	if c.Upload.MaxSizeMB == 0 {
 		c.Upload.MaxSizeMB = 20
 	}
+	if err := validateProd(&c); err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 
-// readConfigFile 读取配置文件并对 ${VAR} 占位符做环境变量展开；merge=true 时合并进已有配置
-func readConfigFile(v *viper.Viper, path string, merge bool) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
+// defaultJWTSecret 与 config.yaml 中的占位密钥一致，prod 校验拒绝该弱默认值
+const defaultJWTSecret = "photography-server-jwt-secret-change-me"
+
+// validateProd prod 安全基线：必注入项缺失时快速失败，避免空凭据连库或弱密钥上线
+func validateProd(c *Config) error {
+	if c.App.Profile != "prod" {
+		return nil
 	}
-	expanded := os.Expand(string(data), os.Getenv)
-	if merge {
-		return v.MergeConfig(strings.NewReader(expanded))
+	if c.JWT.Secret == "" || c.JWT.Secret == defaultJWTSecret {
+		return errors.New("prod 环境必须通过 APP_JWT_SECRET 注入 JWT 密钥（不得为空或默认值）")
 	}
-	return v.ReadConfig(strings.NewReader(expanded))
+	if c.DB.Host == "" || c.DB.User == "" || c.DB.Password == "" {
+		return errors.New("prod 环境必须通过 APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 注入数据库连接信息")
+	}
+	return nil
 }
 
 // profilePath 计算环境配置文件名：config/config.yaml + prod => config/config.prod.yaml

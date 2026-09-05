@@ -1,8 +1,10 @@
 # ============================================================
 # 生产环境配置（安全基线）
 # 启动：go run ./cmd/server -c config/config.yaml -p prod
-# 注意：生产密钥/数据库密码请通过环境变量注入（APP_JWT_SECRET 等），
-#       勿将真实密钥提交到仓库。
+# 环境覆盖：APP_* 环境变量优先于本文件（如 APP_DB_HOST 覆盖 db.host）
+# 必须注入（缺失时启动即失败，由 config.Load 校验）：
+#   APP_JWT_SECRET / APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD
+# 其余项未注入时使用下方默认值；勿将真实密钥提交到仓库。
 # ============================================================
 
 app:
@@ -10,15 +12,15 @@ app:
   port: 8080
 
 jwt:
-  secret: ${APP_JWT_SECRET}
+  secret: "" # 必须通过 APP_JWT_SECRET 注入
   issuer: photography-server
   expire_hours: 168
 
 db:
-  host: ${APP_DB_HOST}
+  host: "" # 必须通过 APP_DB_HOST 注入
   port: 3306
-  user: ${APP_DB_USER}
-  password: ${APP_DB_PASSWORD}
+  user: "" # 必须通过 APP_DB_USER 注入
+  password: "" # 必须通过 APP_DB_PASSWORD 注入
   name: photography
   charset: utf8mb4
   max_idle_conns: 20
@@ -26,19 +28,19 @@ db:
   log_mode: false
 
 redis:
-  addr: ${APP_REDIS_ADDR:-redis:6379}
-  password: ${APP_REDIS_PASSWORD:-}
+  addr: redis:6379 # APP_REDIS_ADDR
+  password: "" # APP_REDIS_PASSWORD
   db: 0
 
 nats:
-  url: ${APP_NATS_URL:-nats://nats:4222}
+  url: nats://nats:4222 # APP_NATS_URL
 
 mongodb:
-  enable: ${APP_MONGO_ENABLE:-false}
-  uri: ${APP_MONGO_URI:-mongodb://mongo:27017}
-  database: ${APP_MONGO_DATABASE:-photography}
-  username: ${APP_MONGO_USERNAME:-}
-  password: ${APP_MONGO_PASSWORD:-}
+  enable: false # APP_MONGO_ENABLE
+  uri: mongodb://mongo:27017 # APP_MONGO_URI
+  database: photography # APP_MONGO_DATABASE
+  username: "" # APP_MONGO_USERNAME
+  password: "" # APP_MONGO_PASSWORD
 
 log:
   level: warn
@@ -48,23 +50,23 @@ upload:
   max_size_mb: 100
 
 xxljob:
-  enable: ${APP_XXLJOB_ENABLE:-false}
-  server_addr: ${APP_XXLJOB_SERVER_ADDR:-http://xxl-job-admin:8080/xxl-job-admin}
-  access_token: ${APP_XXLJOB_ACCESS_TOKEN:-}
-  executor_ip: ${APP_XXLJOB_EXECUTOR_IP:-127.0.0.1}
-  executor_port: ${APP_XXLJOB_EXECUTOR_PORT:-"9999"}
-  registry_key: ${APP_XXLJOB_REGISTRY_KEY:-photography-server}
-  log_dir: ${APP_XXLJOB_LOG_DIR:-/data/logs/xxl-job}
+  enable: true # APP_XXLJOB_ENABLE
+  server_addr: http://xxl-job-admin:9100 # APP_XXLJOB_SERVER_ADDR
+  access_token: "" # APP_XXLJOB_ACCESS_TOKEN
+  executor_ip: 127.0.0.1 # APP_XXLJOB_EXECUTOR_IP
+  executor_port: "9999" # APP_XXLJOB_EXECUTOR_PORT
+  registry_key: photography-server # APP_XXLJOB_REGISTRY_KEY
+  log_dir: /data/logs/xxl-job
 
 elasticsearch:
-  enable: ${APP_ES_ENABLE:-false}
+  enable: false # APP_ES_ENABLE；多地址可用 APP_ELASTICSEARCH_URLS 覆盖（逗号分隔）
   urls:
-    - ${APP_ES_URL:-http://elasticsearch:9200}
-  username: ${APP_ES_USERNAME:-}
-  password: ${APP_ES_PASSWORD:-}
+    - http://elasticsearch:9200
+  username: "" # APP_ES_USERNAME
+  password: "" # APP_ES_PASSWORD
 
 skywalking:
-  enable: ${APP_SKYWALKING_ENABLE:-false}
-  oap_addr: ${APP_SKYWALKING_OAP_ADDR:-skywalking-oap:11800}
-  service: ${APP_SKYWALKING_SERVICE:-photography-server}
-  instance: ${APP_SKYWALKING_INSTANCE:-}
+  enable: false # APP_SKYWALKING_ENABLE
+  oap_addr: skywalking-oap:11800 # APP_SKYWALKING_OAP_ADDR
+  service: photography-server # APP_SKYWALKING_SERVICE
+  instance: "" # APP_SKYWALKING_INSTANCE，留空默认取主机名
