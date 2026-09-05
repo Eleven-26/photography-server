@@ -1,10 +1,13 @@
 package infrastructure
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/logger"
@@ -115,43 +118,52 @@ func (c *NatsClient) ensureStream(name, subj string) {
 	}
 }
 
-// Publish 非持久化发布（fire-and-forget）
-func (c *NatsClient) Publish(subject string, data []byte) error {
+// traceMsg 构造携带 W3C TraceContext 的消息：把 ctx 中的 span 上下文注入消息 Header，
+// 使消费端能抽取同一 trace 续接链路（方案A完整透传）。
+// ctx 无有效 span（如链路未启用）时 Inject 为空操作，Header 为空，消息行为与普通消息一致。
+func (c *NatsClient) traceMsg(ctx context.Context, subject string, data []byte) *nats.Msg {
+	hdr := make(nats.Header)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(hdr))
+	return &nats.Msg{Subject: subject, Header: hdr, Data: data}
+}
+
+// Publish 非持久化发布（fire-and-forget），透传请求链路到消息
+func (c *NatsClient) Publish(ctx context.Context, subject string, data []byte) error {
 	if c == nil || c.nc == nil {
 		return nats.ErrConnectionClosed
 	}
-	return c.nc.Publish(subject, data)
+	return c.nc.PublishMsg(c.traceMsg(ctx, subject, data))
 }
 
-// PublishSync 非持久化同步发布
-func (c *NatsClient) PublishSync(subject string, data []byte) error {
+// PublishSync 非持久化同步发布，透传请求链路到消息
+func (c *NatsClient) PublishSync(ctx context.Context, subject string, data []byte) error {
 	if c == nil || c.nc == nil {
 		return nats.ErrConnectionClosed
 	}
-	return c.nc.Publish(subject, data)
+	return c.nc.PublishMsg(c.traceMsg(ctx, subject, data))
 }
 
-// PublishPersistent 持久化发布（通过 JetStream，自动创建 Stream）
-func (c *NatsClient) PublishPersistent(subject string, data []byte) (*nats.PubAck, error) {
+// PublishPersistent 持久化发布（通过 JetStream，自动创建 Stream），透传请求链路到消息
+func (c *NatsClient) PublishPersistent(ctx context.Context, subject string, data []byte) (*nats.PubAck, error) {
 	if c == nil || c.js == nil {
 		return nil, nats.ErrJetStreamNotEnabled
 	}
-	ack, err := c.js.Publish(subject, data)
+	ack, err := c.js.PublishMsg(c.traceMsg(ctx, subject, data))
 	if err != nil {
 		// 可能 stream 不存在，尝试重建后重试
 		logger.Warnf("jetStream publish [%s] failed, try recreate stream: %v", subject, err)
 		c.ensureStream(defaultStream, ">")
-		ack, err = c.js.Publish(subject, data)
+		ack, err = c.js.PublishMsg(c.traceMsg(ctx, subject, data))
 	}
 	return ack, err
 }
 
-// Request 请求-响应模式
-func (c *NatsClient) Request(subject string, data []byte, timeout time.Duration) ([]byte, error) {
+// Request 请求-响应模式，透传请求链路到消息
+func (c *NatsClient) Request(ctx context.Context, subject string, data []byte, timeout time.Duration) ([]byte, error) {
 	if c == nil || c.nc == nil {
 		return nil, nats.ErrConnectionClosed
 	}
-	msg, err := c.nc.Request(subject, data, timeout)
+	msg, err := c.nc.RequestMsg(c.traceMsg(ctx, subject, data), timeout)
 	if err != nil {
 		return nil, err
 	}

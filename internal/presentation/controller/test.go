@@ -135,7 +135,7 @@ func (h *Controller) NATSPub(c *gin.Context) {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	if err := infrastructure.GetNatsClient().Publish(req.Subject, []byte(req.Msg)); err != nil {
+	if err := infrastructure.GetNatsClient().Publish(c.Request.Context(), req.Subject, []byte(req.Msg)); err != nil {
 		response.Fail(c, errs.Internal("nats pub 失败: "+err.Error()))
 		return
 	}
@@ -160,7 +160,7 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 		return
 	}
 	subject := "photography." + req.Subject
-	ack, err := client.PublishPersistent(subject, []byte(req.Msg))
+	ack, err := client.PublishPersistent(c.Request.Context(), subject, []byte(req.Msg))
 	if err != nil {
 		response.Fail(c, errs.Internal("nats persistent pub 失败: "+err.Error()))
 		return
@@ -186,7 +186,7 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	data, err := infrastructure.GetNatsClient().Request(req.Subject, []byte(req.Msg), 3*time.Second)
+	data, err := infrastructure.GetNatsClient().Request(c.Request.Context(), req.Subject, []byte(req.Msg), 3*time.Second)
 	if err != nil {
 		response.Fail(c, errs.Internal("nats request 超时或失败: "+err.Error()))
 		return
@@ -230,7 +230,7 @@ func (h *Controller) NATSPubPull(c *gin.Context) {
 		return
 	}
 	subject := "photography." + req.Subject
-	ack, err := client.PublishPersistent(subject, []byte(req.Msg))
+	ack, err := client.PublishPersistent(c.Request.Context(), subject, []byte(req.Msg))
 	if err != nil {
 		response.Fail(c, errs.Internal("nats pub-pull 失败: "+err.Error()))
 		return
