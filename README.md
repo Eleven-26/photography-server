@@ -106,21 +106,22 @@ make docker-up / docker-down / docker-build
 # 把配置复制出来并修改成真实值
 
 # 创建所有配置目录
-mkdir -p data/horizon data/jaeger
+mkdir -p volume/horizon volume/jaeger volume/nats/conf
 
 # 复制，需要手动改值
 cp ./photography-server/.env.example .env
 cp ./photography-server/docker-compose.yml docker-compose.yml
 
 # 复制根目录配置文件，需要手动改值
-cp ./photography-server/config/horizon.example.yaml ./data/horizon/horizon.yaml
-cp ./photography-server/config/jaeger.example.yaml ./data/jaeger/config.yaml
+cp ./photography-server/config/horizon.example.yaml ./volume/horizon/horizon.yaml
+cp ./photography-server/config/jaeger.example.yaml ./volume/jaeger/config.yaml
+cp ./photography-server/config/nats.example.conf ./volume/nats/conf/nats.conf
 
 # 目录结构
 prod
 ├── photography-server
 ├── photography-frontend
-├── data # 存放挂载数据
+├── volume # 存放挂载数据
 ├── docker-compose.yml
 ├── .env
 

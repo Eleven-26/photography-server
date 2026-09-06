@@ -13,8 +13,8 @@ services:
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - ${MYSQL_DATA_DIR:-./mysql/data}:/var/lib/mysql
-      - ${MYSQL_CONF_DIR:-./mysql/conf}:/etc/mysql/conf.d
+      - ${MYSQL_DATA_DIR:-./volume/mysql/data}:/var/lib/mysql
+      - ${MYSQL_CONF_DIR:-./volume/mysql/conf}:/etc/mysql/conf.d
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: ${MYSQL_HEALTH_INTERVAL:-5s}
@@ -31,7 +31,7 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - ${REDIS_DATA_DIR:-./redis/data}:/data
+      - ${REDIS_DATA_DIR:-./volume/redis/data}:/data
     command: redis-server --appendonly ${REDIS_AOF:-yes}
     restart: unless-stopped
     healthcheck:
@@ -51,8 +51,8 @@ services:
       - "${NATS_MONITOR_PORT:-8222}:8222"
     command: ["-c", "/etc/nats/nats.conf", "-js", "-sd", "/data"]
     volumes:
-      - ${NATS_CONF_DIR:-./nats/conf}/nats.conf:/etc/nats/nats.conf:ro
-      - ${NATS_DATA_DIR:-./nats/data}:/data
+      - ${NATS_CONF_DIR:-./volume/nats/conf}/nats.conf:/etc/nats/nats.conf:ro
+      - ${NATS_DATA_DIR:-./volume/nats/data}:/data
     restart: unless-stopped
     networks:
       - backend-net
@@ -89,7 +89,7 @@ services:
     ports:
       - "${ES_PORT:-9200}:9200"
     volumes:
-      - ${ES_DATA_DIR:-./elasticsearch/data}:/usr/share/elasticsearch/data
+      - ${ES_DATA_DIR:-./volume/elasticsearch/data}:/usr/share/elasticsearch/data
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cat/health | grep -q green || curl -s http://localhost:9200/_cat/health | grep -q yellow"]
       interval: ${MYSQL_HEALTH_INTERVAL:-5s}
@@ -110,7 +110,7 @@ services:
     ports:
       - "${MONGO_PORT:-27017}:27017"
     volumes:
-      - ${MONGO_DATA_DIR:-./mongo/data}:/data/db
+      - ${MONGO_DATA_DIR:-./volume/mongo/data}:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: ${MYSQL_HEALTH_INTERVAL:-5s}
@@ -133,7 +133,7 @@ services:
       - "${SW_BDB_PORT:-17912}:17912"        # OAP 数据读写
       - "${SW_BDB_HTTP_PORT:-17913}:17913"   # 监控/管理
     volumes:
-      - ${SW_BDB_DATA_DIR:-./skywalking/banyandb/data}:/data
+      - ${SW_BDB_DATA_DIR:-./volume/skywalking/banyandb/data}:/data
     command: standalone --observability-modes=native --stream-root-path /data/stream --measure-root-path /data/measure
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -nz 127.0.0.1 17912"]
@@ -182,7 +182,7 @@ services:
         condition: service_healthy
     volumes:
       # Horizon UI 的 OAP 地址与登录用户只从该文件读取（无 env 注入入口），必须挂载
-      - ${SW_UI_CONFIG_FILE:-./horizon/horizon.yaml}:/app/horizon.yaml:ro
+      - ${SW_UI_CONFIG_FILE:-./volume/horizon/horizon.yaml}:/app/horizon.yaml:ro
     ports:
       - "${SW_UI_PORT:-9080}:8081"   # Horizon 容器内监听 8081
     restart: unless-stopped
@@ -208,7 +208,7 @@ services:
       - "${CLICKHOUSE_PORT:-9000}:9000"          # native 协议（Jaeger 连接用）
       - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"     # HTTP 接口（调试用）
     volumes:
-      - ${CLICKHOUSE_DATA_DIR:-./clickhouse/data}:/var/lib/clickhouse
+      - ${CLICKHOUSE_DATA_DIR:-./volume/clickhouse/data}:/var/lib/clickhouse
     ulimits:
       nofile:
         soft: 262144
@@ -230,7 +230,7 @@ services:
       clickhouse:
         condition: service_healthy
     volumes:
-      - ${JAEGER_CONFIG_FILE:-./jaeger/config.yaml}:/etc/jaeger/config.yaml:ro
+      - ${JAEGER_CONFIG_FILE:-./volume/jaeger/config.yaml}:/etc/jaeger/config.yaml:ro
     command: ["--config", "/etc/jaeger/config.yaml"]
     ports:
       - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"    # 应用 OTLP gRPC 上报入口
