@@ -22,7 +22,10 @@ COPY . .
 RUN if [ "$SW_AGENT_ENABLE" = "true" ]; then \
       AGENT_BIN="/app/sw-agent/skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64" && \
       chmod +x "${AGENT_BIN}" && \
-      printf 'agent:\n  service_name: %s\n  sampler: 1\n  reporter:\n    grpc:\n      backend_service: %s\n' "${SW_AGENT_SERVICE}" "${SW_AGENT_BACKEND}" > /tmp/agent.config && \
+      # 生成 agent.config：结构与官方 agent.default.yaml 一致（reporter 为顶层键）。
+      # 值写成 ${ENV:default} 占位格式 —— 默认固化 ARG 传入值，运行期仍可被环境变量覆盖。
+      printf 'agent:\n  service_name: ${SW_AGENT_NAME:%s}\n  sampler: ${SW_AGENT_SAMPLE:1}\nreporter:\n  grpc:\n    backend_service: ${SW_AGENT_REPORTER_GRPC_BACKEND_SERVICE:%s}\n' \
+        "${SW_AGENT_SERVICE}" "${SW_AGENT_BACKEND}" > /tmp/agent.config && \
       echo ">>> building with local agent: ${AGENT_BIN}" && \
       go build -trimpath -ldflags "-s -w" -toolexec="${AGENT_BIN} -config /tmp/agent.config" -a -o /out/photography-server ./cmd/server; \
     else \

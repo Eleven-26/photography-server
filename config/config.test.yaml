@@ -16,6 +16,7 @@ db:
   user: root
   password: test123456
   name: photography
+  charset: utf8mb4
   log_mode: true
 
 redis:
