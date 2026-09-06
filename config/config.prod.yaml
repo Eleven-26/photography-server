@@ -70,3 +70,15 @@ jaeger:
   endpoint: jaeger:4317 # APP_JAEGER_ENDPOINT，Jaeger OTLP gRPC
   service: photography-server # APP_JAEGER_SERVICE
   instance: "" # APP_JAEGER_INSTANCE，留空默认取主机名
+
+# Nacos 配置中心 + 注册中心：生产建议开启（业务配置集中托管；SDK 自带本地快照兜底）
+nacos:
+  enable: false # APP_NACOS_ENABLE
+  server_addr: nacos:8848 # APP_NACOS_SERVER_ADDR
+  namespace: "" # APP_NACOS_NAMESPACE
+  group: DEFAULT_GROUP # APP_NACOS_GROUP
+  data_id: photography-server-${profile}.yaml # APP_NACOS_DATA_ID
+  username: "" # APP_NACOS_USERNAME，开启鉴权时必填
+  password: "" # APP_NACOS_PASSWORD
+  service_name: photography-server # APP_NACOS_SERVICE_NAME
+  register_ip: "" # APP_NACOS_REGISTER_IP，留空自动探测

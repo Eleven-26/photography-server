@@ -62,3 +62,8 @@ jaeger:
   endpoint: test-jaeger:4317 # 测试栈 Jaeger OTLP gRPC 地址（若测试栈无 jaeger，改回实际 OTLP 后端）
   service: photography-server
   instance: ""
+
+# Nacos：测试栈按需开启（服务名与测试栈 compose 对齐）
+nacos:
+  enable: false
+  server_addr: test-nacos:8848

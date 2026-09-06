@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -40,7 +41,9 @@ func main() {
 		profile = "dev"
 	}
 
-	cfg, err := config.Load(configPath, profile)
+	// nacos.enable=true 时：本地配置退化为 bootstrap，业务配置从 Nacos 拉取（远程优先），
+	// 拉取失败直接返回错误终止启动（fail-fast）；enable=false 时 fetcher 不触发，与本地加载行为一致。
+	cfg, err := config.LoadWithFetcher(configPath, profile, infrastructure.FetchConfig)
 	if err != nil {
 		panic(fmt.Sprintf("加载配置失败: %v", err))
 	}
@@ -98,18 +101,28 @@ func main() {
 	svc := service.New(cfg.Upload.Dir)
 	engine := router.New(cfg, svc)
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.App.Port),
-		Handler: engine,
-	}
+	srv := &http.Server{Handler: engine}
 
+	// 先 Listen 成功再启动 serve，保证后续 Nacos 注册的实例一定可服务
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.App.Port))
+	if err != nil {
+		panic(fmt.Sprintf("监听端口失败: %v", err))
+	}
 	go func() {
-		logger.Infof("photography-server listening on %s", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Infof("photography-server listening on %s", ln.Addr())
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Errorf("server error: %v", err)
 			os.Exit(1)
 		}
 	}()
+
+	// Nacos：服务注册（nacos.enable=true 时生效；失败只告警不影响服务）。
+	// 临时实例：SDK 自动心跳，进程退出自动摘除（shutdown 时另有主动反注册）。
+	if cfg.Nacos.Enable {
+		if _, err := infrastructure.RegisterService(cfg.App.Name, cfg.App.Port, map[string]string{"profile": cfg.App.Profile}); err != nil {
+			logger.Warnf("nacos 服务注册失败: %v", err)
+		}
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -121,4 +134,5 @@ func main() {
 		logger.Errorf("shutdown error: %v", err)
 	}
 	infrastructure.CloseJaeger(ctx)
+	infrastructure.CloseNacos()
 }

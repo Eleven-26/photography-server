@@ -79,3 +79,16 @@ jaeger:
   endpoint: jaeger:4317 # OTLP gRPC endpoint（compose 服务名）
   service: photography-server
   instance: "" # 留空默认取主机名
+
+# Nacos 配置中心 + 服务注册（可选）：enable=true 时本地文件退化为 bootstrap，业务配置以 Nacos 为准；
+# enable=false 时本段仅占位。compose 内服务名 nacos，变量见 .env.example 的 NACOS_*/APP_NACOS_* 段
+nacos:
+  enable: false
+  server_addr: nacos:8848 # v2 SDK 走 gRPC，端口自动 +1000（9848）
+  namespace: "" # 留空 = public
+  group: DEFAULT_GROUP
+  data_id: photography-server-${profile}.yaml # ${profile} 自动替换为 dev/test/prod
+  username: "" # NACOS_AUTH_ENABLE=true 时必填
+  password: ""
+  service_name: photography-server # 注册到 Nacos 的服务名
+  register_ip: "" # 留空自动探测（容器内为容器 IP）

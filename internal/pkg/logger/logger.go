@@ -17,6 +17,9 @@ type Logger struct {
 var std = &Logger{level: "info", prefix: "photography", out: os.Stdout}
 
 func Init(level string) {
+	if level == "" {
+		level = "info"
+	}
 	std.level = level
 }
 

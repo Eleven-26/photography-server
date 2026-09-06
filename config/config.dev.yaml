@@ -62,3 +62,8 @@ jaeger:
   endpoint: 127.0.0.1:4317 # 本机 Jaeger OTLP gRPC 地址
   service: photography-server
   instance: ""
+
+# Nacos：本地开发默认关闭（enable=false 走纯本地配置，无需起 Nacos）
+nacos:
+  enable: false
+  server_addr: 127.0.0.1:8848

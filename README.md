@@ -11,10 +11,11 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
+- **配置中心/注册中心**：Nacos（可选，`nacos.enable=true` 时本地配置退化为 bootstrap，业务配置托管 Nacos；实例自动注册/摘除）
 - **链路追踪**（两通道各自独立，见「链路追踪」）：① SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；② OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码为通道②专属（通道①由注入 agent 自动埋点，代码零侵入），切换仅改构建/部署配置
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
-- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / 后端 / 前端）
+- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / Nacos / 后端 / 前端）
 
 ## 目录结构
 
@@ -36,7 +37,7 @@ photography-server
 │   ├── config              # 配置加载（多环境合并 + 环境变量展开）
 │   ├── domain              # 领域纯函数（订单状态机 / 退款比例 / 编号生成 / 金额取整）
 │   ├── enum                # 业务枚举（int 状态位）
-│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/Jaeger 通道）
+│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/Jaeger 通道/Nacos 注册）
 │   ├── middleware          # CORS / JWT 认证 / 请求日志 / Recovery / 操作审计
 │   ├── model               # 数据模型（统一 5 固定字段 + company_id 多租户）
 │   ├── pkg                 # 基础能力包
@@ -144,6 +145,7 @@ docker compose up -d --build
 | skywalking-banyandb | 17912 / 17913 | 链路追踪存储①（BanyanDB） |
 | jaeger | 4317 / 16686 | 链路追踪后端②（OTel OTLP 上报 / Jaeger UI） |
 | clickhouse | 9000 | 链路追踪存储②（Jaeger 数据落库） |
+| nacos | 8848 / 9848 | 配置中心/注册中心（控制台 / SDK gRPC，9848=8848+1000 不可改） |
 
 后端容器内通过 `APP_*` 环境变量注入连接信息（见 `docker-compose.yml`），数据源均指向 compose 服务名。
 
@@ -158,7 +160,7 @@ docker compose up -d --build
 
 > `APP_JAEGER_*` 对应配置段 `jaeger.*`（OTel exporter 开关/地址）。通道②的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
 
-SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`；agent 二进制本地化在 `build/agent/`（二进制已 gitignore，目录由 `.gitkeep` 占位保证存在），随 `COPY build/agent/ ...` 进入构建上下文，无需联网下载）：
+SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`；agent 二进制本地化在 `build/agent/`，**有意随仓库入库约 45MB**——Dockerfile 为离线构建，新环境 clone 后直接 COPY 进镜像即可，无需联网下载）：
 
 ```bash
 # 本机注入构建（需先下载对应版本 agent 二进制）
@@ -168,6 +170,23 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 ```
 
 代码侧：SkyWalking-go 由 agent 自动埋点 gin HTTP 入口与 gorm SQL，无需业务埋点；通道②（Jaeger）复用 OTel 手动埋点（gin otelgin / gorm OTel 插件 / xxl-job 根 span / NATS traceparent 透传），由 `APP_JAEGER_ENABLE` 控制。响应 `trace_id` 双通道通用：Jaeger 版取 OTel entry span，native 版取 agent native trace id（自动切换取值源，无感知）。xxl-job / NATS 的手动埋点暂仅 OTel（Jaeger）通道生效（SkyWalking-go native 版为 P1 待办，当前 HTTP+SQL 主链路已覆盖）。
+
+### Nacos 配置中心 + 服务注册（可选）
+
+一个开关 `nacos.enable` 切换两种模式，**本地开发保持 false 即可，行为与未接入 Nacos 完全一致**：
+
+- **enable=false（默认）**：纯本地三层加载（`config.yaml` → `config.<profile>.yaml` → `APP_*` 环境变量）。
+- **enable=true（部署环境）**：本地 yaml 退化为 bootstrap（只保留 `nacos.*` 段），业务配置以 Nacos 上 `data_id` 对应的 YAML 为准，优先级 `APP_* 环境变量 > Nacos 远端 > config.<profile>.yaml > config.yaml`。拉取失败直接终止启动（fail-fast）；Nacos 短暂不可用时 SDK 自动读本地快照兜底。
+
+行为细节：
+
+| 能力 | 说明 |
+|---|---|
+| 配置拉取 | 启动时 `GetConfig` 全量拉取并合并（远程覆盖本地同名字段）；**配置变更需重启进程生效**（不做运行期热更） |
+| 服务注册 | HTTP 端口就绪后注册为**临时实例**（SDK 自动心跳，进程退出自动摘除；优雅退出时另有主动反注册），metadata 带 `profile` |
+| 快照目录 | `.nacos/cache`（`nacos.cache_dir` 可改）；SDK 日志在 `.nacos/log` |
+
+启用步骤：`docker compose up -d nacos` → 控制台 `http://localhost:8848/nacos`（默认 nacos/nacos）→ 新建 YAML 配置（data_id 默认 `photography-server-prod.yaml`，Group `DEFAULT_GROUP`，内容为与 `config.prod.yaml` 同结构的完整 YAML）→ `.env` 设 `APP_NACOS_ENABLE=true` 后重启 backend。
 
 ## 接口约定
 

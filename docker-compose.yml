@@ -272,6 +272,9 @@ services:
       # 只跑 Jaeger 通道时可注释掉本项，避免每次 up 都拉起整套 SkyWalking 栈
       skywalking-oap:
         condition: service_started
+      # 仅 APP_NACOS_ENABLE=true 时需要；未启用 Nacos 时可注释掉本项
+      nacos:
+        condition: service_started
     environment:
       APP_MODE: ${APP_MODE:-release}
       APP_PROFILE: ${APP_PROFILE:-prod}
@@ -312,6 +315,15 @@ services:
       APP_JAEGER_ENDPOINT: ${APP_JAEGER_ENDPOINT:-jaeger:4317}
       APP_JAEGER_SERVICE: ${APP_JAEGER_SERVICE:-photography-server}
       APP_JAEGER_INSTANCE: ${APP_JAEGER_INSTANCE:-}
+      # Nacos 配置中心 + 注册中心（enable=true 时本地 yaml 退化为 bootstrap，业务配置从 Nacos 拉取）
+      APP_NACOS_ENABLE: ${APP_NACOS_ENABLE:-false}
+      APP_NACOS_SERVER_ADDR: ${APP_NACOS_SERVER_ADDR:-nacos:8848}
+      APP_NACOS_NAMESPACE: ${APP_NACOS_NAMESPACE:-}
+      APP_NACOS_GROUP: ${APP_NACOS_GROUP:-DEFAULT_GROUP}
+      APP_NACOS_DATA_ID: ${APP_NACOS_DATA_ID:-photography-server-${APP_PROFILE:-prod}.yaml}
+      APP_NACOS_USERNAME: ${APP_NACOS_USERNAME:-}
+      APP_NACOS_PASSWORD: ${APP_NACOS_PASSWORD:-}
+      APP_NACOS_SERVICE_NAME: ${APP_NACOS_SERVICE_NAME:-photography-server}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -321,6 +333,26 @@ services:
     networks:
       - backend-net
       - frontend-net
+
+  # ===== Nacos 配置中心 + 注册中心（可选，APP_NACOS_ENABLE=true 时 backend 才会连接）=====
+  # standalone 模式 + 内嵌 Derby 存储，开箱可用；数据卷持久化便于重启后保留配置与本地快照语义一致。
+  # 控制台 http://localhost:8848/nacos（默认账号 nacos/nacos，生产务必开启鉴权并改密）。
+  # 客户端 SDK 走 gRPC：9848 = 8848+1000，映射端口必须保持该偏移关系。
+  nacos:
+    image: nacos/nacos-server:${NACOS_VERSION:-v2.3.2}
+    container_name: photography-nacos
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_ENABLE=${NACOS_AUTH_ENABLE:-false} # 开启后须同步设置 APP_NACOS_USERNAME/PASSWORD
+      - JVM_XMS=${NACOS_JVM_XMS:-256m}
+      - JVM_XMX=${NACOS_JVM_XMX:-512m}
+      - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "${NACOS_PORT:-8848}:8848"      # 控制台 / OpenAPI
+      - "${NACOS_GRPC_PORT:-9848}:9848" # gRPC（客户端 SDK 实际连接端口）
+    restart: unless-stopped
+    networks:
+      - backend-net
 
   # 前端服务
   frontend:

@@ -62,3 +62,8 @@ jaeger:
   endpoint: jaeger-dev:4317 # docker.dev 栈 Jaeger OTLP gRPC 地址
   service: photography-server
   instance: ""
+
+# Nacos：docker.dev 栈按需开启（服务名与实际 compose 对齐，默认随栈起 nacos-dev）
+nacos:
+  enable: false
+  server_addr: nacos-dev:8848
