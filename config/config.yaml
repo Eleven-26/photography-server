@@ -66,6 +66,9 @@ elasticsearch:
 # collector/OAP 不可达时仅后台重试，不影响服务）
 skywalking:
   enable: true
-  endpoint: 127.0.0.1:4317 # otel-collector OTLP gRPC 地址
+  # OTel exporter endpoint（三通道互斥）：
+  #   通道1 OTel→SkyWalking(zipkin)：127.0.0.1:4317（本机 otel-collector）
+  #   通道3 OTel→Jaeger：127.0.0.1:4317（指向本机 jaeger，存储 ClickHouse）
+  endpoint: 127.0.0.1:4317
   service: photography-server
   instance: "" # 留空默认取主机名

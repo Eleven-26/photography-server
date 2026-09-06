@@ -31,13 +31,17 @@ type ES struct {
 	Password string   `mapstructure:"password"`
 }
 
-// SkyWalking SkyWalking 链路追踪方案配置：OpenTelemetry SDK 经 OTLP gRPC 上报 otel-collector，
-// 由 collector 转发 SkyWalking OAP（OAP 的 OTLP receiver 与 agent gRPC 共享 11800 端口）
-// 命名说明：配置段以方案名（skywalking）命名，与后续新增的其他链路追踪方案
-// （如 otel+Jaeger，独立配置段 jaeger:）相互区分
+// SkyWalking SkyWalking 链路追踪方案配置（实为通用 OpenTelemetry exporter 开关/地址，命名沿用历史）：
+//
+//	Enable=true 时 OTel SDK 经 OTLP gRPC 上报 Endpoint。
+//	三通道互斥（同一请求只激活一个，否则双 trace/双 trace_id）：
+//	  通道1 OTel→SkyWalking(zipkin)：Endpoint=otel-collector:4317（collector 转发 OAP）；
+//	  通道2 SkyWalking-go(native)：构建注入 agent 直连 OAP:11800，此时 Enable=false；
+//	  通道3 OTel→Jaeger：Endpoint=jaeger:4317（存储 ClickHouse，Jaeger UI 按 trace_id 查）。
+//	Jaeger 通道复用全部 OTel 埋点代码，仅部署侧改 endpoint，无独立 jaeger 配置段。
 type SkyWalking struct {
 	Enable   bool   `mapstructure:"enable"`
-	Endpoint string `mapstructure:"endpoint"` // OTLP gRPC endpoint，如 otel-collector:4317
+	Endpoint string `mapstructure:"endpoint"` // OTLP gRPC endpoint：otel-collector:4317（通道1）/ jaeger:4317（通道3）
 	Service  string `mapstructure:"service"`
 	Instance string `mapstructure:"instance"` // 实例名，留空默认取主机名
 }

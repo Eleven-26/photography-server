@@ -1,0 +1,60 @@
+# =====================================================================
+# Jaeger v2 配置模板（ClickHouse 存储 + OTLP 摄取 + 内置 UI）
+# 对应 docker-compose.yml 中 jaeger 服务（image: jaegertracing/jaeger:2.18.0）
+#
+# 用途：作为「Jaeger 通道」的查询/存储端。后端应用不注入 skywalking-go agent，
+#       仅设 APP_SKYWALKING_ENABLE=true 且 APP_SKYWALKING_ENDPOINT=jaeger:4317，
+#       复用同一套 OpenTelemetry 埋点（HTTP/SQL/xxl/mq 全部照常）经 OTLP 上报本服务。
+#
+# 版本事实：ClickHouse 为 Jaeger v2.18.0 起的官方原生存储后端（alpha，ADR-008），
+#           不再是旧的三方 grpc-plugin（该插件 API 已废弃）。create_schema: true 时
+#           启动自动建表，无需手写 DDL；数据库本身须已存在（compose 里由
+#           clickhouse 服务 CLICKHOUSE_DB=jaeger 自动创建）。
+#
+# 部署：拷到 compose 根目录 ./jaeger/config.yaml（或改 .env 的 JAEGER_CONFIG_FILE 指向本文件）。
+# =====================================================================
+
+extensions:
+  jaeger_storage:
+    backends:
+      clickhouse-storage:
+        clickhouse:
+          # compose 网络内用服务名；宿主机直连调试改为 127.0.0.1:9000
+          addresses:
+            - clickhouse:9000
+          database: jaeger
+          # compose 的 clickhouse 服务若设置了 CLICKHOUSE_USER/CLICKHOUSE_PASSWORD，
+          # 需在此加 basic auth（username/password），两处保持一致；未设密码则删除本段
+          # auth:
+          #   basic:
+          #     username: default
+          #     password: ""
+          create_schema: true   # 启动自动建 spans/索引表（首次启动必须）
+          # ttl: 720h           # 数据保留时长，过期由 ClickHouse 自动清理（0/缺省=不清理）
+  jaeger_query:
+    storage:
+      traces: clickhouse-storage
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    # 默认即可；高吞吐可调 timeout/send_batch_size
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: clickhouse-storage
+
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]

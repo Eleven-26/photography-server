@@ -208,6 +208,57 @@ services:
     networks:
       - backend-net
 
+  # ===== Jaeger 通道（可选，与上方 SkyWalking 栈互斥部署，两者可并存但不建议同开）=====
+  # 数据流：backend --OTLP:4317--> jaeger(collector+query 一体) --native--> clickhouse
+  # 版本说明：ClickHouse 存储为 Jaeger v2.18.0 起的官方原生后端（alpha），无需 ES / 三方 grpc-plugin；
+  #   启用方式：后端不注入 sw-go agent，设 APP_SKYWALKING_ENABLE=true 且 APP_SKYWALKING_ENDPOINT=jaeger:4317
+  #   （APP_SKYWALKING_* 实为 OTel exporter 的通用开关/地址，命名沿用历史）；数据落 clickhouse.jaeger 库，
+  #   UI 由 jaeger 单进程内置（:16686），支持按 trace_id 精确检索。
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
+    container_name: photography-clickhouse
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-jaeger}   # 启动时自动创建该库（Jaeger 不自己建库）
+      # 可选加固：设 CLICKHOUSE_USER/CLICKHOUSE_PASSWORD 后，须同步到 config/jaeger 配置的 auth.basic
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${CLICKHOUSE_PORT:-9000}:9000"          # native 协议（Jaeger 连接用）
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"     # HTTP 接口（调试用）
+    volumes:
+      - ${CLICKHOUSE_DATA_DIR:-./clickhouse/data}:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  jaeger:
+    image: jaegertracing/jaeger:${JAEGER_VERSION:-2.18.0}
+    container_name: photography-jaeger
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ${JAEGER_CONFIG_FILE:-./jaeger/config.yaml}:/etc/jaeger/config.yaml:ro
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    ports:
+      - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"    # 应用 OTLP gRPC 上报入口
+      - "${JAEGER_OTLP_HTTP_PORT:-4318}:4318"    # 应用 OTLP HTTP 上报入口
+      - "${JAEGER_UI_PORT:-16686}:16686"         # Jaeger UI
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   # 后端服务
   backend:
     build:
@@ -269,10 +320,14 @@ services:
       APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
       APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
       APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
-      # 链路追踪双通道（运行时互斥，勿同时开启，否则同一请求产生双 trace/双 trace_id）：
-      # 通道1 OTel（默认）：APP_SKYWALKING_ENABLE=true 时经 otel-collector 上报，数据存 OAP zipkin 兼容格式（Horizon「Zipkin」模式查）；
-      # 通道2 SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 自读上方 build arg 直连 OAP:11800，
-      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_SKYWALKING_ENABLE 须为 false。
+      # 链路追踪三通道（运行时互斥，勿同时开启，否则同一请求产生双 trace/双 trace_id）：
+      # 通道1 OTel→SkyWalking(zipkin 兼容)：APP_SKYWALKING_ENABLE=true 且 endpoint=otel-collector:4317，
+      #   经 collector 转发 OAP，数据存 zipkin 兼容格式（Horizon「Zipkin」模式查）；
+      # 通道2 SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 直连 OAP:11800，
+      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_SKYWALKING_ENABLE 须为 false；
+      # 通道3 OTel→Jaeger（复用 OTL 埋点，不注入 agent）：APP_SKYWALKING_ENABLE=true 且 endpoint=jaeger:4317，
+      #   数据落 ClickHouse（compose 内 clickhouse+jaeger 服务），Jaeger UI(:16686) 按 trace_id 精确检索。
+      # APP_SKYWALKING_* 名义上是 skywalking 段，实为 OTel exporter 的通用开关/地址（通道1与通道3共用）。
       APP_SKYWALKING_ENABLE: ${APP_SKYWALKING_ENABLE:-false}
       APP_SKYWALKING_ENDPOINT: ${APP_SKYWALKING_ENDPOINT:-otel-collector:4317}
       APP_SKYWALKING_SERVICE: ${APP_SKYWALKING_SERVICE:-photography-server}

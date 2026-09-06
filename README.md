@@ -11,7 +11,7 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
-- **链路追踪**（双通道互斥，见「链路追踪」）：① OpenTelemetry SDK（OTLP → otel-collector → SkyWalking OAP 11，数据存 Zipkin 兼容格式，Horizon「Zipkin」模式查）；② SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）。OTel 埋点代码两通道共用保留，为后续 Jaeger 备用
+- **链路追踪**（三通道互斥，见「链路追踪」）：① OpenTelemetry SDK → SkyWalking OAP（数据存 Zipkin 兼容格式，Horizon「Zipkin」模式查）；② SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；③ OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码三通道共用，切换仅改部署配置
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
 - **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / 后端 / 前端）
@@ -102,23 +102,30 @@ make docker-up / docker-down / docker-build
 主要配置段：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
 
 ## Docker 部署
-```
-把配置复制出来并修改成真实值
+```bash
+# 把配置复制出来并修改成真实值
 
-把photography-server的 .env.example 复制出来改成 .env
-把photography-server的 docker-compose.yml 复制出来
-把photography-server/config的 horizon.example.yaml 复制出来改成 horizon.yaml，存放位置根据docker-compose的配置存放
-把photography-server/config的 otel-collector.example.yaml 复制出来改成 config.yaml，存放位置根据docker-compose的配置存放
-把photography-server/config的 nats.example.conf 复制出来改成 nats.conf，存放位置根据docker-composer的配置存放
+# 创建所有配置目录
+mkdir -p data/horizon data/openTelemetry-collector data/jaeger
 
-目录结构
+# 复制，需要手动改值
+cp ./photography-server/.env.example .env
+cp ./photography-server/docker-compose.yml docker-compose.yml
+
+# 复制根目录配置文件，需要手动改值
+cp ./photography-server/config/horizon.example.yaml ./data/horizon/horizon.yaml
+cp ./photography-server/config/otel-collector.example.yaml ./data/openTelemetry-collector/config.yaml
+cp ./photography-server/config/jaeger.example.yaml ./data/jaeger/config.yaml
+
+# 目录结构
 prod
 ├── photography-server
 ├── photography-frontend
+├── data # 存放挂载数据
 ├── docker-compose.yml
 ├── .env
 
-在pro目录下执行
+# 在prod目录下执行
 docker compose up -d --build
 ```
 
@@ -138,14 +145,17 @@ docker compose up -d --build
 
 后端容器内通过 `APP_*` 环境变量注入连接信息（见 `docker-compose.yml`），数据源均指向 compose 服务名。
 
-### 链路追踪（SkyWalking 双通道）
+### 链路追踪（三通道互斥）
 
-两套通道运行时互斥，**勿同时开启**（同一请求会产双 trace / 双 trace_id）：
+各通道运行时互斥，**勿同时开启**（同一请求会产双 trace / 双 trace_id）：
 
-| 通道 | 数据形态 | 启用方式 | Horizon 查看 |
+| 通道 | 数据形态 | 启用方式 | 查看 |
 |---|---|---|---|
-| OTel（默认） | OTLP → otel-collector → OAP，存 Zipkin 兼容格式 | `.env` 设 `APP_SKYWALKING_ENABLE=true` | 「Zipkin」数据源 |
-| SkyWalking-go（native） | agent 编译期注入，直连 OAP:11800 | `.env` 设 `SW_AGENT_ENABLE=true` 构建（并保持 `APP_SKYWALKING_ENABLE=false`） | 「原生」数据源 + 拓扑/指标 |
+| ① OTel→SkyWalking(zipkin) | OTLP → otel-collector → OAP，存 Zipkin 兼容格式 | `.env` 设 `APP_SKYWALKING_ENABLE=true`、`APP_SKYWALKING_ENDPOINT=otel-collector:4317` | Horizon「Zipkin」数据源 |
+| ② SkyWalking-go(native) | agent 编译期注入，直连 OAP:11800 | `.env` 设 `SW_AGENT_ENABLE=true` 构建（并保持 `APP_SKYWALKING_ENABLE=false`） | Horizon「原生」数据源 + 拓扑/指标 |
+| ③ OTel→Jaeger | OTLP → jaeger(collector+query 一体) → **ClickHouse**（v2.18.0 官方原生存储，alpha） | `.env` 设 `APP_SKYWALKING_ENABLE=true`、`APP_SKYWALKING_ENDPOINT=jaeger:4317`，**不注入 agent** | Jaeger UI :16686，**按 trace_id 精确检索** |
+
+> `APP_SKYWALKING_*` 名义为 skywalking 段，实为 OTel exporter 的通用开关/地址（通道①与③共用，命名沿用历史）。通道③的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
 
 SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`，agent 从清华 Apache 镜像下载）：
 
