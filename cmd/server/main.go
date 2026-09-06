@@ -15,8 +15,9 @@ import (
 	// SkyWalking Go agent（skywalking-go）：编译期无侵入注入探针（go build -toolexec="<agent>" -a）。
 	// 无注入的普通构建（本地 go run / Jaeger 版）此 import 为零副作用占位；注入构建时 agent 自启，
 	// 自动埋点 gin HTTP 入口与 gorm SQL，数据直连 OAP native gRPC(:11800)，Horizon「原生」模式可见。
-	// 运行时互斥约定：SkyWalking-go 版需将 OTel 通道关闭（APP_SKYWALKING_ENABLE=false），
-	// 避免同一请求双 trace；Jaeger 版则不注入 agent、启用 OTel exporter（保留的 OTel 埋点代码）。
+	// 两通道各自独立、互不依赖，但勿同时开启（同一请求会双 span/双上报）：
+	//   ① SkyWalking-go(native)：Dockerfile SW_AGENT_ENABLE=true 构建注入即启用，无运行时开关；
+	//   ② OTel→Jaeger：不注入 agent，jaeger.enable=true 时启用 OTel exporter（下方 InitJaeger）。
 	_ "github.com/apache/skywalking-go"
 
 	"photography-server/internal/config"
@@ -46,11 +47,11 @@ func main() {
 	logger.Init(cfg.Log.Level)
 	logger.Infof("running profile: %s", cfg.App.Profile)
 
-	// SkyWalking 链路追踪：OTel SDK → otel-collector → SkyWalking OAP；未启用时跳过，collector 不可达不影响启动。
+	// Jaeger 链路通道（OTel SDK → Jaeger，复用 OTel 埋点）；未启用时跳过，Jaeger 不可达不影响启动。
 	// 注意：必须先于 InitMySQL —— GORM 的 OTel 插件在安装时捕获全局 TracerProvider，
 	// 顺序颠倒会导致 SQL span 走 noop provider，永远不产生数据。
-	if err := infrastructure.InitSkyWalking(&cfg.SkyWalking); err != nil {
-		logger.Warnf("skywalking not available, skipping: %v", err)
+	if err := infrastructure.InitJaeger(&cfg.Jaeger); err != nil {
+		logger.Warnf("jaeger not available, skipping: %v", err)
 	}
 
 	if err := infrastructure.InitMySQL(cfg); err != nil {
@@ -119,5 +120,5 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Errorf("shutdown error: %v", err)
 	}
-	infrastructure.CloseSkyWalking(ctx)
+	infrastructure.CloseJaeger(ctx)
 }

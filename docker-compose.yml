@@ -120,11 +120,12 @@ services:
     networks:
       - backend-net
 
-  # 链路追踪：BanyanDB（存储） + OAP（后端） + OTel Collector（采集转发） + Horizon UI
-  # 数据流：backend --OTLP:4317--> otel-collector --OTLP:11800--> OAP --> BanyanDB
+  # 链路追踪（SkyWalking native 栈）：BanyanDB（存储）+ OAP（后端） + Horizon UI
+  # 数据流：backend（注入 skywalking-go agent）--native gRPC:11800--> OAP --> BanyanDB
   # 版本说明：OAP 11.0.0 配套 BanyanDB 0.11.0；11.0 起官方 UI 为 Horizon 版
   # （apache/skywalking-ui:horizon-*，容器内监听 8081，配置只认挂载的 horizon.yaml）；
   # OAP 的 17128 为 admin 端口，Horizon UI 的写 API 依赖它。
+  # 另一条链路通道（OTel→Jaeger + ClickHouse）见下方 clickhouse/jaeger 服务，与本栈互不依赖。
   skywalking-banyandb:
     image: apache/skywalking-banyandb:${SW_BDB_VERSION:-0.11.0}
     container_name: photography-skywalking-banyandb
@@ -154,18 +155,14 @@ services:
       - SW_STORAGE=banyandb
       - SW_STORAGE_BANYANDB_TARGETS=skywalking-banyandb:17912
       - SW_HEALTH_CHECKER=default
-      # 必启：OTLP traces handler 内部把 OTLP span 转为 Zipkin 格式，依赖 receiver-zipkin 模块
-      # （默认 application.yml 里 receiver-zipkin/query-zipkin 均为禁用，不开启则 OTLP 链路上报被拒：
-      #   ModuleNotFoundRuntimeException: receiver-zipkin missing → collector 侧 Unknown 永久错误丢数据）
-      - SW_RECEIVER_ZIPKIN=default
-      - SW_QUERY_ZIPKIN=default
+      # 仅服务 native 通道：skywalking-go agent 的 native gRPC 上报默认开启；
+      # 已废弃 OTel→SkyWalking(zipkin) 通道，不再需要 receiver-zipkin/query-zipkin 与 9412。
       - JAVA_OPTS=${SW_OAP_JAVA_OPTS:--Xms512m -Xmx512m}
       - TZ=${TZ:-Asia/Shanghai}
     ports:
-      - "${SW_OAP_GRPC_PORT:-11800}:11800"   # agent/OTLP gRPC 上报（otel-collector 连这里）
+      - "${SW_OAP_GRPC_PORT:-11800}:11800"   # skywalking-go agent native gRPC 上报
       - "${SW_OAP_QUERY_PORT:-12800}:12800"  # REST/GraphQL 查询（Horizon UI 用）
       - "${SW_OAP_ADMIN_PORT:-17128}:17128"  # admin（Horizon UI 写 API 用）
-      - "${SW_OAP_ZIPKIN_PORT:-9412}:9412"   # Zipkin 查询 API（OTLP 链路以 Zipkin 格式存储，/zipkin/api/v2/*；宿主机调试用，栈内 UI 走容器网络不依赖此映射）
     healthcheck:
       # 新版 OAP 镜像无 curl，用 bash 内置 /dev/tcp 探测
       test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/12800"]
@@ -173,22 +170,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 90s
-    restart: unless-stopped
-    networks:
-      - backend-net
-
-  otel-collector:
-    image: otel/opentelemetry-collector:${OTEL_COLLECTOR_VERSION:-0.157.0}
-    container_name: photography-otel-collector
-    depends_on:
-      skywalking-oap:
-        condition: service_started
-    volumes:
-      - ${OTEL_CONFIG_FILE:-./openTelemetry-collector/config.yaml}:/etc/otelcol/config.yaml:ro
-    command: ["--config=/etc/otelcol/config.yaml"]
-    ports:
-      - "${OTEL_GRPC_PORT:-4317}:4317"   # 应用 OTLP gRPC 上报入口
-      - "${OTEL_HTTP_PORT:-4318}:4318"   # 应用 OTLP HTTP 上报入口
     restart: unless-stopped
     networks:
       - backend-net
@@ -208,11 +189,11 @@ services:
     networks:
       - backend-net
 
-  # ===== Jaeger 通道（可选，与上方 SkyWalking 栈互斥部署，两者可并存但不建议同开）=====
+  # ===== Jaeger 链路通道（与上方 SkyWalking native 栈互不依赖，二选一使用，不建议同开）=====
   # 数据流：backend --OTLP:4317--> jaeger(collector+query 一体) --native--> clickhouse
   # 版本说明：ClickHouse 存储为 Jaeger v2.18.0 起的官方原生后端（alpha），无需 ES / 三方 grpc-plugin；
-  #   启用方式：后端不注入 sw-go agent，设 APP_SKYWALKING_ENABLE=true 且 APP_SKYWALKING_ENDPOINT=jaeger:4317
-  #   （APP_SKYWALKING_* 实为 OTel exporter 的通用开关/地址，命名沿用历史）；数据落 clickhouse.jaeger 库，
+  #   启用方式：后端不注入 sw-go agent，设 APP_JAEGER_ENABLE=true 且 APP_JAEGER_ENDPOINT=jaeger:4317
+  #   （配置段 jaeger.*，复用 OTel 埋点）；数据落 clickhouse.jaeger 库，
   #   UI 由 jaeger 单进程内置（:16686），支持按 trace_id 精确检索。
   clickhouse:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
@@ -266,7 +247,8 @@ services:
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
       args:
         # SkyWalking Go agent 注入构建：SW_AGENT_ENABLE=true 时产物内织入 agent，
-        # 走 native 通道（直连 OAP:11800），此时须同时 APP_SKYWALKING_ENABLE=false（互斥）。
+        # 走 native 通道（直连 OAP:11800）；false 时不注入（Jaeger 通道/纯 OTel 埋点）。
+        # 注：native 构建运行期须保持 APP_JAEGER_ENABLE=false，避免 OTel 与 native 双上报。
         SW_AGENT_ENABLE: ${SW_AGENT_ENABLE:-false}
         SW_AGENT_VERSION: ${SW_AGENT_VERSION:-0.7.0}
         SW_AGENT_SERVICE: ${SW_AGENT_SERVICE:-photography-server}
@@ -285,8 +267,6 @@ services:
       elasticsearch:
         condition: service_healthy
       mongo:
-        condition: service_started
-      otel-collector:
         condition: service_started
       skywalking-oap:
         condition: service_started
@@ -320,18 +300,16 @@ services:
       APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
       APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
       APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
-      # 链路追踪三通道（运行时互斥，勿同时开启，否则同一请求产生双 trace/双 trace_id）：
-      # 通道1 OTel→SkyWalking(zipkin 兼容)：APP_SKYWALKING_ENABLE=true 且 endpoint=otel-collector:4317，
-      #   经 collector 转发 OAP，数据存 zipkin 兼容格式（Horizon「Zipkin」模式查）；
-      # 通道2 SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 直连 OAP:11800，
-      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_SKYWALKING_ENABLE 须为 false；
-      # 通道3 OTel→Jaeger（复用 OTL 埋点，不注入 agent）：APP_SKYWALKING_ENABLE=true 且 endpoint=jaeger:4317，
+      # 链路追踪两通道（各自独立，勿同开，否则同一请求产双 span/双上报）：
+      # 通道① SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 直连 OAP:11800，
+      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_JAEGER_ENABLE 须为 false；
+      # 通道② OTel→Jaeger（复用 OTL 埋点，不注入 agent）：APP_JAEGER_ENABLE=true 且 endpoint=jaeger:4317，
       #   数据落 ClickHouse（compose 内 clickhouse+jaeger 服务），Jaeger UI(:16686) 按 trace_id 精确检索。
-      # APP_SKYWALKING_* 名义上是 skywalking 段，实为 OTel exporter 的通用开关/地址（通道1与通道3共用）。
-      APP_SKYWALKING_ENABLE: ${APP_SKYWALKING_ENABLE:-false}
-      APP_SKYWALKING_ENDPOINT: ${APP_SKYWALKING_ENDPOINT:-otel-collector:4317}
-      APP_SKYWALKING_SERVICE: ${APP_SKYWALKING_SERVICE:-photography-server}
-      APP_SKYWALKING_INSTANCE: ${APP_SKYWALKING_INSTANCE:-}
+      # APP_JAEGER_* 对应 config 的 jaeger 段（OTel exporter 开关/地址）。
+      APP_JAEGER_ENABLE: ${APP_JAEGER_ENABLE:-false}
+      APP_JAEGER_ENDPOINT: ${APP_JAEGER_ENDPOINT:-jaeger:4317}
+      APP_JAEGER_SERVICE: ${APP_JAEGER_SERVICE:-photography-server}
+      APP_JAEGER_INSTANCE: ${APP_JAEGER_INSTANCE:-}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:

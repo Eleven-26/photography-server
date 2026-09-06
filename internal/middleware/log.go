@@ -13,7 +13,7 @@ import (
 )
 
 // RequestLog 请求日志中间件
-// 注意：须注册在 SkyWalkingTrace 之前也能取到 trace_id ——
+// 注意：须注册在 JaegerTrace / agent 入口之前也能取到 trace_id ——
 // 日志在 c.Next() 之后输出，此时链路中间件已执行完，span 已注入请求上下文。
 func RequestLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -65,7 +65,9 @@ func (m *Middlewares) OperationLog() gin.HandlerFunc {
 			log.Status = 0
 		}
 		// 同步写入：透传请求 ctx（WithContext）使该条 SQL 的 span 挂在当前 HTTP 请求链路下，
-		// 而不是以独立 trace 入库 —— 与 repository 层 ctx 贯穿的约定保持一致。
+		// 而不是以独立 trace 入库 —— 与 repository 层 ctx 贯穿的约定保持一致
+		// （Jaeger 通道由 gorm OTel 插件产生 SQL span，native 通道由注入 agent 增强 database/sql，
+		//   两者都依赖 ctx 里带有父 span，此约定为两条通道共用的前提）。
 		// gin 请求处理链未结束时 Request.Context() 仍有效，可直接复用。
 		if err := infrastructure.MySQL().WithContext(c.Request.Context()).Create(&log).Error; err != nil {
 			logger.Warnf("operation log write failed: %v", err)

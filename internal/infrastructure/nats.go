@@ -119,8 +119,9 @@ func (c *NatsClient) ensureStream(name, subj string) {
 }
 
 // traceMsg 构造携带 W3C TraceContext 的消息：把 ctx 中的 span 上下文注入消息 Header，
-// 使消费端能抽取同一 trace 续接链路（方案A完整透传）。
-// ctx 无有效 span（如链路未启用）时 Inject 为空操作，Header 为空，消息行为与普通消息一致。
+// 使消费端能抽取同一 trace 续接链路（Jaeger/OTel 通道的生产→消费完整透传）。
+// ctx 无有效 span（如链路未启用 / SkyWalking-go native 通道——agent 的链路上下文不在 OTel ctx 中）时
+// Inject 为空操作，Header 为空，消息行为与普通消息一致；native 通道的 MQ 透传（sw8 header）为 P1 待办。
 func (c *NatsClient) traceMsg(ctx context.Context, subject string, data []byte) *nats.Msg {
 	hdr := make(nats.Header)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(hdr))

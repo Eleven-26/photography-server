@@ -11,17 +11,17 @@ import (
 )
 
 type Config struct {
-	App        App        `mapstructure:"app"`
-	JWT        JWT        `mapstructure:"jwt"`
-	DB         DB         `mapstructure:"db"`
-	Redis      Redis      `mapstructure:"redis"`
-	NATS       NATS       `mapstructure:"nats"`
-	Mongo      Mongo      `mapstructure:"mongodb"`
-	Log        Log        `mapstructure:"log"`
-	Upload     Upload     `mapstructure:"upload"`
-	XxlJob     XxlJob     `mapstructure:"xxljob"`
-	ES         ES         `mapstructure:"elasticsearch"`
-	SkyWalking SkyWalking `mapstructure:"skywalking"`
+	App    App    `mapstructure:"app"`
+	JWT    JWT    `mapstructure:"jwt"`
+	DB     DB     `mapstructure:"db"`
+	Redis  Redis  `mapstructure:"redis"`
+	NATS   NATS   `mapstructure:"nats"`
+	Mongo  Mongo  `mapstructure:"mongodb"`
+	Log    Log    `mapstructure:"log"`
+	Upload Upload `mapstructure:"upload"`
+	XxlJob XxlJob `mapstructure:"xxljob"`
+	ES     ES     `mapstructure:"elasticsearch"`
+	Jaeger Jaeger `mapstructure:"jaeger"`
 }
 
 type ES struct {
@@ -31,18 +31,19 @@ type ES struct {
 	Password string   `mapstructure:"password"`
 }
 
-// SkyWalking SkyWalking 链路追踪方案配置（实为通用 OpenTelemetry exporter 开关/地址，命名沿用历史）：
+// Jaeger Jaeger 链路通道配置（复用 OpenTelemetry 埋点，OTLP gRPC 上报 Jaeger，存储 ClickHouse）。
+// 本段实为通用 OTel exporter 开关/地址，当前唯一用途即 Jaeger 通道：
 //
-//	Enable=true 时 OTel SDK 经 OTLP gRPC 上报 Endpoint。
-//	三通道互斥（同一请求只激活一个，否则双 trace/双 trace_id）：
-//	  通道1 OTel→SkyWalking(zipkin)：Endpoint=otel-collector:4317（collector 转发 OAP）；
-//	  通道2 SkyWalking-go(native)：构建注入 agent 直连 OAP:11800，此时 Enable=false；
-//	  通道3 OTel→Jaeger：Endpoint=jaeger:4317（存储 ClickHouse，Jaeger UI 按 trace_id 查）。
-//	Jaeger 通道复用全部 OTel 埋点代码，仅部署侧改 endpoint，无独立 jaeger 配置段。
-type SkyWalking struct {
+//	Enable=true 时 OTel SDK 经 OTLP gRPC 上报 Endpoint（如 jaeger:4317）。
+//	两通道各自独立、互不依赖，但勿同时开启（同一请求会产双 span/双上报）：
+//	  通道① SkyWalking-go(native)：Dockerfile SW_AGENT_ENABLE=true 构建期注入 agent，
+//	      直连 OAP:11800（agent.config 的 backend_service），无运行时开关，与本段无关；
+//	  通道② OTel→Jaeger：本段 enable=true + endpoint=jaeger:4317，不注入 agent，
+//	      复用全部 OTel 手动埋点（HTTP 入口/SQL/xxl-job/NATS），Jaeger UI 按 trace_id 查。
+type Jaeger struct {
 	Enable   bool   `mapstructure:"enable"`
-	Endpoint string `mapstructure:"endpoint"` // OTLP gRPC endpoint：otel-collector:4317（通道1）/ jaeger:4317（通道3）
-	Service  string `mapstructure:"service"`
+	Endpoint string `mapstructure:"endpoint"` // OTLP gRPC endpoint：jaeger:4317（compose 服务名）
+	Service  string `mapstructure:"service"`  // 上报的服务名（otelgin/span 的 service.name）
 	Instance string `mapstructure:"instance"` // 实例名，留空默认取主机名
 }
 

@@ -18,15 +18,15 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 
 	engine := gin.New()
 	engine.Use(middleware.CORS(), middleware.Recovery(), middleware.RequestLog())
-	// SkyWalking 链路追踪（OTel → otel-collector → SkyWalking OAP）：未启用时返回 nil，请求路径零影响
-	if tm := middleware.SkyWalkingTrace(cfg.SkyWalking.Service); tm != nil {
+	// Jaeger 链路通道（OTel → Jaeger，复用 OTel 埋点）：未启用时返回 nil，请求路径零影响
+	if tm := middleware.JaegerTrace(cfg.Jaeger.Service); tm != nil {
 		engine.Use(tm)
 		// 把 entry span 的 trace_id 回写响应头 X-Trace-Id，便于日志/UI 检索；需注册在 otelgin 之后
 		engine.Use(middleware.TraceID())
 		// 把请求参数（query/JSON body）追加到 entry span 属性；需在 otelgin 之后、业务处理器之前
 		engine.Use(middleware.TraceParams())
 	} else {
-		// 非 OTel 通道：SkyWalking-go agent 版（注入构建）的 entry span 由 agent 在 gin 外层自动创建，
+		// 非 Jaeger/OTel 通道：SkyWalking-go agent 版（注入构建）的 entry span 由 agent 在 gin 外层自动创建，
 		// TraceID 中间件从 agent 上下文取 native trace_id 回写响应头；纯本地开发（无任何追踪）时为 no-op。
 		engine.Use(middleware.TraceID())
 	}
@@ -231,8 +231,8 @@ func registerDebug(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/mongo/update", ctl.MongoUpdate)
 	t.POST("/mongo/delete", ctl.MongoDelete)
 	t.POST("/mongo/delete-by-id", ctl.MongoDeleteByID)
-	t.POST("/skywalking/status", ctl.SkyWalkingStatus)
-	t.POST("/skywalking/trace", ctl.SkyWalkingTrace)
+	t.POST("/jaeger/status", ctl.JaegerStatus)
+	t.POST("/jaeger/trace", ctl.JaegerTrace)
 
 	t.POST("/test", ctl.Test)
 }

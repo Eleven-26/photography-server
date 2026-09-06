@@ -62,13 +62,12 @@ elasticsearch:
   username: ""
   password: ""
 
-# SkyWalking 链路追踪方案（OTel SDK 经 OTLP 上报 otel-collector，由其转发 SkyWalking OAP；
-# collector/OAP 不可达时仅后台重试，不影响服务）
-skywalking:
+# Jaeger 链路通道（复用 OTel 埋点，OTLP gRPC 上报本机 Jaeger；Jaeger 不可达时仅后台重试，不影响服务）
+# 两通道各自独立（勿同开，否则同一请求双 span/双上报）：
+#   ① SkyWalking-go(native)：Dockerfile SW_AGENT_ENABLE=true 构建注入 agent 即启用，无运行时开关；
+#   ② OTel→Jaeger：本节 enable=true + endpoint=jaeger:4317，不注入 agent。
+jaeger:
   enable: true
-  # OTel exporter endpoint（三通道互斥）：
-  #   通道1 OTel→SkyWalking(zipkin)：127.0.0.1:4317（本机 otel-collector）
-  #   通道3 OTel→Jaeger：127.0.0.1:4317（指向本机 jaeger，存储 ClickHouse）
-  endpoint: 127.0.0.1:4317
+  endpoint: 127.0.0.1:4317 # OTLP gRPC endpoint（本机 Jaeger）
   service: photography-server
   instance: "" # 留空默认取主机名

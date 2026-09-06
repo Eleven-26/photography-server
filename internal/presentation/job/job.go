@@ -21,16 +21,18 @@ func Register(executor xxl.Executor) {
 	logger.Infof("xxl-job tasks registered")
 }
 
-// traced 为 xxl 任务包一层链路追踪：
+// traced 为 xxl 任务包一层链路追踪（Jaeger/OTel 通道）：
 // go-client 的任务 ctx 是硬编码 context.Background()（不继承调度 HTTP 请求的链路），
 // 因此这里在任务入口用全局 Tracer 创建一次任务执行的"根 span"，
 // 任务内所有 SQL（repository 已 ctx 贯穿 WithContext）自动挂到该链路下，
 // 日志行带 trace_id 可回溯，达到"一次任务执行 = 一条独立 trace"。
 // 追踪未启用时返回原函数，零开销、零行为变化。
+// 注意：SkyWalking-go（native）通道走编译期 agent 自动埋点，不覆盖 xxl-job（无 HTTP/SQL 之外的
+// 自动插件），该通道下 xxl 的 native 手动埋点为 P1 待办。
 // 用法：executor.RegTask("job.xxx", traced("job.xxx", XxxJob))
 func traced(handler string, fn xxl.TaskFunc) xxl.TaskFunc {
 	return func(cxt context.Context, param *xxl.RunReq) string {
-		tr := infrastructure.SkyWalkingTracer()
+		tr := infrastructure.JaegerTracer()
 		if tr == nil {
 			return fn(cxt, param)
 		}

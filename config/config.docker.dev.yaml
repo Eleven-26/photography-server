@@ -57,8 +57,8 @@ elasticsearch:
   username: ""
   password: ""
 
-skywalking:
+jaeger:
   enable: true
-  endpoint: skywalking-oap-dev:4317 # otel-collector OTLP gRPC 地址
+  endpoint: jaeger-dev:4317 # docker.dev 栈 Jaeger OTLP gRPC 地址
   service: photography-server
   instance: ""

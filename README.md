@@ -11,7 +11,7 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
-- **链路追踪**（三通道互斥，见「链路追踪」）：① OpenTelemetry SDK → SkyWalking OAP（数据存 Zipkin 兼容格式，Horizon「Zipkin」模式查）；② SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；③ OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码三通道共用，切换仅改部署配置
+- **链路追踪**（两通道各自独立，见「链路追踪」）：① SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；② OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码为通道②专属（通道①由注入 agent 自动埋点，代码零侵入），切换仅改构建/部署配置
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
 - **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / 后端 / 前端）
@@ -36,7 +36,7 @@ photography-server
 │   ├── config              # 配置加载（多环境合并 + 环境变量展开）
 │   ├── domain              # 领域纯函数（订单状态机 / 退款比例 / 编号生成 / 金额取整）
 │   ├── enum                # 业务枚举（int 状态位）
-│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/SkyWalking）
+│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/Jaeger 通道）
 │   ├── middleware          # CORS / JWT 认证 / 请求日志 / Recovery / 操作审计
 │   ├── model               # 数据模型（统一 5 固定字段 + company_id 多租户）
 │   ├── pkg                 # 基础能力包
@@ -106,7 +106,7 @@ make docker-up / docker-down / docker-build
 # 把配置复制出来并修改成真实值
 
 # 创建所有配置目录
-mkdir -p data/horizon data/openTelemetry-collector data/jaeger
+mkdir -p data/horizon data/jaeger
 
 # 复制，需要手动改值
 cp ./photography-server/.env.example .env
@@ -114,7 +114,6 @@ cp ./photography-server/docker-compose.yml docker-compose.yml
 
 # 复制根目录配置文件，需要手动改值
 cp ./photography-server/config/horizon.example.yaml ./data/horizon/horizon.yaml
-cp ./photography-server/config/otel-collector.example.yaml ./data/openTelemetry-collector/config.yaml
 cp ./photography-server/config/jaeger.example.yaml ./data/jaeger/config.yaml
 
 # 目录结构
@@ -139,34 +138,35 @@ docker compose up -d --build
 | xxl-job-admin | 9100 | 任务调度中心 |
 | elasticsearch | 9200 | 搜索引擎 |
 | mongo | 27017 | 文档数据库 |
-| skywalking-oap | 11800 / 12800 | 链路追踪后端（agent 上报 / 查询） |
-| skywalking-ui | 9080 | 链路追踪 UI |
-| skywalking-banyandb | 17912 / 17913 | 链路追踪存储 |
+| skywalking-oap | 11800 / 12800 | 链路追踪后端①（skywalking-go native agent 上报 / 查询） |
+| skywalking-ui | 9080 | 链路追踪 UI①（Horizon） |
+| skywalking-banyandb | 17912 / 17913 | 链路追踪存储①（BanyanDB） |
+| jaeger | 4317 / 16686 | 链路追踪后端②（OTel OTLP 上报 / Jaeger UI） |
+| clickhouse | 9000 | 链路追踪存储②（Jaeger 数据落库） |
 
 后端容器内通过 `APP_*` 环境变量注入连接信息（见 `docker-compose.yml`），数据源均指向 compose 服务名。
 
-### 链路追踪（三通道互斥）
+### 链路追踪（两通道各自独立）
 
-各通道运行时互斥，**勿同时开启**（同一请求会产双 trace / 双 trace_id）：
+两通道各自独立、互不依赖，**勿同时开启**（同一请求会产双 span / 双上报）：
 
 | 通道 | 数据形态 | 启用方式 | 查看 |
 |---|---|---|---|
-| ① OTel→SkyWalking(zipkin) | OTLP → otel-collector → OAP，存 Zipkin 兼容格式 | `.env` 设 `APP_SKYWALKING_ENABLE=true`、`APP_SKYWALKING_ENDPOINT=otel-collector:4317` | Horizon「Zipkin」数据源 |
-| ② SkyWalking-go(native) | agent 编译期注入，直连 OAP:11800 | `.env` 设 `SW_AGENT_ENABLE=true` 构建（并保持 `APP_SKYWALKING_ENABLE=false`） | Horizon「原生」数据源 + 拓扑/指标 |
-| ③ OTel→Jaeger | OTLP → jaeger(collector+query 一体) → **ClickHouse**（v2.18.0 官方原生存储，alpha） | `.env` 设 `APP_SKYWALKING_ENABLE=true`、`APP_SKYWALKING_ENDPOINT=jaeger:4317`，**不注入 agent** | Jaeger UI :16686，**按 trace_id 精确检索** |
+| ① SkyWalking-go(native) | agent 编译期注入，直连 OAP:11800 | `.env` 设 `SW_AGENT_ENABLE=true` 构建（不注入 agent 则本通道不生效）；运行期无开关 | Horizon「原生」数据源 + 拓扑/指标 |
+| ② OTel→Jaeger | OTLP → jaeger(collector+query 一体) → **ClickHouse**（v2.18.0 官方原生存储，alpha） | `.env` 设 `APP_JAEGER_ENABLE=true`、`APP_JAEGER_ENDPOINT=jaeger:4317`，**不注入 agent** | Jaeger UI :16686，**按 trace_id 精确检索** |
 
-> `APP_SKYWALKING_*` 名义为 skywalking 段，实为 OTel exporter 的通用开关/地址（通道①与③共用，命名沿用历史）。通道③的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
+> `APP_JAEGER_*` 对应配置段 `jaeger.*`（OTel exporter 开关/地址）。通道②的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
 
-SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`，agent 从清华 Apache 镜像下载）：
+SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`；agent 二进制本地化在 `sw-agent/`（已 gitignore），随 `COPY . .` 进入构建上下文，无需联网下载）：
 
 ```bash
 # 本机注入构建（需先下载对应版本 agent 二进制）
 go build -toolexec="<agent-路径> -config <agent.config>" -a -o server ./cmd/server
-# agent.config 示例：agent.reporter.grpc.backend_service 指向 OAP:11800
+# agent.config 示例：reporter.grpc.backend_service 指向 OAP:11800（Dockerfile 内自动生成）
 docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agent
 ```
 
-代码侧：SkyWalking-go 由 agent 自动埋点 gin HTTP 入口与 gorm SQL，无需业务埋点；OTel 埋点代码全部保留但默认关闭（`APP_SKYWALKING_ENABLE=false`），响应 `trace_id` 在 SkyWalking-go 版为 native trace id（自动切换取值源，无感知）。xxl-job / NATS 的手动埋点暂仅 OTel 通道生效（SkyWalking-go 版为 P1 待办，当前 HTTP+SQL 主链路已覆盖）。
+代码侧：SkyWalking-go 由 agent 自动埋点 gin HTTP 入口与 gorm SQL，无需业务埋点；通道②（Jaeger）复用 OTel 手动埋点（gin otelgin / gorm OTel 插件 / xxl-job 根 span / NATS traceparent 透传），由 `APP_JAEGER_ENABLE` 控制。响应 `trace_id` 双通道通用：Jaeger 版取 OTel entry span，native 版取 agent native trace id（自动切换取值源，无感知）。xxl-job / NATS 的手动埋点暂仅 OTel（Jaeger）通道生效（SkyWalking-go native 版为 P1 待办，当前 HTTP+SQL 主链路已覆盖）。
 
 ## 接口约定
 
@@ -185,7 +185,7 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 | NATS | `/test/nats/status` `/pub` `/pub-persistent` `/pub-pull` `/request` |
 | Elasticsearch | `/test/es/status` `/index` `/search` `/list` `/delete` |
 | MongoDB | `/test/mongo/status` `/insert` `/insert-many` `/find` `/find-one` `/update` `/delete` `/delete-by-id` |
-| SkyWalking | `/test/skywalking/status` `/trace`（在请求链路下创建子 span 验证上报，数据到 UI 查看） |
+| Jaeger 通道 | `/test/jaeger/status` `/trace`（在请求链路下创建子 span 验证上报，数据到 Jaeger UI 查看） |
 
 ## 单元测试
 

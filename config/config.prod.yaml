@@ -65,8 +65,8 @@ elasticsearch:
   username: "" # APP_ES_USERNAME
   password: "" # APP_ES_PASSWORD
 
-skywalking:
-  enable: false # APP_SKYWALKING_ENABLE
-  endpoint: otel-collector:4317 # APP_SKYWALKING_ENDPOINT，otel-collector OTLP gRPC
-  service: photography-server # APP_SKYWALKING_SERVICE
-  instance: "" # APP_SKYWALKING_INSTANCE，留空默认取主机名
+jaeger:
+  enable: false # APP_JAEGER_ENABLE（Jaeger 通道默认关；native 注入构建也须保持 false，避免双上报）
+  endpoint: jaeger:4317 # APP_JAEGER_ENDPOINT，Jaeger OTLP gRPC
+  service: photography-server # APP_JAEGER_SERVICE
+  instance: "" # APP_JAEGER_INSTANCE，留空默认取主机名

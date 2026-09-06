@@ -2,9 +2,12 @@
 # Jaeger v2 配置模板（ClickHouse 存储 + OTLP 摄取 + 内置 UI）
 # 对应 docker-compose.yml 中 jaeger 服务（image: jaegertracing/jaeger:2.18.0）
 #
-# 用途：作为「Jaeger 通道」的查询/存储端。后端应用不注入 skywalking-go agent，
-#       仅设 APP_SKYWALKING_ENABLE=true 且 APP_SKYWALKING_ENDPOINT=jaeger:4317，
+# 用途：作为「Jaeger 链路通道」的查询/存储端。后端应用不注入 skywalking-go agent，
+#       仅设 APP_JAEGER_ENABLE=true 且 APP_JAEGER_ENDPOINT=jaeger:4317（对应配置段 jaeger.*），
 #       复用同一套 OpenTelemetry 埋点（HTTP/SQL/xxl/mq 全部照常）经 OTLP 上报本服务。
+#
+# 两通道各自独立：SkyWalking-go(native) 走 OAP:11800 与本服务无关；勿同时开启两通道，
+# 否则同一请求双 span/双上报。
 #
 # 版本事实：ClickHouse 为 Jaeger v2.18.0 起的官方原生存储后端（alpha，ADR-008），
 #           不再是旧的三方 grpc-plugin（该插件 API 已废弃）。create_schema: true 时

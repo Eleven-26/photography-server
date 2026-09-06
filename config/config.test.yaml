@@ -57,8 +57,8 @@ elasticsearch:
   username: ""
   password: ""
 
-skywalking:
+jaeger:
   enable: true
-  endpoint: test-otel-collector:4317
+  endpoint: test-jaeger:4317 # 测试栈 Jaeger OTLP gRPC 地址（若测试栈无 jaeger，改回实际 OTLP 后端）
   service: photography-server
   instance: ""

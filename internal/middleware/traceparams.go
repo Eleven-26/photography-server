@@ -24,7 +24,7 @@ var sensitiveKeySubstrings = []string{"password", "pwd", "secret", "token", "aut
 //   - query string -> http.query
 //   - JSON body    -> http.request.body（限 4KB，敏感字段值脱敏为 ****）
 //
-// 必须注册在 SkyWalkingTrace（otelgin）之后、业务处理器之前：
+// 必须注册在 JaegerTrace（otelgin）之后、业务处理器之前：
 // 前者保证能从请求上下文取到 entry span，后者保证 body 先读取再复原、业务不受影响。
 func TraceParams() gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -201,13 +201,15 @@ func durableName(subject string) string {
 
 // ======================== 链路透传包装 ========================
 
-// traced 消费链路包装：从消息 Header 抽取生产端注入的 W3C TraceContext 作为父上下文，
-// 在父上下文上创建"处理 span"续接同一 trace（生产→消费完整链路）。
+// traced 消费链路包装（Jaeger/OTel 通道）：从消息 Header 抽取生产端注入的 W3C TraceContext 作为
+// 父上下文，在父上下文上创建"处理 span"续接同一 trace（生产→消费完整链路）。
 // 消息无 traceparent（手动测试/旧消息）时退化为独立根 span，保证每次处理都有可查链路。
 // 追踪未启用时原样调用业务 handler，零开销。
+// 注意：SkyWalking-go（native）通道的消息 Header 无 OTel traceparent（agent 未注入），
+// 该通道下 MQ 透传需按 sw8 header 格式手动接入，为 P1 待办。
 func traced(subject string, handler natsHandler) nats.MsgHandler {
 	return func(msg *nats.Msg) {
-		tr := infrastructure.SkyWalkingTracer()
+		tr := infrastructure.JaegerTracer()
 		if tr == nil {
 			handler(context.Background(), msg)
 			return

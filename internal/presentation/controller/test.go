@@ -702,7 +702,7 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 	response.OK(c, gin.H{"deleted_count": res.DeletedCount})
 }
 
-// ======================== SkyWalking 链路追踪示例 ========================
+// ======================== Jaeger 链路通道验证示例 ========================
 
 // currentTraceID 从请求上下文取 entry span 的 trace_id（otelgin 中间件注入）。
 // 追踪未启用或 span 无效时返回空串。
@@ -713,38 +713,38 @@ func currentTraceID(c *gin.Context) string {
 	return ""
 }
 
-// SkyWalkingStatus 检查 SkyWalking 追踪状态，并回传当前请求的 trace_id 便于 UI 检索
-// POST /test/skywalking/status
-func (h *Controller) SkyWalkingStatus(c *gin.Context) {
-	if !infrastructure.SkyWalkingEnabled() {
-		response.Fail(c, errs.Internal("skywalking 未启用（enable=false 或初始化失败）"))
+// JaegerStatus 检查 Jaeger（OTel）通道追踪状态，并回传当前请求的 trace_id 便于 UI 检索
+// POST /test/jaeger/status
+func (h *Controller) JaegerStatus(c *gin.Context) {
+	if !infrastructure.JaegerEnabled() {
+		response.Fail(c, errs.Internal("jaeger 未启用（enable=false 或初始化失败）"))
 		return
 	}
 	response.OK(c, gin.H{
 		"status":   "enabled",
 		"trace_id": currentTraceID(c),
-		"hint":     "tracer 已初始化，span 经 OTLP 上报 otel-collector 并转发 SkyWalking OAP；用本响应的 trace_id 到 SkyWalking UI 的 Trace 页检索该链路",
+		"hint":     "tracer 已初始化，span 经 OTLP 上报 Jaeger；用本响应的 trace_id 到 Jaeger UI(:16686) 按 trace_id 检索该链路",
 	})
 }
 
-type skywalkingTraceReq struct {
+type jaegerTraceReq struct {
 	Operation string `json:"operation"` // 自定义 span 操作名，默认 debug/manual-span
 	SleepMs   int    `json:"sleep_ms"`  // 模拟业务耗时（毫秒），默认 50，上限 5000
 	WithDB    bool   `json:"with_db"`   // 为 true 时执行一条带参数的 SQL，用于验证 db span 埋点
 }
 
-// SkyWalkingTrace 在当前请求链路（entry span）下创建一段子 span，用于验证上报链路。
+// JaegerTrace 在当前请求链路（entry span）下创建一段子 span，用于验证上报链路。
 // with_db=true 时追加执行一条带参数的 SQL（gorm OTel 插件产生 client span），
 // UI 中可同时看到请求参数（http.query / http.request.body）与 SQL 语句（db.query.text）。
-// 前置条件：skywalking.enable=true 且 otel-collector → OAP 链路可达；请求本身已被 trace 中间件覆盖。
-// POST /test/skywalking/trace
-func (h *Controller) SkyWalkingTrace(c *gin.Context) {
-	tracer := infrastructure.SkyWalkingTracer()
+// 前置条件：jaeger.enable=true 且 endpoint=jaeger:4317 可达；请求本身已被 trace 中间件覆盖。
+// POST /test/jaeger/trace
+func (h *Controller) JaegerTrace(c *gin.Context) {
+	tracer := infrastructure.JaegerTracer()
 	if tracer == nil {
-		response.Fail(c, errs.Internal("skywalking 未启用"))
+		response.Fail(c, errs.Internal("jaeger 未启用"))
 		return
 	}
-	var req skywalkingTraceReq
+	var req jaegerTraceReq
 	// body 可选：允许空请求体，解析失败仅当非 EOF 才报错
 	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
 		response.Fail(c, errs.BadRequest("参数解析失败: "+err.Error()))
@@ -791,6 +791,6 @@ func (h *Controller) SkyWalkingTrace(c *gin.Context) {
 		"sleep_ms":  req.SleepMs,
 		"trace_id":  currentTraceID(c), // 子 span 与 entry span 同一 trace，可直接到 UI 检索
 		"db_probe":  dbProbe,           // with_db=true 时的 SQL 执行结果（验证参数填充）
-		"hint":      "子 span 已结束并进入上报队列；用 trace_id 到 SkyWalking UI 的 Trace 页查询（service 见配置 skywalking.service）",
+		"hint":      "子 span 已结束并进入上报队列；用 trace_id 到 Jaeger UI(:16686) 查询（service 见配置 jaeger.service）",
 	})
 }
