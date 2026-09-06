@@ -157,7 +157,7 @@ docker compose up -d --build
 
 > `APP_JAEGER_*` 对应配置段 `jaeger.*`（OTel exporter 开关/地址）。通道②的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
 
-SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`；agent 二进制本地化在 `sw-agent/`（已 gitignore），随 `COPY . .` 进入构建上下文，无需联网下载）：
+SkyWalking-go 版构建要点（Dockerfile 已内置开关 `SW_AGENT_ENABLE` / `SW_AGENT_VERSION` / `SW_AGENT_SERVICE` / `SW_AGENT_BACKEND`；agent 二进制本地化在 `build/agent/`（二进制已 gitignore，目录由 `.gitkeep` 占位保证存在），随 `COPY build/agent/ ...` 进入构建上下文，无需联网下载）：
 
 ```bash
 # 本机注入构建（需先下载对应版本 agent 二进制）

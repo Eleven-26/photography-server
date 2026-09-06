@@ -4,12 +4,13 @@ WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 GOFLAGS=-mod=mod
 
 # SkyWalking Go agent（skywalking-go）注入构建开关：
-# SW_AGENT_ENABLE=true 时以 -toolexec 织入构建产物（agent 为 build context 内 sw-agent/ 目录的本地
-# 二进制，随 COPY . . 带入镜像，无需联网下载），服务走 SkyWalking native 通道（Horizon「原生」模式
+# SW_AGENT_ENABLE=true 时以 -toolexec 织入构建产物（agent 为 build context 内 build/agent/ 目录的本地
+# 二进制，随 COPY build/agent/ 带入镜像，无需联网下载），服务走 SkyWalking native 通道（Horizon「原生」模式
 # 可见、具备 OAP 拓扑/指标分析）。
 # 默认 false —— 纯 OTel / Jaeger 版：不注入，保留的 OTel 埋点代码照常工作。
 # 注意：注入构建会强制 -a 全量 rebuild（编译时间明显变长）；agent 版本需与 go.mod 依赖一致，
-# 且 sw-agent/ 下存在 skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64（从官方 bin.tgz 解压即可）。
+# 且 build/agent/ 下存在 skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64（从官方 bin.tgz 解压即可；
+# 该二进制已 gitignore，目录由 .gitkeep 占位，缺失时注入分支会直接报文件不存在）。
 ARG SW_AGENT_ENABLE=false
 ARG SW_AGENT_VERSION=0.7.0
 ARG SW_AGENT_SERVICE=photography-server

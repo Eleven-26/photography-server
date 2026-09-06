@@ -51,7 +51,7 @@ upload:
 
 xxljob:
   enable: true # APP_XXLJOB_ENABLE
-  server_addr: http://xxl-job-admin:9100 # APP_XXLJOB_SERVER_ADDR
+  server_addr: http://xxl-job-admin:8080 # APP_XXLJOB_SERVER_ADDR（容器内访问用监听端口 8080；9100 是宿主机映射端口）
   access_token: "" # APP_XXLJOB_ACCESS_TOKEN
   executor_ip: 127.0.0.1 # APP_XXLJOB_EXECUTOR_IP
   executor_port: "9999" # APP_XXLJOB_EXECUTOR_PORT

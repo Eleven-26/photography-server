@@ -4,8 +4,9 @@
 *.exe
 bin
 
-# skywalking-go agent（Dockerfile 注入构建用，本地解压的二进制，勿入库）
-sw-agent/
+# skywalking-go agent 二进制：有意随仓库入库（约 45MB，勿加忽略规则）
+# 原因：Dockerfile 是离线构建（不联网下载），新环境 clone 后必须能直接 COPY 进镜像；
+# 若要改为不入库，必须同步给 Dockerfile 加「本地缺失时自动下载」的 fallback，否则注入构建必然失败。
 
 # env
 .env

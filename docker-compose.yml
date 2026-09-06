@@ -268,6 +268,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_started
+      # 仅 native 通道需要（OAP 未就绪时 agent 上报会自行重试）；
+      # 只跑 Jaeger 通道时可注释掉本项，避免每次 up 都拉起整套 SkyWalking 栈
       skywalking-oap:
         condition: service_started
     environment:
