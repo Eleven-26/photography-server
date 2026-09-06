@@ -3,15 +3,24 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/trace"
+
+	skywtrace "github.com/apache/skywalking-go/toolkit/trace"
 )
 
 // CurrentTraceID 返回当前请求的 trace_id（无有效 span 时为空串）。
-// 链路未启用时请求上下文里没有 span，返回空，调用方自行决定降级展示。
+// 取值优先级：
+//  1. OpenTelemetry 通道（Jaeger 版）：请求上下文里的 entry span；
+//  2. gin context 缓存值（TraceID 中间件已写入，SkyWalking-go 版为 agent native trace id）；
+//  3. skywalking-go agent 当前 goroutine 上下文（toolkit，仅注入构建且有活跃 span 时非空；
+//     普通构建下 toolkit 为安全空实现，返回空串，不影响请求路径）。
 func CurrentTraceID(c *gin.Context) string {
 	if sc := trace.SpanContextFromContext(c.Request.Context()); sc.IsValid() {
 		return sc.TraceID().String()
 	}
-	return c.GetString("trace_id")
+	if tid := c.GetString("trace_id"); tid != "" {
+		return tid
+	}
+	return skywtrace.GetTraceID()
 }
 
 // TraceID 将当前请求 entry span 的 trace_id 写入响应头 X-Trace-Id，

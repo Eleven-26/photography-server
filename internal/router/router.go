@@ -25,6 +25,10 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 		engine.Use(middleware.TraceID())
 		// 把请求参数（query/JSON body）追加到 entry span 属性；需在 otelgin 之后、业务处理器之前
 		engine.Use(middleware.TraceParams())
+	} else {
+		// 非 OTel 通道：SkyWalking-go agent 版（注入构建）的 entry span 由 agent 在 gin 外层自动创建，
+		// TraceID 中间件从 agent 上下文取 native trace_id 回写响应头；纯本地开发（无任何追踪）时为 no-op。
+		engine.Use(middleware.TraceID())
 	}
 
 	ctl := controller.New(svc, cfg)

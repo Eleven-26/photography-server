@@ -213,6 +213,13 @@ services:
     build:
       context: ${BACKEND_CONTEXT:-./photography-server}
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
+      args:
+        # SkyWalking Go agent 注入构建：SW_AGENT_ENABLE=true 时产物内织入 agent，
+        # 走 native 通道（直连 OAP:11800），此时须同时 APP_SKYWALKING_ENABLE=false（互斥）。
+        SW_AGENT_ENABLE: ${SW_AGENT_ENABLE:-false}
+        SW_AGENT_VERSION: ${SW_AGENT_VERSION:-0.7.0}
+        SW_AGENT_SERVICE: ${SW_AGENT_SERVICE:-photography-server}
+        SW_AGENT_BACKEND: ${SW_AGENT_BACKEND:-skywalking-oap:11800}
     image: chenkangfu/photography-server:${VERSION:-latest}  # 通过环境变量传入版本
     container_name: photography-backend
     depends_on:
@@ -262,6 +269,10 @@ services:
       APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
       APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
       APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
+      # 链路追踪双通道（运行时互斥，勿同时开启，否则同一请求产生双 trace/双 trace_id）：
+      # 通道1 OTel（默认）：APP_SKYWALKING_ENABLE=true 时经 otel-collector 上报，数据存 OAP zipkin 兼容格式（Horizon「Zipkin」模式查）；
+      # 通道2 SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 自读上方 build arg 直连 OAP:11800，
+      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_SKYWALKING_ENABLE 须为 false。
       APP_SKYWALKING_ENABLE: ${APP_SKYWALKING_ENABLE:-false}
       APP_SKYWALKING_ENDPOINT: ${APP_SKYWALKING_ENDPOINT:-otel-collector:4317}
       APP_SKYWALKING_SERVICE: ${APP_SKYWALKING_SERVICE:-photography-server}

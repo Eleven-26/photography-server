@@ -12,6 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	// SkyWalking Go agent（skywalking-go）：编译期无侵入注入探针（go build -toolexec="<agent>" -a）。
+	// 无注入的普通构建（本地 go run / Jaeger 版）此 import 为零副作用占位；注入构建时 agent 自启，
+	// 自动埋点 gin HTTP 入口与 gorm SQL，数据直连 OAP native gRPC(:11800)，Horizon「原生」模式可见。
+	// 运行时互斥约定：SkyWalking-go 版需将 OTel 通道关闭（APP_SKYWALKING_ENABLE=false），
+	// 避免同一请求双 trace；Jaeger 版则不注入 agent、启用 OTel exporter（保留的 OTel 埋点代码）。
+	_ "github.com/apache/skywalking-go"
+
 	"photography-server/internal/config"
 	"photography-server/internal/infrastructure"
 	"photography-server/internal/middleware"

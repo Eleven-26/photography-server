@@ -4,6 +4,9 @@
 *.exe
 bin
 
+# skywalking-go agent（Dockerfile 注入构建用，本地解压的二进制，勿入库）
+sw-agent/
+
 # env
 .env
 
