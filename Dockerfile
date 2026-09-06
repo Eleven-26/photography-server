@@ -15,12 +15,19 @@ ARG SW_AGENT_VERSION=0.7.0
 ARG SW_AGENT_SERVICE=photography-server
 ARG SW_AGENT_BACKEND=skywalking-oap:11800
 
+# 依赖下载（缓存）
 COPY go.mod go.sum ./
 RUN go mod download
 
+# 复制 Agent
+COPY build/agent/ /app/build/agent/
+
+# 复制源码
 COPY . .
+
+# 构建
 RUN if [ "$SW_AGENT_ENABLE" = "true" ]; then \
-      AGENT_BIN="/app/sw-agent/skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64" && \
+      AGENT_BIN="/app/build/agent/skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64" && \
       chmod +x "${AGENT_BIN}" && \
       # 生成 agent.config：结构与官方 agent.default.yaml 一致（reporter 为顶层键）。
       # 值写成 ${ENV:default} 占位格式 —— 默认固化 ARG 传入值，运行期仍可被环境变量覆盖。
