@@ -5,18 +5,23 @@ import "photography-server/internal/enum"
 // Asset 作品集
 type Asset struct {
 	TenantBase
-	Code         string           `gorm:"column:code;size:20;not null;uniqueIndex:uk_asset_code,priority:1;comment:作品编号 WK-xxx" json:"code"`
-	Title        string           `gorm:"column:title;size:100;comment:作品标题" json:"title"`
-	Category     string           `gorm:"column:category;size:50;comment:作品类型(婚纱/写真/儿童/全家福/活动跟拍等)" json:"category"`
-	Cover        string           `gorm:"column:cover;size:500;comment:封面图" json:"cover"`
-	Images       string           `gorm:"column:images;type:text;comment:作品图片(逗号分隔)" json:"images"`
-	Description  string           `gorm:"column:description;size:1000;comment:作品描述" json:"description"`
-	Photographer string           `gorm:"column:photographer;size:50;comment:摄影师" json:"photographer"`
-	Model        string           `gorm:"column:model;size:50;comment:模特" json:"model"`
-	Location     string           `gorm:"column:location;size:100;comment:拍摄地点" json:"location"`
-	Status       enum.AssetStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-草稿 2-已发布" json:"status"`
-	ViewCount    int64            `gorm:"column:view_count;default:0;comment:浏览数" json:"view_count"`
-	PublishedAt  *string          `gorm:"column:published_at;comment:发布时间" json:"published_at"`
+	Code          string           `gorm:"column:code;size:20;not null;uniqueIndex:uk_asset_code,priority:1;comment:作品编号 WK-xxx" json:"code"`
+	Title         string           `gorm:"column:title;size:100;comment:作品标题" json:"title"`
+	Category      string           `gorm:"column:category;size:50;comment:作品类型(婚纱/写真/儿童/全家福/活动跟拍等)" json:"category"`
+	Cover         string           `gorm:"column:cover;size:500;comment:封面图" json:"cover"`
+	Images        string           `gorm:"column:images;type:text;comment:作品图片(逗号分隔)" json:"images"`
+	Description   string           `gorm:"column:description;size:1000;comment:作品描述" json:"description"`
+	Photographer  string           `gorm:"column:photographer;size:50;comment:摄影师" json:"photographer"`
+	Model         string           `gorm:"column:model;size:50;comment:模特" json:"model"`
+	Location      string           `gorm:"column:location;size:100;comment:拍摄地点" json:"location"`
+	Status        enum.AssetStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-草稿 2-已发布" json:"status"`
+	Visibility    int              `gorm:"column:visibility;type:tinyint;default:1;comment:可见性 1-公开 2-未公开" json:"visibility"`
+	Featured      int              `gorm:"column:featured;type:tinyint;default:0;comment:精选展示(主页顶部) 0-否 1-是" json:"featured"`
+	Authorization int              `gorm:"column:authorization;type:tinyint;default:2;comment:客户授权 1-待授权 2-已授权" json:"authorization"`
+	ShootDate     *string          `gorm:"column:shoot_date;comment:拍摄日期" json:"shoot_date"`
+	PackageIDs    string           `gorm:"column:package_ids;size:200;comment:关联套餐ID(逗号分隔)" json:"package_ids"`
+	ViewCount     int64            `gorm:"column:view_count;default:0;comment:浏览数" json:"view_count"`
+	PublishedAt   *string          `gorm:"column:published_at;comment:发布时间" json:"published_at"`
 }
 
 func (Asset) TableName() string { return "biz_asset" }

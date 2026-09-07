@@ -5,12 +5,17 @@ import (
 
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
+	appctl "photography-server/internal/presentation/app"
 	"photography-server/internal/presentation/controller"
+	"photography-server/internal/presentation/h5"
+	"photography-server/internal/presentation/wechat"
 	"photography-server/internal/service"
 )
 
 // New 构建 gin 引擎并按客户端分组注册 RPC 风格路由
-// 客户端分组：pc-管理后台 miniapp-小程序管理后台 app-APP h5-移动端
+// 客户端分组：pc-管理后台 miniapp-小程序管理后台 app-摄影师APP h5-客户H5 wechat-客户小程序
+// 三端入口分开：管理端接口仅注册在 pc/miniapp；摄影师 App 注册在 /app（员工认证）；
+// 客户 H5 注册在 /h5（客户认证）；客户小程序注册在 /wechat（客户认证，复用 H5 能力）。
 func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	if cfg.App.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -47,16 +52,32 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	// 公共接口：登录（四个客户端统一走 /auth/login）
 	api.POST("/auth/login", ctl.Login)
 
-	// 各客户端业务路由分组（RPC 风格：/client/module/action/:id）
+	// 管理端分组（员工认证）：pc-管理后台 miniapp-小程序管理后台
 	pc := api.Group("", mw.Auth(), mw.OperationLog())
 	miniapp := api.Group("/miniapp", mw.Auth(), mw.OperationLog())
-	app := api.Group("/app", mw.Auth(), mw.OperationLog())
-	h5 := api.Group("/h5", mw.Auth(), mw.OperationLog())
-
 	registerCommon(pc, ctl)
 	registerCommon(miniapp, ctl)
-	registerCommon(app, ctl)
-	registerCommon(h5, ctl)
+
+	// ---- 摄影师 App（员工验证码登录 + StaffAuth）----
+	appCtl := appctl.New(svc, cfg)
+	appPub := api.Group("/app")
+	appCtl.RegisterPublic(appPub)
+	appAuth := api.Group("/app", mw.StaffAuth(), mw.OperationLog())
+	appCtl.RegisterAuthed(appAuth)
+
+	// ---- 客户 H5（客户验证码登录 + CustomerAuth）----
+	h5Ctl := h5.New(svc, cfg)
+	h5Pub := api.Group("/h5")
+	h5Ctl.RegisterPublic(h5Pub)
+	h5Auth := api.Group("/h5", mw.CustomerAuth())
+	h5Ctl.RegisterAuthed(h5Auth)
+
+	// ---- 客户微信小程序（复用 H5 能力，独立入口 /wechat）----
+	wcCtl := wechat.New(svc, cfg)
+	wcPub := api.Group("/wechat")
+	wcCtl.RegisterPublic(wcPub)
+	wcAuth := api.Group("/wechat", mw.CustomerAuth())
+	wcCtl.RegisterAuthed(wcAuth)
 
 	// 调试路由：仅非 release（dev/test）环境注册，生产环境不暴露基础设施操作能力
 	if cfg.App.Mode != "release" {

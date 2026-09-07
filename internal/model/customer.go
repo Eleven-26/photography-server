@@ -18,6 +18,9 @@ type Customer struct {
 	Status      enum.CustomerStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-潜在 2-活跃 3-流失" json:"status"`
 	Remark      string              `gorm:"column:remark;size:500;comment:备注" json:"remark"`
 	Avatar      string              `gorm:"column:avatar;size:500;comment:头像地址" json:"avatar"`
+	OpenID      string              `gorm:"column:openid;size:64;index;comment:微信小程序openid" json:"openid"`
+	UnionID     string              `gorm:"column:unionid;size:64;comment:微信unionid" json:"unionid"`
+	IsVerified  int                 `gorm:"column:is_verified;type:tinyint;default:0;comment:手机号是否已验证 0-否 1-是" json:"is_verified"`
 	OrderCount  int64               `gorm:"column:order_count;default:0;comment:订单数(冗余)" json:"order_count"`
 	TotalAmount float64             `gorm:"column:total_amount;type:decimal(12,2);default:0;comment:累计消费(冗余)" json:"total_amount"`
 }

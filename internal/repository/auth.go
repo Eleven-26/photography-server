@@ -30,6 +30,22 @@ func (r *AuthRepo) GetByUsername(ctx context.Context, username string) (*model.S
 	return &u, nil
 }
 
+// GetByMobile 按手机号查员工（摄影师 App 验证码登录用）。
+// 登录发生在认证之前、尚无公司上下文，故不做租户过滤；同号多租户时取最早注册者。
+func (r *AuthRepo) GetByMobile(ctx context.Context, mobile string) (*model.SysUser, error) {
+	var u model.SysUser
+	if err := r.conn().WithContext(ctx).
+		Where("mobile = ? AND deleted = 0", mobile).Order("id ASC").First(&u).Error; err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// TouchLogin 登录成功后刷新最近登录时间与 IP
+func (r *AuthRepo) TouchLogin(ctx context.Context, userID int64, ip string) error {
+	return r.UpdateLoginInfo(ctx, userID, ip)
+}
+
 func (r *AuthRepo) GetByID(ctx context.Context, companyID, userID int64) (*model.SysUser, error) {
 	var u model.SysUser
 	if err := r.tenant(companyID).WithContext(ctx).First(&u, userID).Error; err != nil {

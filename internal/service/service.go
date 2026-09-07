@@ -23,8 +23,11 @@ type Operator struct {
 // Service 业务服务根结构，按领域拆分到不同文件。
 // 分层纪律：service 只依赖 repository（数据访问唯一入口），
 // 不持有任何基础设施句柄；开启事务统一走 repository.Tx(...)。
+// JWTSecret/JWTIssuer：客户端三端签发 JWT 所需（由 config.JWT 注入，只读）。
 type Service struct {
 	UploadDir        string
+	JWTSecret        string
+	JWTIssuer        string
 	AuthRepo         *repository.AuthRepo
 	UserRepo         *repository.UserRepo
 	CustomerRepo     *repository.CustomerRepo
@@ -39,25 +42,44 @@ type Service struct {
 	FinanceRepo      *repository.FinanceRepo
 	DashboardRepo    *repository.DashboardRepo
 	UploadRepo       *repository.UploadRepo
+	// 三端（小程序/APP/H5）新增实体
+	RescheduleRepo    *repository.OrderRescheduleRepo
+	ReviewRepo        *repository.ReviewRepo
+	CustomRequestRepo *repository.CustomRequestRepo
+	AddonRepo         *repository.AddonRepo
+	LeadExtraRepo     *repository.LeadExtraRepo
+	SlotTemplateRepo  *repository.SlotTemplateRepo
+	StudioSettingRepo *repository.StudioSettingRepo
+	DeviceRepo        *repository.DeviceRepo
 }
 
-func New(uploadDir string) *Service {
+func New(uploadDir, jwtSecret, jwtIssuer string) *Service {
 	return &Service{
-		UploadDir:        uploadDir,
-		AuthRepo:         repository.NewAuthRepo(),
-		UserRepo:         repository.NewUserRepo(),
-		CustomerRepo:     repository.NewCustomerRepo(),
-		AssetRepo:        repository.NewAssetRepo(),
-		CalendarRepo:     repository.NewCalendarRepo(),
-		NotificationRepo: repository.NewNotificationRepo(),
-		SettingsRepo:     repository.NewSettingsRepo(),
-		PackageRepo:      repository.NewPackageRepo(),
-		LeadRepo:         repository.NewLeadRepo(),
-		OrderRepo:        repository.NewOrderRepo(),
-		DeliveryRepo:     repository.NewDeliveryRepo(),
-		FinanceRepo:      repository.NewFinanceRepo(),
-		DashboardRepo:    repository.NewDashboardRepo(),
-		UploadRepo:       repository.NewUploadRepo(),
+		UploadDir:         uploadDir,
+		JWTSecret:         jwtSecret,
+		JWTIssuer:         jwtIssuer,
+		AuthRepo:          repository.NewAuthRepo(),
+		UserRepo:          repository.NewUserRepo(),
+		CustomerRepo:      repository.NewCustomerRepo(),
+		AssetRepo:         repository.NewAssetRepo(),
+		CalendarRepo:      repository.NewCalendarRepo(),
+		NotificationRepo:  repository.NewNotificationRepo(),
+		SettingsRepo:      repository.NewSettingsRepo(),
+		PackageRepo:       repository.NewPackageRepo(),
+		LeadRepo:          repository.NewLeadRepo(),
+		OrderRepo:         repository.NewOrderRepo(),
+		DeliveryRepo:      repository.NewDeliveryRepo(),
+		FinanceRepo:       repository.NewFinanceRepo(),
+		DashboardRepo:     repository.NewDashboardRepo(),
+		UploadRepo:        repository.NewUploadRepo(),
+		RescheduleRepo:    repository.NewOrderRescheduleRepo(),
+		ReviewRepo:        repository.NewReviewRepo(),
+		CustomRequestRepo: repository.NewCustomRequestRepo(),
+		AddonRepo:         repository.NewAddonRepo(),
+		LeadExtraRepo:     repository.NewLeadExtraRepo(),
+		SlotTemplateRepo:  repository.NewSlotTemplateRepo(),
+		StudioSettingRepo: repository.NewStudioSettingRepo(),
+		DeviceRepo:        repository.NewDeviceRepo(),
 	}
 }
 

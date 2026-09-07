@@ -1,0 +1,514 @@
+package h5
+
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+
+	"photography-server/internal/config"
+	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/dto"
+	"photography-server/internal/response"
+	"photography-server/internal/service"
+)
+
+// Controller 客户 H5 端接口（客户预约全链路：浏览套餐 → 提交预约 → 支付定金 →
+// 选片 → 确认成片 → 评价）。公开接口无需登录，业务接口经 CustomerAuth 注入客户上下文。
+type Controller struct {
+	Svc *service.Service
+	Cfg *config.Config
+}
+
+func New(svc *service.Service, cfg *config.Config) *Controller {
+	return &Controller{Svc: svc, Cfg: cfg}
+}
+
+// RegisterPublic 注册公开路由（无需登录；company_id 由 query/header 指定租户）
+func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
+	g.POST("/auth/sms-code", h.SmsCode)
+	g.POST("/auth/login", h.Login)
+	g.POST("/package/list", h.PackageList)
+	g.POST("/package/detail/:id", h.PackageDetail)
+	g.POST("/studio/info", h.StudioInfo)
+	g.POST("/slot/list", h.SlotList)
+	g.POST("/custom-request/submit", h.CustomRequestSubmit)
+}
+
+// RegisterAuthed 注册需登录路由（CustomerAuth 注入 ClientUser）
+func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
+	// 预约/订单
+	g.POST("/order/submit", h.BookingSubmit)
+	g.POST("/order/confirm/:id", h.BookingConfirm)
+	g.POST("/order/cancel/:id", h.BookingCancel)
+	g.POST("/order/list", h.OrderList)
+	g.POST("/order/detail/:id", h.OrderDetail)
+	// 改期
+	g.POST("/reschedule/apply/:order_id", h.RescheduleApply)
+	g.POST("/reschedule/cancel/:id", h.RescheduleCancel)
+	// 退款
+	g.POST("/refund/apply/:order_id", h.RefundApply)
+	// 评价
+	g.POST("/review/create/:order_id", h.ReviewCreate)
+	// 选片与交付
+	g.POST("/delivery/detail/:id", h.DeliveryDetail)
+	g.POST("/delivery/select/:id", h.SelectPhotos)
+	g.POST("/delivery/confirm-extra/:id", h.ConfirmExtra)
+	g.POST("/delivery/confirm/:id", h.ConfirmDelivery)
+	g.POST("/delivery/feedback/:item_id", h.FeedbackSubmit)
+	// 定制需求
+	g.POST("/custom-request/list", h.CustomRequestList)
+}
+
+// clientCompanyID 公开接口的租户定位：query company_id 优先，其次 X-Company-Id 头
+func clientCompanyID(c *gin.Context) int64 {
+	if v := c.Query("company_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
+			return id
+		}
+	}
+	if v := c.GetHeader("X-Company-Id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
+			return id
+		}
+	}
+	return 0
+}
+
+func requireCompanyID(c *gin.Context) (int64, error) {
+	id := clientCompanyID(c)
+	if id <= 0 {
+		return 0, errs.BadRequest("缺少工作室标识（company_id）")
+	}
+	return id, nil
+}
+
+// bindJSON 绑定 JSON 请求体
+func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
+	if err := c.ShouldBindJSON(obj); err != nil {
+		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
+	}
+	return nil
+}
+
+func pager(c *gin.Context) (int, int) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	return page, pageSize
+}
+
+func pathID(c *gin.Context, name string) (int64, error) {
+	id, err := strconv.ParseInt(c.Param(name), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, errs.BadRequest("参数错误")
+	}
+	return id, nil
+}
+
+// ---------------------------------------------------------------------
+// 公开接口
+// ---------------------------------------------------------------------
+
+// SmsCode 发送登录验证码
+func (h *Controller) SmsCode(c *gin.Context) {
+	var req struct {
+		Mobile string `json:"mobile" binding:"required"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.SendSmsCode(c.Request.Context(), "login", req.Mobile); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// Login 客户手机号验证码登录（未注册自动建档），openid 为小程序场景透传
+func (h *Controller) Login(c *gin.Context) {
+	var req struct {
+		CompanyID int64  `json:"company_id"`
+		Mobile    string `json:"mobile" binding:"required"`
+		Code      string `json:"code" binding:"required"`
+		OpenID    string `json:"openid"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	companyID := req.CompanyID
+	if companyID <= 0 {
+		companyID = clientCompanyID(c)
+	}
+	if companyID <= 0 {
+		response.Fail(c, errs.BadRequest("缺少工作室标识（company_id）"))
+		return
+	}
+	customer, token, err := h.Svc.CustomerSmsLogin(c.Request.Context(), companyID, req.Mobile, req.Code, req.OpenID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{
+		"token":    token,
+		"customer": customer,
+	})
+}
+
+// PackageList 套餐列表（已上架）
+func (h *Controller) PackageList(c *gin.Context) {
+	companyID, err := requireCompanyID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ClientPackages(c.Request.Context(), companyID, page, pageSize, c.Query("category"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// PackageDetail 套餐详情
+func (h *Controller) PackageDetail(c *gin.Context) {
+	companyID, err := requireCompanyID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	pkg, err := h.Svc.ClientPackageDetail(c.Request.Context(), companyID, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, pkg)
+}
+
+// StudioInfo 工作室预约主页信息
+func (h *Controller) StudioInfo(c *gin.Context) {
+	companyID, err := requireCompanyID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	info, err := h.Svc.ClientStudioInfo(c.Request.Context(), companyID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, info)
+}
+
+// SlotList 指定日期可约时段（query: date、photographer_id 可选）
+func (h *Controller) SlotList(c *gin.Context) {
+	companyID, err := requireCompanyID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
+	slots, err := h.Svc.ClientSlots(c.Request.Context(), companyID, c.Query("date"), photographerID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, slots)
+}
+
+// CustomRequestSubmit 提交定制需求（游客/登录均可）
+func (h *Controller) CustomRequestSubmit(c *gin.Context) {
+	var req dto.ClientCustomRequestReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	cu := middleware.GetClientUser(c)
+	companyID := clientCompanyID(c)
+	if cu != nil {
+		companyID = cu.CompanyID
+	}
+	if companyID <= 0 {
+		response.Fail(c, errs.BadRequest("缺少工作室标识（company_id）"))
+		return
+	}
+	m, err := h.Svc.ClientSubmitCustomRequest(c.Request.Context(), companyID, cu, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, m)
+}
+
+// ---------------------------------------------------------------------
+// 登录后接口
+// ---------------------------------------------------------------------
+
+// BookingSubmit 提交预约单
+func (h *Controller) BookingSubmit(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	var req dto.ClientBookingReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	o, err := h.Svc.ClientSubmitBooking(c.Request.Context(), cu, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, o)
+}
+
+// BookingConfirm 确认预约单
+func (h *Controller) BookingConfirm(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientConfirmBooking(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// BookingCancel 取消预约单
+func (h *Controller) BookingCancel(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	if err := h.Svc.ClientCancelBooking(c.Request.Context(), cu, id, req.Reason); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// OrderList 我的订单
+func (h *Controller) OrderList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ClientOrders(c.Request.Context(), cu, page, pageSize, c.Query("status"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// OrderDetail 订单详情
+func (h *Controller) OrderDetail(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	detail, err := h.Svc.ClientOrderDetail(c.Request.Context(), cu, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, detail)
+}
+
+// RescheduleApply 申请改期
+func (h *Controller) RescheduleApply(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := pathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientRescheduleReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	rs, err := h.Svc.ClientRescheduleApply(c.Request.Context(), cu, orderID, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, rs)
+}
+
+// RescheduleCancel 撤回改期申请
+func (h *Controller) RescheduleCancel(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientRescheduleCancel(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// RefundApply 申请退款
+func (h *Controller) RefundApply(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := pathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientRefundReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	rf, err := h.Svc.ClientRefundApply(c.Request.Context(), cu, orderID, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, rf)
+}
+
+// ReviewCreate 评价订单
+func (h *Controller) ReviewCreate(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := pathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientReviewReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	rv, err := h.Svc.ClientReviewCreate(c.Request.Context(), cu, orderID, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, rv)
+}
+
+// DeliveryDetail 交付单与明细（选片页/成片页）
+func (h *Controller) DeliveryDetail(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	d, items, err := h.Svc.ClientDeliveryItems(c.Request.Context(), cu, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"delivery": d, "items": items})
+}
+
+// SelectPhotos 提交选片
+func (h *Controller) SelectPhotos(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req struct {
+		ItemIDs []int64 `json:"item_ids" binding:"required"`
+	}
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientSelectPhotos(c.Request.Context(), cu, id, req.ItemIDs); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ConfirmExtra 确认加片费用
+func (h *Controller) ConfirmExtra(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientConfirmExtra(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ConfirmDelivery 确认成片
+func (h *Controller) ConfirmDelivery(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientConfirmDelivery(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// FeedbackSubmit 提交精修反馈
+func (h *Controller) FeedbackSubmit(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	itemID, err := pathID(c, "item_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientFeedbackReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientFeedbackSubmit(c.Request.Context(), cu, itemID, req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// CustomRequestList 我的定制需求
+func (h *Controller) CustomRequestList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ClientCustomRequests(c.Request.Context(), cu, page, pageSize)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}

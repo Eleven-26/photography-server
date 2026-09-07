@@ -28,20 +28,30 @@ func (Lead) TableName() string { return "crm_lead" }
 // Quote 报价单
 type Quote struct {
 	TenantBase
-	Code        string           `gorm:"column:code;size:20;not null;uniqueIndex:uk_quote_code,priority:1;comment:报价单编号 QT-xxx" json:"code"`
-	LeadID      int64            `gorm:"column:lead_id;index;comment:关联线索ID" json:"lead_id"`
-	CustomerID  int64            `gorm:"column:customer_id;index;comment:关联客户ID" json:"customer_id"`
-	PackageID   int64            `gorm:"column:package_id;index;comment:关联套餐ID" json:"package_id"`
-	Version     int              `gorm:"column:version;default:1;comment:套餐版本号" json:"version"`
-	Title       string           `gorm:"column:title;size:100;comment:报价标题" json:"title"`
-	PackageName string           `gorm:"column:package_name;size:100;comment:套餐名称(下单时快照)" json:"package_name"`
-	BasePrice   float64          `gorm:"column:base_price;type:decimal(12,2);comment:基础套餐价(快照)" json:"base_price"`
-	AddonPrice  float64          `gorm:"column:addon_price;type:decimal(12,2);default:0;comment:加选金额(快照)" json:"addon_price"`
-	TotalPrice  float64          `gorm:"column:total_price;type:decimal(12,2);comment:报价总额" json:"total_price"`
-	Status      enum.QuoteStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-草稿 2-已发送 3-已接受 4-已拒绝 5-已成交" json:"status"`
-	Remark      string           `gorm:"column:remark;size:500;comment:备注" json:"remark"`
-	OwnerID     int64            `gorm:"column:owner_id;index;comment:负责人ID" json:"owner_id"`
-	ShootDate   *string          `gorm:"column:shoot_date;comment:意向拍摄日期" json:"shoot_date"`
+	Code          string           `gorm:"column:code;size:20;not null;uniqueIndex:uk_quote_code,priority:1;comment:报价单编号 QT-xxx" json:"code"`
+	LeadID        int64            `gorm:"column:lead_id;index;comment:关联线索ID" json:"lead_id"`
+	CustomerID    int64            `gorm:"column:customer_id;index;comment:关联客户ID" json:"customer_id"`
+	PackageID     int64            `gorm:"column:package_id;index;comment:关联套餐ID" json:"package_id"`
+	Version       int              `gorm:"column:version;default:1;comment:套餐版本号" json:"version"`
+	Title         string           `gorm:"column:title;size:100;comment:报价标题" json:"title"`
+	PackageName   string           `gorm:"column:package_name;size:100;comment:套餐名称(下单时快照)" json:"package_name"`
+	BasePrice     float64          `gorm:"column:base_price;type:decimal(12,2);comment:基础套餐价(快照)" json:"base_price"`
+	AddonPrice    float64          `gorm:"column:addon_price;type:decimal(12,2);default:0;comment:加选金额(快照)" json:"addon_price"`
+	TotalPrice    float64          `gorm:"column:total_price;type:decimal(12,2);comment:报价总额" json:"total_price"`
+	Status        enum.QuoteStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-草稿 2-已发送 3-已接受 4-已拒绝 5-已成交" json:"status"`
+	Remark        string           `gorm:"column:remark;size:500;comment:备注" json:"remark"`
+	OwnerID       int64            `gorm:"column:owner_id;index;comment:负责人ID" json:"owner_id"`
+	ShootDate     *string          `gorm:"column:shoot_date;comment:意向拍摄日期" json:"shoot_date"`
+	ShootTime     string           `gorm:"column:shoot_time;size:20;comment:拍摄时间段" json:"shoot_time"`
+	ValidUntil    *string          `gorm:"column:valid_until;comment:报价有效期至" json:"valid_until"`
+	DurationHours float64          `gorm:"column:duration_hours;type:decimal(5,2);comment:拍摄时长(小时)" json:"duration_hours"`
+	Location      string           `gorm:"column:location;size:200;comment:拍摄地点" json:"location"`
+	LocationType  string           `gorm:"column:location_type;size:20;comment:地点类型 outdoor-外拍 studio-合作影棚" json:"location_type"`
+	LocationFee   float64          `gorm:"column:location_fee;type:decimal(12,2);default:0;comment:场地费" json:"location_fee"`
+	PeopleCount   string           `gorm:"column:people_count;size:20;comment:拍摄人数" json:"people_count"`
+	Addons        string           `gorm:"column:addons;type:text;comment:加项清单(JSON数组)" json:"addons"`
+	AcceptAt      *string          `gorm:"column:accept_at;comment:客户接受时间" json:"accept_at"`
+	OrderID       int64            `gorm:"column:order_id;index;comment:转化生成的订单ID" json:"order_id"`
 }
 
 func (Quote) TableName() string { return "biz_quote" }

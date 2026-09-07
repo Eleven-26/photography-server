@@ -51,6 +51,17 @@ func (r *DeliveryRepo) UpdateItemKind(ctx context.Context, companyID, itemID int
 	return r.tenant(companyID).WithContext(ctx).Model(&model.DeliveryItem{}).Where("id = ?", itemID).Update("kind", kind).Error
 }
 
+// UpdateItem 更新交付明细字段（客户选片/修图反馈等）
+func (r *DeliveryRepo) UpdateItem(ctx context.Context, companyID, itemID int64, updates map[string]interface{}) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.DeliveryItem{}).
+		Where("id = ?", itemID).Updates(updates).Error
+}
+
+// FirstItem 按 ID 取单条交付明细（租户过滤）
+func (r *DeliveryRepo) FirstItem(ctx context.Context, companyID, itemID int64, out *model.DeliveryItem) error {
+	return r.tenant(companyID).WithContext(ctx).First(out, itemID).Error
+}
+
 func (r *DeliveryRepo) ListItems(ctx context.Context, companyID, deliveryID int64) ([]model.DeliveryItem, error) {
 	var list []model.DeliveryItem
 	err := r.tenant(companyID).WithContext(ctx).Where("delivery_id = ?", deliveryID).Order("id ASC").Find(&list).Error

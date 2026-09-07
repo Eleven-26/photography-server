@@ -4,6 +4,7 @@ import "photography-server/internal/enum"
 
 // orderTransitions 定义允许的订单状态流转（领域状态机，纯数据无副作用，便于单元测试）
 var orderTransitions = map[enum.OrderStatus][]enum.OrderStatus{
+	enum.OrderStatusPendingConfirm:  {enum.OrderStatusPendingDeposit, enum.OrderStatusCancelled}, // 客户预约 → 摄影师确认/取消
 	enum.OrderStatusPendingDeposit:  {enum.OrderStatusPendingShoot, enum.OrderStatusCancelled},
 	enum.OrderStatusPendingShoot:    {enum.OrderStatusShooting, enum.OrderStatusCancelled},
 	enum.OrderStatusShooting:        {enum.OrderStatusRetouching, enum.OrderStatusCancelled},

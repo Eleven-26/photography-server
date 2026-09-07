@@ -98,7 +98,7 @@ func main() {
 	}
 
 	middleware.Init(cfg)
-	svc := service.New(cfg.Upload.Dir)
+	svc := service.New(cfg.Upload.Dir, cfg.JWT.Secret, cfg.JWT.Issuer)
 	engine := router.New(cfg, svc)
 
 	srv := &http.Server{Handler: engine}

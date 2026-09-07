@@ -4,6 +4,7 @@ package enum
 type OrderStatus int
 
 const (
+	OrderStatusPendingConfirm  OrderStatus = 0 // 待确认（客户 H5/小程序 预约，待摄影师确认）
 	OrderStatusPendingDeposit  OrderStatus = 1 // 待定金
 	OrderStatusPendingShoot    OrderStatus = 2 // 待拍摄
 	OrderStatusShooting        OrderStatus = 3 // 拍摄中
@@ -14,6 +15,7 @@ const (
 )
 
 var orderStatusName = map[OrderStatus]string{
+	OrderStatusPendingConfirm:  "待确认",
 	OrderStatusPendingDeposit:  "待定金",
 	OrderStatusPendingShoot:    "待拍摄",
 	OrderStatusShooting:        "拍摄中",
