@@ -1,92 +1,26 @@
-# 公共基础配置（dev/test/prod 共用的默认值）
-# 环境差异通过 config.dev.yaml / config.test.yaml / config.prod.yaml 覆盖
-# 选择环境：启动参数 -p dev|test|prod 或环境变量 APP_PROFILE，默认 dev
+# ============================================================
+# Bootstrap 配置（本地唯一保留的配置文件）
+# Nacos 是唯一业务配置源：本文件只提供 Nacos 连接信息，
+# 业务配置在 Nacos 控制台按 data_id 管理（发布模板见 config/nacos/）。
+#
+# 启动顺序：先起 Nacos 并发布对应 data_id，再启动本服务（拉取失败即终止，fail-fast；
+# Nacos 整体不可达时 SDK 自动降级读本地快照 .nacos/cache）。
+# 环境：启动参数 -p dev|test|prod 或环境变量 APP_PROFILE，决定 data_id 中的 ${profile}。
+# 连接信息可用 APP_NACOS_* 环境变量覆盖（如 APP_NACOS_SERVER_ADDR，docker.dev 等场景用）。
+# 业务配置变更需重启生效（无热更）。
+# ============================================================
 
-app:
-  name: photography-server
-  mode: debug
-  port: 8080
-  timezone: Asia/Shanghai
-
-jwt:
-  secret: photography-server-jwt-secret-change-me
-  issuer: photography-server
-  expire_hours: 168
-
-db:
-  host: 127.0.0.1
-  port: 3306
-  user: root
-  password: root
-  name: photography
-  charset: utf8mb4
-  max_idle_conns: 10
-  max_open_conns: 100
-  log_mode: false
-
-redis:
-  addr: 127.0.0.1:6379
-  password: ""
-  db: 0
-
-nats:
-  url: nats://127.0.0.1:4222
-
-mongodb:
-  enable: true
-  uri: mongodb://127.0.0.1:27017
-  database: photography
-  username: ""
-  password: ""
-
-log:
-  level: info
-
-upload:
-  dir: ./uploads
-  max_size_mb: 20
-
-xxljob:
-  enable: true
-  server_addr: http://127.0.0.1:9100 # xxl-job 地址
-  access_token: default_token # 确保已创建容器时的一致
-  executor_ip: host.docker.internal # 回调的go程序地址，不能用127.0.0.1，这个指向了xxl-job容器本身，go不在该容器内
-  executor_port: "9999" # 回调的go程序所在主机的端口
-  registry_key: photography-server # 确保与 Admin 后台执行器管理的 AppName 一致
-  log_dir: ./logs/xxl-job
-
-elasticsearch:
-  enable: true
-  urls:
-    - http://127.0.0.1:9200
-  username: ""
-  password: ""
-
-# Jaeger 链路通道（复用 OTel 埋点，OTLP gRPC 上报本机 Jaeger；Jaeger 不可达时仅后台重试，不影响服务）
-# 两通道各自独立（勿同开，否则同一请求双 span/双上报）：
-#   ① SkyWalking-go(native)：Dockerfile SW_AGENT_ENABLE=true 构建注入 agent 即启用，无运行时开关；
-#   ② OTel→Jaeger：本节 enable=true + endpoint=jaeger:4317，不注入 agent。
-jaeger:
-  enable: true
-  endpoint: 127.0.0.1:4317 # OTLP gRPC endpoint（本机 Jaeger）
-  service: photography-server
-  instance: "" # 留空默认取主机名
-
-# Nacos 配置中心 + 服务注册（可选）：enable=true 时本地文件退化为 bootstrap，业务配置以 Nacos 为准；
-# enable=false（本地开发默认）时本段仅占位，行为与未接入 Nacos 完全一致
 nacos:
-  enable: false
   server_addr: 127.0.0.1:8848 # v2 SDK 走 gRPC，端口自动 +1000（9848）
   namespace: "" # 留空 = public
   group: DEFAULT_GROUP
   data_id: photography-server-${profile}.yaml # ${profile} 自动替换为 dev/test/prod
-  username: "" # 开启鉴权时必填
+  username: "" # 服务端开启鉴权（NACOS_AUTH_ENABLE=true）时必填
   password: ""
   service_name: photography-server # 注册到 Nacos 的服务名
   register_ip: "" # 留空自动探测本机 IP
-  # 以下为 SDK 可调项：env（APP_NACOS_TIMEOUT_MS 等）能覆盖的前提是 key 存在于本文件
-  timeout_ms: 5000 # 请求超时
-  cache_dir: .nacos/cache # 本地快照目录
+  timeout_ms: 5000 # 请求超时（APP_NACOS_TIMEOUT_MS 可覆盖）
+  cache_dir: .nacos/cache # 本地快照目录（Nacos 短暂不可用时的启动兜底）
   log_level: warn # SDK 自身日志级别
   cluster_name: DEFAULT # 集群名
   weight: 1 # 注册权重

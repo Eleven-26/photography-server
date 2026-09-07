@@ -11,7 +11,7 @@
 - **搜索引擎**：Elasticsearch 8（go-elasticsearch v8）
 - **文档数据库**：MongoDB（mongo-driver v2）
 - **任务调度**：XXL-JOB
-- **配置中心/注册中心**：Nacos（可选，`nacos.enable=true` 时本地配置退化为 bootstrap，业务配置托管 Nacos；实例自动注册/摘除）
+- **配置中心/注册中心**：Nacos（**唯一业务配置源，硬依赖**：本地仅留 bootstrap 连接段，业务配置 100% 托管 Nacos 按 data_id 分环境；拉取失败 fail-fast，SDK 本地快照兜底；实例自动注册/摘除）
 - **链路追踪**（两通道各自独立，见「链路追踪」）：① SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；② OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码为通道②专属（通道①由注入 agent 自动埋点，代码零侵入），切换仅改构建/部署配置
 - **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
@@ -24,11 +24,12 @@ photography-server
 ├── cmd
 │   ├── server              # API 服务入口（配置加载 + 各组件初始化 + 优雅退出）
 ├── config
-│   ├── config.yaml         # 公共基础配置
-│   ├── config.dev.yaml     # 开发环境覆盖（默认）
-│   ├── config.test.yaml    # 测试环境覆盖
-│   ├── config.prod.yaml    # 生产环境覆盖
-│   └── config.example.yaml # 示例配置模板
+│   ├── config.yaml         # Bootstrap（仅 Nacos 连接段，本地唯一配置文件）
+│   ├── config.example.yaml # Bootstrap 模板
+│   └── nacos               # Nacos 发布模板（控制台内容的版本化镜像，按 data_id 分环境）
+│       ├── photography-server-dev.yaml
+│       ├── photography-server-docker.dev.yaml
+│       └── photography-server-prod.yaml
 ├── docs
 │   ├── 需求文档-摄影工作室管理系统.md
 │   └── sql                 # DDL / DML 建库脚本
@@ -88,19 +89,18 @@ make tidy     # go mod tidy
 make docker-up / docker-down / docker-build
 ```
 
-## 多环境配置
+## 配置加载（Nacos 单一配置源）
 
-加载机制：先加载基础 `config.yaml`，再用 `config.<profile>.yaml` 合并覆盖，最后环境变量兜底。
+加载机制：本地 `config.yaml` 仅为 **bootstrap**（只含 `nacos.*` 连接段）→ 启动必拉 Nacos 远程配置（按 profile 区分 data_id）→ 环境变量最终覆盖。
 
-- 环境选择：启动参数 `-p dev|test|prod`，或环境变量 `APP_PROFILE`（默认 dev）
-- 优先级：`APP_*` 环境变量 > 环境配置文件 > `config.yaml`
-- 配置文件中支持 `${VAR}` 占位符，自动用同名环境变量展开（如 `config.prod.yaml` 中的 `${APP_JWT_SECRET}`）
-- 示例：
-  - 开发：`go run ./cmd/server -c config/config.yaml -p dev`
-  - 测试：`go run ./cmd/server -c config/config.yaml -p test`
-  - 生产：`go run ./cmd/server -c config/config.yaml -p prod`
+- 环境选择：启动参数 `-p dev|test|prod`，或环境变量 `APP_PROFILE`（默认 dev）——只决定 data_id 中的 `${profile}` 占位
+- 优先级：`APP_*` 环境变量 > Nacos 远程配置 > 本地 bootstrap
+- 环境差异全部体现在 Nacos 上不同的 data_id（`photography-server-<profile>.yaml`，模板见 `config/nacos/`）
+- 远程未发布的 key 即零值（仅 `app.port` / `jwt.expire_hours` / `upload.max_size_mb` 有代码兜底）；prod 下 `APP_JWT_SECRET` / `APP_DB_*` 仍强制 env 注入校验
+- 变量命名规则：`APP_` + 段名_键名（`db.host`→`APP_DB_HOST`、`mongodb.*`→`APP_MONGODB_*`、`redis.addr`→`APP_REDIS_ADDR`、`app.mode`→`APP_APP_MODE`；回归测试见 `internal/config/env_mapping_test.go`）
+- 示例：`go run ./cmd/server -c config/config.yaml -p dev`（需先本地起 Nacos 并发布 `photography-server-dev.yaml`）
 
-主要配置段：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
+主要配置段（都在 Nacos 上管理）：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
 
 ## Docker 部署
 ```bash
@@ -171,22 +171,22 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 
 代码侧：SkyWalking-go 由 agent 自动埋点 gin HTTP 入口与 gorm SQL，无需业务埋点；通道②（Jaeger）复用 OTel 手动埋点（gin otelgin / gorm OTel 插件 / xxl-job 根 span / NATS traceparent 透传），由 `APP_JAEGER_ENABLE` 控制。响应 `trace_id` 双通道通用：Jaeger 版取 OTel entry span，native 版取 agent native trace id（自动切换取值源，无感知）。xxl-job / NATS 的手动埋点暂仅 OTel（Jaeger）通道生效（SkyWalking-go native 版为 P1 待办，当前 HTTP+SQL 主链路已覆盖）。
 
-### Nacos 配置中心 + 服务注册（可选）
+### Nacos 配置中心 + 服务注册（唯一配置源，硬依赖）
 
-一个开关 `nacos.enable` 切换两种模式，**本地开发保持 false 即可，行为与未接入 Nacos 完全一致**：
+无开关：本地只保留 bootstrap（`config.yaml`，仅 `nacos.*` 连接段），业务配置 100% 托管 Nacos。
 
-- **enable=false（默认）**：纯本地三层加载（`config.yaml` → `config.<profile>.yaml` → `APP_*` 环境变量）。
-- **enable=true（部署环境）**：本地 yaml 退化为 bootstrap（只保留 `nacos.*` 段），业务配置以 Nacos 上 `data_id` 对应的 YAML 为准，优先级 `APP_* 环境变量 > Nacos 远端 > config.<profile>.yaml > config.yaml`。拉取失败直接终止启动（fail-fast）；Nacos 短暂不可用时 SDK 自动读本地快照兜底。
+- 优先级 `APP_* 环境变量 > Nacos 远端 > 本地 bootstrap`；拉取失败直接终止启动（fail-fast）；Nacos 短暂不可用时 SDK 自动读本地快照兜底（快照目录已挂载持久化）
+- 环境差异用不同 data_id：`photography-server-dev.yaml` / `photography-server-docker.dev.yaml` / `photography-server-prod.yaml`（Group `DEFAULT_GROUP`）
 
 行为细节：
 
 | 能力 | 说明 |
 |---|---|
-| 配置拉取 | 启动时 `GetConfig` 全量拉取并合并（远程覆盖本地同名字段）；**配置变更需重启进程生效**（不做运行期热更） |
+| 配置拉取 | 启动时 `GetConfig` 全量拉取合并；**配置变更需重启进程生效**（不做运行期热更） |
 | 服务注册 | HTTP 端口就绪后注册为**临时实例**（SDK 自动心跳，进程退出自动摘除；优雅退出时另有主动反注册），metadata 带 `profile` |
-| 快照目录 | `.nacos/cache`（`nacos.cache_dir` 可改）；SDK 日志在 `.nacos/log` |
+| 快照目录 | `.nacos/cache`（`nacos.cache_dir` 可改，compose 已挂载持久卷）；SDK 日志在 `.nacos/log` |
 
-启用步骤：`docker compose up -d nacos` → 控制台 `http://localhost:8848/nacos`（默认 nacos/nacos）→ 新建 YAML 配置（data_id 默认 `photography-server-prod.yaml`，Group `DEFAULT_GROUP`，内容为与 `config.prod.yaml` 同结构的完整 YAML）→ `.env` 设 `APP_NACOS_ENABLE=true` 后重启 backend。
+启用步骤：`docker compose up -d nacos` → 控制台 `http://localhost:8850/`（v3 独立端口，默认 admin/nacos，开启鉴权后用 `.env` 里配置的账号）→ 按 `config/nacos/photography-server-<profile>.yaml` 模板新建 YAML 配置并发布 → 确认 `.env` 的 `APP_NACOS_SERVER_ADDR/USERNAME/PASSWORD` 后启动 backend（或整栈 `docker compose up -d`，nacos 为硬依赖会先起）。
 
 ## 接口约定
 

@@ -1,0 +1,73 @@
+# ============================================================
+# Nacos 发布模板：data_id=photography-server-dev.yaml group=DEFAULT_GROUP
+# 本文件是 Nacos 控制台内容的版本化镜像（git 留档），修改后需到控制台同步发布；
+# 运行期以控制台为准，变更需重启生效（无热更）。本地文件不参与加载。
+# 首次接入：把本文件全文粘贴到 Nacos 控制台发布该 data_id，然后启动服务。
+# 注意：不要把 nacos 连接段放进远程配置（连接信息只存在于本地 bootstrap）。
+# ============================================================
+
+app:
+  mode: debug
+  port: 8080
+  timezone: Asia/Shanghai
+
+jwt:
+  secret: dev-secret-1234567890
+  issuer: photography-server
+  expire_hours: 168
+
+db:
+  host: 127.0.0.1 # APP_DB_HOST 可覆盖
+  port: 3306
+  user: root
+  password: root
+  name: photography
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  log_mode: true
+
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 0
+
+nats:
+  url: nats://127.0.0.1:4222
+
+mongodb:
+  enable: true
+  uri: mongodb://127.0.0.1:27017
+  database: photography
+  username: ""
+  password: ""
+
+log:
+  level: debug
+
+upload:
+  dir: ./uploads
+  max_size_mb: 20
+
+xxljob:
+  enable: true
+  server_addr: http://127.0.0.1:9100 # xxl-job 地址
+  access_token: default_token # 确保与容器创建时一致
+  executor_ip: host.docker.internal # 注册回调的 go 程序地址，不能用 127.0.0.1（会指向 xxl-job 容器自身）
+  executor_port: "9999"
+  registry_key: photography-server # 需到 Admin 后台执行器管理手动添加同名 AppName
+  log_dir: ./logs/xxl-job
+
+elasticsearch:
+  enable: true
+  urls:
+    - http://127.0.0.1:9200
+  username: ""
+  password: ""
+
+# Jaeger 链路通道（复用 OTel 埋点）；与 SkyWalking native 通道勿同开（双 span/双上报）
+jaeger:
+  enable: true
+  endpoint: 127.0.0.1:4317
+  service: photography-server
+  instance: ""

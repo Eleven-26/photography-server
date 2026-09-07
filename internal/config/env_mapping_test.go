@@ -7,12 +7,19 @@ import (
 // env_mapping_test.go 固化 viper AutomaticEnv 的变量名映射约定（曾因命名错误产生过一批死变量）：
 // 变量名 = APP_ + 段名_键名（EnvKeyReplacer 仅把 "." 替换为 "_"，段名参与拼接）。
 // 断言「正确名生效」与「旧错误名不生效」双向，防止回归。
+// 业务段来自远程配置（fake fetcher），nacos 连接段来自本地 bootstrap——env 对两者均可覆盖。
 
-const envMapBase = `
+const envMapBootstrap = `
 app:
   name: demo
+nacos:
+  register_ip: ""
+  timeout_ms: 5000
+`
+
+const envMapRemote = `
+app:
   mode: debug
-  port: 8080
 redis:
   addr: 127.0.0.1:6379
 mongodb:
@@ -23,18 +30,10 @@ elasticsearch:
   enable: false
   urls:
     - http://127.0.0.1:9200
-jaeger:
-  enable: false
-  endpoint: 127.0.0.1:4317
-nacos:
-  enable: false
-  register_ip: ""
-  timeout_ms: 5000
 `
 
 func TestEnvVarNameMapping(t *testing.T) {
-	dir := t.TempDir()
-	base := writeConf(t, dir, "config.yaml", envMapBase)
+	base := writeBootstrap(t, envMapBootstrap)
 
 	// 正确名（生效）+ 旧错误名（不得生效）
 	t.Setenv("APP_MONGODB_ENABLE", "true")
@@ -50,7 +49,7 @@ func TestEnvVarNameMapping(t *testing.T) {
 	t.Setenv("APP_NACOS_REGISTER_IP", "10.0.0.9")
 	t.Setenv("APP_NACOS_TIMEOUT_MS", "8000")
 
-	cfg, err := Load(base, "dev")
+	cfg, err := LoadWithFetcher(base, "dev", fakeFetcher(envMapRemote))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -71,6 +70,6 @@ func TestEnvVarNameMapping(t *testing.T) {
 		t.Errorf("APP_APP_MODE 未生效: %q", cfg.App.Mode)
 	}
 	if cfg.Nacos.RegisterIp != "10.0.0.9" || cfg.Nacos.TimeoutMs != 8000 {
-		t.Errorf("nacos 可选字段 env 覆盖未生效: ip=%q timeout=%d", cfg.Nacos.RegisterIp, cfg.Nacos.TimeoutMs)
+		t.Errorf("nacos 连接字段 env 覆盖未生效: ip=%q timeout=%d", cfg.Nacos.RegisterIp, cfg.Nacos.TimeoutMs)
 	}
 }

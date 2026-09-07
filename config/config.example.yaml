@@ -1,104 +1,28 @@
 # ============================================================
-# 示例配置（复制为 config.yaml 后按需修改）
-# 多环境机制：
-#   config.yaml         公共基础配置
-#   config.dev.yaml     开发环境覆盖（默认）
-#   config.test.yaml    测试环境覆盖
-#   config.prod.yaml    生产环境覆盖
-# 环境选择：-p dev|test|prod 或环境变量 APP_PROFILE
-# 优先级：APP_* 环境变量 > 环境配置文件 > config.yaml
-# 环境覆盖：设置 APP_* 环境变量即可覆盖同名配置项（如 APP_DB_HOST 覆盖 db.host），无需占位符
-# 命名规则：变量名 = APP_ + 段名_键名（注意拼段名！实测约定：
-#   db.host→APP_DB_HOST；redis.addr→APP_REDIS_ADDR（单字段 host:port）；
-#   mongodb.*→APP_MONGODB_*；elasticsearch.*→APP_ELASTICSEARCH_*（多地址逗号分隔）；
-#   app.mode→APP_APP_MODE；log.level→APP_LOG_LEVEL。回归测试见 internal/config/env_mapping_test.go）
+# Bootstrap 配置模板（复制为 config.yaml 后按需修改）
+# Nacos 是唯一业务配置源：本地只保留 bootstrap（本文件内容，仅 nacos 连接段），
+# 业务配置在 Nacos 控制台按 data_id 发布，版本化模板见 config/nacos/photography-server-*.yaml。
+#
+# 多环境机制（本地 profile 配置文件已废弃）：
+#   环境由 -p dev|test|prod 或 APP_PROFILE 决定，仅影响 data_id 中的 ${profile} 占位；
+#   环境差异全部体现在 Nacos 上不同的 data_id（photography-server-<profile>.yaml）。
+# 优先级：APP_* 环境变量 > Nacos 远程配置 > 本地 bootstrap
+# 变量命名规则：APP_ + 段名_键名（如 db.host→APP_DB_HOST、mongodb.*→APP_MONGODB_*、
+#   redis.addr→APP_REDIS_ADDR、app.mode→APP_APP_MODE；回归测试见 internal/config/env_mapping_test.go）
+# 启动顺序：先起 Nacos 并发布对应 data_id，再启动本服务（拉取失败即 fail-fast）。
 # ============================================================
 
-app:
-  name: photography-server
-  mode: debug
-  port: 8080
-  timezone: Asia/Shanghai
-
-jwt:
-  secret: please-set-a-strong-secret
-  issuer: photography-server
-  expire_hours: 168
-
-db:
-  host: 127.0.0.1
-  port: 3306
-  user: root
-  password: root
-  name: photography
-  charset: utf8mb4
-  max_idle_conns: 10
-  max_open_conns: 100
-  log_mode: false
-
-redis:
-  addr: 127.0.0.1:6379
-  password: ""
-  db: 0
-
-nats:
-  url: nats://127.0.0.1:4222
-
-mongodb:
-  enable: true
-  uri: mongodb://127.0.0.1:27017
-  database: photography
-  username: ""
-  password: ""
-
-log:
-  level: info
-
-upload:
-  dir: ./uploads
-  max_size_mb: 20
-
-xxljob:
-  enable: true
-  server_addr: http://127.0.0.1:8080/xxl-job-admin
-  access_token: ""
-  executor_ip: 127.0.0.1
-  executor_port: "9999"
-  registry_key: photography-server
-  log_dir: ./logs/xxl-job
-
-elasticsearch:
-  enable: true
-  urls:
-    - http://127.0.0.1:9200
-  username: ""
-  password: ""
-
-# Jaeger 链路通道（复用 OTel 埋点，OTLP gRPC 上报 Jaeger；Jaeger 不可达时仅后台重试，不影响服务）
-# 两通道各自独立（勿同开，否则同一请求双 span/双上报）：
-#   ① SkyWalking-go(native)：Dockerfile SW_AGENT_ENABLE=true 构建注入 agent 即启用，无运行时开关；
-#   ② OTel→Jaeger：本节 enable=true + endpoint=jaeger:4317，不注入 agent。
-jaeger:
-  enable: true
-  endpoint: jaeger:4317 # OTLP gRPC endpoint（compose 服务名）
-  service: photography-server
-  instance: "" # 留空默认取主机名
-
-# Nacos 配置中心 + 服务注册（可选）：enable=true 时本地文件退化为 bootstrap，业务配置以 Nacos 为准；
-# enable=false 时本段仅占位。compose 内服务名 nacos，变量见 .env.example 的 NACOS_*/APP_NACOS_* 段
 nacos:
-  enable: false
-  server_addr: nacos:8848 # v2 SDK 走 gRPC，端口自动 +1000（9848）
+  server_addr: 127.0.0.1:8848 # 容器内互联用服务名（如 nacos:8848 / nacos-dev:8848），可用 APP_NACOS_SERVER_ADDR 覆盖
   namespace: "" # 留空 = public
   group: DEFAULT_GROUP
   data_id: photography-server-${profile}.yaml # ${profile} 自动替换为 dev/test/prod
-  username: "" # NACOS_AUTH_ENABLE=true 时必填
+  username: "" # 服务端开启鉴权（NACOS_AUTH_ENABLE=true）时必填
   password: ""
   service_name: photography-server # 注册到 Nacos 的服务名
   register_ip: "" # 留空自动探测（容器内为容器 IP）
-  # 以下为 SDK 可调项：env（APP_NACOS_TIMEOUT_MS 等）能覆盖的前提是 key 存在于本文件
-  timeout_ms: 5000 # 请求超时
-  cache_dir: .nacos/cache # 本地快照目录
+  timeout_ms: 5000 # 请求超时（APP_NACOS_TIMEOUT_MS 可覆盖）
+  cache_dir: .nacos/cache # 本地快照目录（Nacos 短暂不可用时的启动兜底）
   log_level: warn # SDK 自身日志级别
   cluster_name: DEFAULT # 集群名
   weight: 1 # 注册权重

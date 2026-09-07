@@ -41,8 +41,8 @@ func main() {
 		profile = "dev"
 	}
 
-	// nacos.enable=true 时：本地配置退化为 bootstrap，业务配置从 Nacos 拉取（远程优先），
-	// 拉取失败直接返回错误终止启动（fail-fast）；enable=false 时 fetcher 不触发，与本地加载行为一致。
+	// Nacos 是唯一业务配置源：本地文件仅为 bootstrap（Nacos 连接信息），业务配置 100% 从 Nacos 拉取
+	// （data_id 按 -p/APP_PROFILE 区分），拉取失败直接终止启动（fail-fast）；SDK 不可达时自动降级本地快照。
 	cfg, err := config.LoadWithFetcher(configPath, profile, infrastructure.FetchConfig)
 	if err != nil {
 		panic(fmt.Sprintf("加载配置失败: %v", err))
@@ -116,12 +116,10 @@ func main() {
 		}
 	}()
 
-	// Nacos：服务注册（nacos.enable=true 时生效；失败只告警不影响服务）。
+	// Nacos：服务注册（配置链路已 fail-fast，注册失败只告警不阻断服务——注册是服务发现增强）。
 	// 临时实例：SDK 自动心跳，进程退出自动摘除（shutdown 时另有主动反注册）。
-	if cfg.Nacos.Enable {
-		if _, err := infrastructure.RegisterService(cfg.App.Name, cfg.App.Port, map[string]string{"profile": cfg.App.Profile}); err != nil {
-			logger.Warnf("nacos 服务注册失败: %v", err)
-		}
+	if _, err := infrastructure.RegisterService(cfg.App.Name, cfg.App.Port, map[string]string{"profile": cfg.App.Profile}); err != nil {
+		logger.Warnf("nacos 服务注册失败: %v", err)
 	}
 
 	quit := make(chan os.Signal, 1)

@@ -1,0 +1,74 @@
+# ============================================================
+# Nacos 发布模板：data_id=photography-server-prod.yaml group=DEFAULT_GROUP
+# 本文件是 Nacos 控制台内容的版本化镜像，修改后需到控制台同步发布（重启生效）。
+# 安全基线（config.Load 校验，prod 缺失即启动失败）：
+#   APP_JWT_SECRET / APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 必须经环境变量注入，
+#   不得为空或默认弱值；密钥类配置也可发布到 Nacos（控制台有鉴权），env 仍可覆盖。
+# 敏感项在远程配置中留空占位，实际值经 APP_* env 注入。
+# ============================================================
+
+app:
+  mode: release
+  port: 8080
+  timezone: Asia/Shanghai
+
+jwt:
+  secret: "" # 必须通过 APP_JWT_SECRET 注入
+  issuer: photography-server
+  expire_hours: 168
+
+db:
+  host: "" # 必须通过 APP_DB_HOST 注入
+  port: 3306
+  user: "" # 必须通过 APP_DB_USER 注入
+  password: "" # 必须通过 APP_DB_PASSWORD 注入
+  name: photography
+  charset: utf8mb4
+  max_idle_conns: 20
+  max_open_conns: 200
+  log_mode: false
+
+redis:
+  addr: redis:6379 # APP_REDIS_ADDR
+  password: "" # APP_REDIS_PASSWORD
+  db: 0
+
+nats:
+  url: nats://nats:4222 # APP_NATS_URL
+
+mongodb:
+  enable: false # APP_MONGODB_ENABLE
+  uri: mongodb://mongo:27017 # APP_MONGODB_URI
+  database: photography # APP_MONGODB_DATABASE
+  username: "" # APP_MONGODB_USERNAME
+  password: "" # APP_MONGODB_PASSWORD
+
+log:
+  level: warn
+
+upload:
+  dir: /data/uploads
+  max_size_mb: 100
+
+xxljob:
+  enable: true # APP_XXLJOB_ENABLE
+  server_addr: http://xxl-job-admin:8080 # APP_XXLJOB_SERVER_ADDR（容器内访问监听端口 8080；9100 是宿主映射）
+  access_token: "" # APP_XXLJOB_ACCESS_TOKEN
+  executor_ip: 127.0.0.1 # APP_XXLJOB_EXECUTOR_IP
+  executor_port: "9999" # APP_XXLJOB_EXECUTOR_PORT
+  registry_key: photography-server # APP_XXLJOB_REGISTRY_KEY
+  log_dir: /data/logs/xxl-job
+
+elasticsearch:
+  enable: false # APP_ELASTICSEARCH_ENABLE；多地址可用 APP_ELASTICSEARCH_URLS 覆盖（逗号分隔）
+  urls:
+    - http://elasticsearch:9200
+  username: "" # APP_ELASTICSEARCH_USERNAME
+  password: "" # APP_ELASTICSEARCH_PASSWORD
+
+# Jaeger 链路通道：默认关；SkyWalking native 注入构建也须保持 false（避免双 span/双上报）
+jaeger:
+  enable: false # APP_JAEGER_ENABLE
+  endpoint: jaeger:4317 # APP_JAEGER_ENDPOINT
+  service: photography-server # APP_JAEGER_SERVICE
+  instance: "" # APP_JAEGER_INSTANCE

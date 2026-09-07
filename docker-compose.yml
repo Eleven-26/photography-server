@@ -272,7 +272,7 @@ services:
       # 只跑 Jaeger 通道时可注释掉本项，避免每次 up 都拉起整套 SkyWalking 栈
       skywalking-oap:
         condition: service_started
-      # 仅 APP_NACOS_ENABLE=true 时需要；未启用 Nacos 时可注释掉本项
+      # Nacos 是唯一业务配置源（硬依赖）：backend 启动必连，未发布 data_id 会 fail-fast
       nacos:
         condition: service_started
     environment:
@@ -315,7 +315,6 @@ services:
       APP_JAEGER_SERVICE: ${APP_JAEGER_SERVICE:-photography-server}
       APP_JAEGER_INSTANCE: ${APP_JAEGER_INSTANCE:-}
       # Nacos 配置中心 + 注册中心（enable=true 时本地 yaml 退化为 bootstrap，业务配置从 Nacos 拉取）
-      APP_NACOS_ENABLE: ${APP_NACOS_ENABLE:-false}
       APP_NACOS_SERVER_ADDR: ${APP_NACOS_SERVER_ADDR:-nacos:8848}
       APP_NACOS_NAMESPACE: ${APP_NACOS_NAMESPACE:-}
       APP_NACOS_GROUP: ${APP_NACOS_GROUP:-DEFAULT_GROUP}
@@ -327,17 +326,21 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
-      - ${BACKEND_CONFIG_FILE:-./photography-server/config/config.prod.yaml}:/app/config/config.yaml:ro
+      # 本地仅挂 bootstrap（Nacos 连接信息）；业务配置 100% 来自 Nacos（data_id 按 APP_PROFILE 区分）
+      - ${BACKEND_CONFIG_FILE:-./photography-server/config/config.yaml}:/app/config/config.yaml:ro
       - ${UPLOADS_DIR:-./uploads}:/app/uploads
+      # SDK 本地快照持久化：容器重启后即使 Nacos 短暂不可用也可用快照兜底启动
+      - ${NACOS_CLIENT_CACHE_DIR:-./volume/nacos-client/cache}:/app/.nacos/cache
     restart: unless-stopped
     networks:
       - backend-net
       - frontend-net
 
-  # ===== Nacos 配置中心 + 注册中心（可选，APP_NACOS_ENABLE=true 时 backend 才会连接）=====
+  # ===== Nacos 配置中心 + 注册中心（唯一业务配置源，backend 硬依赖）=====
   # standalone 模式 + 内嵌 Derby 存储，开箱可用；数据卷持久化便于重启后保留配置与本地快照语义一致。
   # v3 控制台为独立端口（容器内 8080，宿主经 NACOS_CONSOLE_PORT 访问）；v2 旧版控制台在 http://localhost:8848/nacos。
   # 客户端 SDK 走 gRPC：9848 = 8848+1000，映射端口必须保持该偏移关系。
+  # 业务配置发布：data_id=photography-server-<profile>.yaml，模板见 config/nacos/（未发布则 backend fail-fast）。
   # 鉴权三件套：NACOS_AUTH_ENABLE=true 时 TOKEN / IDENTITY_KEY / IDENTITY_VALUE 缺一即 exit 255
   # （脚本报 "env NACOS_AUTH_IDENTITY_KEY must be set."）。IDENTITY 为服务端间识别头，standalone 也必填；
   # Go 客户端不使用它们，连接只需 APP_NACOS_USERNAME/PASSWORD。

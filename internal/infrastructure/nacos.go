@@ -33,11 +33,12 @@ type nacosHub struct {
 
 var nacosState nacosHub
 
-// NacosEnabled 当前是否已建立 Nacos 客户端（nacos.enable=true 且初始化成功）
+// NacosEnabled 当前是否已建立 Nacos 客户端（初始化成功后为 true）
 func NacosEnabled() bool { return nacosState.naming != nil || nacosState.conf != nil }
 
 // InitNacos 建立配置客户端与命名客户端（幂等：重复调用返回首次结果）。
-// 未启用（nacos.enable=false）时不要调用本函数，各查询函数会返回 nil 让业务流程跳过。
+// Nacos 是唯一业务配置源（硬依赖）：配置拉取在启动阶段经 FetchConfig 触发，
+// 客户端建立失败会随 FetchConfig 一并返回错误终止启动。
 func InitNacos(n config.Nacos) error {
 	nacosState.once.Do(func() { nacosState.init(n) })
 	return nacosState.err

@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -51,17 +50,16 @@ type Jaeger struct {
 	Instance string `mapstructure:"instance"` // 实例名，留空默认取主机名
 }
 
-// Nacos 配置中心 + 服务注册发现。一个开关（enable）切换两种模式：
+// Nacos 配置中心 + 服务注册发现（唯一业务配置源，硬依赖，无开关）：
 //
-//	enable=true（部署环境）：本地 config.yaml 退化为 bootstrap —— 只提供本段 nacos.* 与兜底默认值，
-//	  业务配置以 Nacos 上 data_id 对应的 YAML 为准（远程合并到本地之上，远程优先）。
-//	  拉取失败直接返回错误终止启动（fail-fast，避免带着错误配置上线）；
-//	  Nacos 整体不可用时由 SDK 降级读取本地快照（cache_dir）尝试兜底。
-//	  配置变更需重启进程生效（不做运行期热更）。
-//	  同时在启动时把本机 IP:Port 注册为临时实例（SDK 自动心跳），优雅退出时反注册。
-//	enable=false（本地开发）：完全沿用本地三层加载，行为与引入 Nacos 前一致，无需起 Nacos。
+//	本地 config.yaml 仅为 bootstrap —— 只提供本段 nacos.* 连接信息，
+//	业务配置 100% 以 Nacos 上 data_id 对应的 YAML 为准（data_id 支持 ${profile} 按环境区分，
+//	发布内容模板见 config/nacos/）。
+//	拉取失败直接返回错误终止启动（fail-fast，避免带着错误配置上线）；
+//	Nacos 整体不可用时由 SDK 降级读取本地快照（cache_dir）尝试兜底。
+//	配置变更需重启进程生效（不做运行期热更）。
+//	启动成功后把本机 IP:Port 注册为临时实例（SDK 自动心跳），优雅退出时反注册。
 type Nacos struct {
-	Enable     bool   `mapstructure:"enable"`
 	ServerAddr string `mapstructure:"server_addr"` // host:8848；v2 SDK 走 gRPC，端口自动 +1000（9848）
 	Namespace  string `mapstructure:"namespace"`   // 命名空间 ID，留空=public
 	Group      string `mapstructure:"group"`       // 默认 DEFAULT_GROUP
@@ -188,10 +186,11 @@ func Load(basePath, profile string) (*Config, error) {
 	return LoadWithFetcher(basePath, profile, nil)
 }
 
-// LoadWithFetcher 加载配置：
-// 基础配置 config.yaml → 环境覆盖 config.<profile>.yaml →（nacos.enable 时）远程配置 → APP_* 环境变量
-// 优先级：APP_* 环境变量 > 远程配置（Nacos）> config.<profile>.yaml > config.yaml
-// 注意：不做 ${VAR} 模板展开；Unmarshal 只能覆盖配置文件中已存在的 key，新增配置项需同步维护各 yaml。
+// LoadWithFetcher 加载配置（Nacos 唯一业务配置源）：
+// 本地 bootstrap config.yaml（仅 nacos 连接段）→ 必拉远程配置（data_id 按 profile 区分）→ APP_* 环境变量
+// 优先级：APP_* 环境变量 > 远程配置（Nacos）> 本地 bootstrap
+// fetch 为空时跳过远程拉取（仅供测试/工具使用，业务字段将缺失）；生产路径必须注入 fetcher（main 传 infrastructure.FetchConfig）。
+// 注意：不做 ${VAR} 模板展开；远程未发布的 key 即为零值（仅 app.port / jwt.expire_hours / upload.max_size_mb 有代码兜底）。
 func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 	if profile == "" {
 		profile = "dev"
@@ -204,15 +203,6 @@ func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 		return nil, err
 	}
 
-	// 环境专用配置覆盖基础配置
-	ppath := profilePath(basePath, profile)
-	if _, err := os.Stat(ppath); err == nil {
-		v.SetConfigFile(ppath)
-		if err := v.MergeInConfig(); err != nil {
-			return nil, err
-		}
-	}
-
 	// 环境变量（APP_ 前缀）优先于配置文件
 	// AutomaticEnv 会在 Get 时自动查找 APP_ 前缀的环境变量
 	// 例如 v.GetString("db.host") → 查找 APP_DB_HOST
@@ -220,16 +210,21 @@ func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
-	// 第一阶段解析：只为拿到 nacos 段，判断是否需要从配置中心拉取
+	// 第一阶段解析：只为拿到 bootstrap 里的 nacos 段（连接信息，可被 APP_NACOS_* env 覆盖）
 	var boot Config
 	if err := v.Unmarshal(&boot); err != nil {
 		return nil, err
 	}
-	if fetch != nil && boot.Nacos.Enable {
+	// 远程配置是唯一业务配置源：fetch 非空必拉，失败即终止启动（fail-fast）；
+	// Nacos 整体不可达时由 SDK 自动降级读本地快照（cache_dir），快照也没有才返回错误
+	if fetch != nil {
 		n := boot.Nacos.withDefaults(profile)
 		content, err := fetch(n)
 		if err != nil {
 			return nil, fmt.Errorf("拉取 Nacos 配置失败（data_id=%s group=%s）: %w", n.DataId, n.Group, err)
+		}
+		if strings.TrimSpace(content) == "" {
+			return nil, fmt.Errorf("远端配置为空（data_id=%s group=%s），请检查 Nacos 控制台是否已发布该配置", n.DataId, n.Group)
 		}
 		v.SetConfigType("yaml")
 		if err := v.MergeConfig(strings.NewReader(content)); err != nil {
@@ -275,13 +270,4 @@ func validateProd(c *Config) error {
 		return errors.New("prod 环境必须通过 APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 注入数据库连接信息")
 	}
 	return nil
-}
-
-// profilePath 计算环境配置文件名：config/config.yaml + prod => config/config.prod.yaml
-func profilePath(base, profile string) string {
-	dir := filepath.Dir(base)
-	name := filepath.Base(base)
-	ext := filepath.Ext(name)
-	stem := strings.TrimSuffix(name, ext)
-	return filepath.Join(dir, stem+"."+profile+ext)
 }
