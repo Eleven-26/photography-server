@@ -5,7 +5,6 @@ import (
 
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
-	appctl "photography-server/internal/presentation/app"
 	"photography-server/internal/presentation/controller"
 	"photography-server/internal/presentation/h5"
 	"photography-server/internal/presentation/wechat"
@@ -13,9 +12,9 @@ import (
 )
 
 // New 构建 gin 引擎并按客户端分组注册 RPC 风格路由
-// 客户端分组：pc-管理后台 miniapp-小程序管理后台 app-摄影师APP h5-客户H5 wechat-客户小程序
-// 三端入口分开：管理端接口仅注册在 pc/miniapp；摄影师 App 注册在 /app（员工认证）；
-// 客户 H5 注册在 /h5（客户认证）；客户小程序注册在 /wechat（客户认证，复用 H5 能力）。
+// 客户端分组：pc-管理后台 miniapp-小程序管理后台 wechat-客户小程序 h5-客户H5
+// 端入口分开：管理端接口仅注册在 pc/miniapp；微信小程序为移动端统一入口（当前无独立 App），
+// 客户区挂 /wechat（客户认证）、员工区挂 /wechat/staff（员工认证）；客户 H5 挂 /h5（客户认证）。
 func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	if cfg.App.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -58,13 +57,6 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	registerCommon(pc, ctl)
 	registerCommon(miniapp, ctl)
 
-	// ---- 摄影师 App（员工验证码登录 + StaffAuth）----
-	appCtl := appctl.New(svc, cfg)
-	appPub := api.Group("/app")
-	appCtl.RegisterPublic(appPub)
-	appAuth := api.Group("/app", mw.StaffAuth(), mw.OperationLog())
-	appCtl.RegisterAuthed(appAuth)
-
 	// ---- 客户 H5（客户验证码登录 + CustomerAuth）----
 	h5Ctl := h5.New(svc, cfg)
 	h5Pub := api.Group("/h5")
@@ -72,12 +64,18 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	h5Auth := api.Group("/h5", mw.CustomerAuth())
 	h5Ctl.RegisterAuthed(h5Auth)
 
-	// ---- 客户微信小程序（复用 H5 能力，独立入口 /wechat）----
+	// ---- 微信小程序（移动端统一入口）----
+	// 客户区（客户验证码登录 + CustomerAuth）
 	wcCtl := wechat.New(svc, cfg)
 	wcPub := api.Group("/wechat")
 	wcCtl.RegisterPublic(wcPub)
 	wcAuth := api.Group("/wechat", mw.CustomerAuth())
 	wcCtl.RegisterAuthed(wcAuth)
+	// 员工区（员工验证码登录 + StaffAuth）：摄影师/助理用小程序处理订单、日程、线索
+	wcStaffPub := api.Group("/wechat/staff")
+	wcCtl.RegisterStaffPublic(wcStaffPub)
+	wcStaffAuth := api.Group("/wechat/staff", mw.StaffAuth(), mw.OperationLog())
+	wcCtl.RegisterStaffAuthed(wcStaffAuth)
 
 	// 调试路由：仅非 release（dev/test）环境注册，生产环境不暴露基础设施操作能力
 	if cfg.App.Mode != "release" {

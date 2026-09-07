@@ -12,13 +12,13 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-// app_staff 摄影师 App 端能力：工作台待办、改期审批、线索沟通与 AI 简报、
+// staff 小程序员工端能力：工作台待办、改期审批、线索沟通与 AI 简报、
 // 档期时段模板、评价回复、工作室设置。复用 Operator 上下文（员工登录）。
 // 订单状态流转/收款/交付上传等操作直接复用 PC 端既有 service 方法。
 
-// AppOverview 工作台待办统计（按状态计数，全部走现有 List 的 total）
-func (s *Service) AppOverview(ctx context.Context, op Operator) (*dto.AppOverview, error) {
-	ov := &dto.AppOverview{}
+// StaffOverview 工作台待办统计（按状态计数，全部走现有 List 的 total）
+func (s *Service) StaffOverview(ctx context.Context, op Operator) (*dto.StaffOverview, error) {
+	ov := &dto.StaffOverview{}
 	type countJob struct {
 		run  func() (int64, error)
 		dest *int64
@@ -70,14 +70,14 @@ func (s *Service) AppOverview(ctx context.Context, op Operator) (*dto.AppOvervie
 // 改期审批
 // ---------------------------------------------------------------------
 
-// AppRescheduleList 改期单列表（status>0 时按状态过滤）
-func (s *Service) AppRescheduleList(ctx context.Context, op Operator, page, pageSize, status int) ([]model.OrderReschedule, int64, error) {
+// StaffRescheduleList 改期单列表（status>0 时按状态过滤）
+func (s *Service) StaffRescheduleList(ctx context.Context, op Operator, page, pageSize, status int) ([]model.OrderReschedule, int64, error) {
 	return s.RescheduleRepo.List(ctx, op.CompanyID, page, pageSize, status)
 }
 
-// AppRescheduleAudit 改期审批。同意后同步更新订单拍摄日期/时间并重建档期锁；
+// StaffRescheduleAudit 改期审批。同意后同步更新订单拍摄日期/时间并重建档期锁；
 // 拒绝仅记录审批备注。
-func (s *Service) AppRescheduleAudit(ctx context.Context, op Operator, rescheduleID int64, approved bool, remark string) error {
+func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, rescheduleID int64, approved bool, remark string) error {
 	rs, err := s.RescheduleRepo.GetByID(ctx, op.CompanyID, rescheduleID)
 	if err != nil {
 		return errs.NotFound("改期单不存在")
@@ -139,16 +139,16 @@ func (s *Service) AppRescheduleAudit(ctx context.Context, op Operator, reschedul
 // 线索沟通 + AI 简报
 // ---------------------------------------------------------------------
 
-// AppLeadMessages 线索沟通记录（按时间正序）
-func (s *Service) AppLeadMessages(ctx context.Context, op Operator, leadID int64) ([]model.LeadMessage, error) {
+// StaffLeadMessages 线索沟通记录（按时间正序）
+func (s *Service) StaffLeadMessages(ctx context.Context, op Operator, leadID int64) ([]model.LeadMessage, error) {
 	if _, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID); err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 	return s.LeadExtraRepo.ListMessages(ctx, op.CompanyID, leadID)
 }
 
-// AppSendLeadMessage 工作室发出沟通消息（追问/报价通知/作品分享）
-func (s *Service) AppSendLeadMessage(ctx context.Context, op Operator, leadID int64, req dto.AppLeadMessageReq) (*model.LeadMessage, error) {
+// StaffSendLeadMessage 工作室发出沟通消息（追问/报价通知/作品分享）
+func (s *Service) StaffSendLeadMessage(ctx context.Context, op Operator, leadID int64, req dto.StaffLeadMessageReq) (*model.LeadMessage, error) {
 	if strings.TrimSpace(req.Content) == "" {
 		return nil, errs.BadRequest("消息内容不能为空")
 	}
@@ -175,10 +175,10 @@ func (s *Service) AppSendLeadMessage(ctx context.Context, op Operator, leadID in
 	return &m, nil
 }
 
-// AppBriefGenerate 生成线索 AI 简报（规则版）。
+// StaffBriefGenerate 生成线索 AI 简报（规则版）。
 // 已确认项来自线索档案字段；缺失项按固定话术模板生成待追问项。
 // TODO(P1): 接入 LLM 按沟通记录动态生成追问话术；当前为规则模板。
-func (s *Service) AppBriefGenerate(ctx context.Context, op Operator, leadID int64) ([]model.LeadBriefItem, error) {
+func (s *Service) StaffBriefGenerate(ctx context.Context, op Operator, leadID int64) ([]model.LeadBriefItem, error) {
 	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
@@ -261,13 +261,13 @@ func (s *Service) AppBriefGenerate(ctx context.Context, op Operator, leadID int6
 	return items, nil
 }
 
-// AppBriefList 简报项列表
-func (s *Service) AppBriefList(ctx context.Context, op Operator, leadID int64) ([]model.LeadBriefItem, error) {
+// StaffBriefList 简报项列表
+func (s *Service) StaffBriefList(ctx context.Context, op Operator, leadID int64) ([]model.LeadBriefItem, error) {
 	return s.LeadExtraRepo.ListBriefItems(ctx, op.CompanyID, leadID)
 }
 
-// AppBriefSend 发送追问（状态 pending → sent；实际触达渠道 TODO）
-func (s *Service) AppBriefSend(ctx context.Context, op Operator, itemID int64) error {
+// StaffBriefSend 发送追问（状态 pending → sent；实际触达渠道 TODO）
+func (s *Service) StaffBriefSend(ctx context.Context, op Operator, itemID int64) error {
 	item, err := s.LeadExtraRepo.GetBriefItem(ctx, op.CompanyID, itemID)
 	if err != nil {
 		return errs.NotFound("简报项不存在")
@@ -283,8 +283,8 @@ func (s *Service) AppBriefSend(ctx context.Context, op Operator, itemID int64) e
 	return s.LeadExtraRepo.UpdateBriefItem(ctx, op.CompanyID, itemID, updates)
 }
 
-// AppBriefConfirm 确认/补充简报项取值（客户回复后录入）
-func (s *Service) AppBriefConfirm(ctx context.Context, op Operator, itemID int64, value string) error {
+// StaffBriefConfirm 确认/补充简报项取值（客户回复后录入）
+func (s *Service) StaffBriefConfirm(ctx context.Context, op Operator, itemID int64, value string) error {
 	if _, err := s.LeadExtraRepo.GetBriefItem(ctx, op.CompanyID, itemID); err != nil {
 		return errs.NotFound("简报项不存在")
 	}
@@ -303,13 +303,13 @@ func (s *Service) AppBriefConfirm(ctx context.Context, op Operator, itemID int64
 // 档期时段模板
 // ---------------------------------------------------------------------
 
-// AppSlotTemplates 档期时段模板列表
-func (s *Service) AppSlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
+// StaffSlotTemplates 档期时段模板列表
+func (s *Service) StaffSlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
 	return s.SlotTemplateRepo.List(ctx, op.CompanyID, photographerID)
 }
 
-// AppSaveSlotTemplate 新建/更新档期时段模板
-func (s *Service) AppSaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.AppSlotTemplateReq) (*model.SlotTemplate, error) {
+// StaffSaveSlotTemplate 新建/更新档期时段模板
+func (s *Service) StaffSaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
 	if req.Weekday < 0 || req.Weekday > 6 {
 		return nil, errs.BadRequest("星期参数错误（0-周日 ... 6-周六）")
 	}
@@ -349,8 +349,8 @@ func (s *Service) AppSaveSlotTemplate(ctx context.Context, op Operator, id int64
 	return &m, nil
 }
 
-// AppDeleteSlotTemplate 删除档期时段模板
-func (s *Service) AppDeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
+// StaffDeleteSlotTemplate 删除档期时段模板
+func (s *Service) StaffDeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
 	if _, err := s.SlotTemplateRepo.GetByID(ctx, op.CompanyID, id); err != nil {
 		return errs.NotFound("模板不存在")
 	}
@@ -361,13 +361,13 @@ func (s *Service) AppDeleteSlotTemplate(ctx context.Context, op Operator, id int
 // 评价回复 / 工作室设置
 // ---------------------------------------------------------------------
 
-// AppReviewList 评价列表（minRating>0 时按最低评分过滤）
-func (s *Service) AppReviewList(ctx context.Context, op Operator, page, pageSize, minRating int) ([]model.OrderReview, int64, error) {
+// StaffReviewList 评价列表（minRating>0 时按最低评分过滤）
+func (s *Service) StaffReviewList(ctx context.Context, op Operator, page, pageSize, minRating int) ([]model.OrderReview, int64, error) {
 	return s.ReviewRepo.List(ctx, op.CompanyID, page, pageSize, minRating)
 }
 
-// AppReviewReply 摄影师回复客户评价
-func (s *Service) AppReviewReply(ctx context.Context, op Operator, reviewID int64, reply string) error {
+// StaffReviewReply 摄影师回复客户评价
+func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID int64, reply string) error {
 	if strings.TrimSpace(reply) == "" {
 		return errs.BadRequest("回复内容不能为空")
 	}
@@ -379,13 +379,13 @@ func (s *Service) AppReviewReply(ctx context.Context, op Operator, reviewID int6
 	return s.ReviewRepo.Update(ctx, op.CompanyID, reviewID, updates)
 }
 
-// AppStudioSettingGet 工作室设置（App 端查看/编辑）
-func (s *Service) AppStudioSettingGet(ctx context.Context, op Operator) (*model.StudioSetting, error) {
+// StaffStudioSettingGet 工作室设置（员工端查看/编辑）
+func (s *Service) StaffStudioSettingGet(ctx context.Context, op Operator) (*model.StudioSetting, error) {
 	return s.StudioSettingRepo.GetOrCreate(ctx, op.CompanyID)
 }
 
-// AppStudioSettingUpdate 工作室设置更新（仅更新传入的非零字段由 controller 组装）
-func (s *Service) AppStudioSettingUpdate(ctx context.Context, op Operator, updates map[string]interface{}) error {
+// StaffStudioSettingUpdate 工作室设置更新（仅更新传入的非零字段由 controller 组装）
+func (s *Service) StaffStudioSettingUpdate(ctx context.Context, op Operator, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -393,13 +393,13 @@ func (s *Service) AppStudioSettingUpdate(ctx context.Context, op Operator, updat
 	return s.StudioSettingRepo.Update(ctx, op.CompanyID, updates)
 }
 
-// AppCustomRequests 定制需求列表（待处理优先）
-func (s *Service) AppCustomRequests(ctx context.Context, op Operator, page, pageSize, status int) ([]model.CustomRequest, int64, error) {
+// StaffCustomRequests 定制需求列表（待处理优先）
+func (s *Service) StaffCustomRequests(ctx context.Context, op Operator, page, pageSize, status int) ([]model.CustomRequest, int64, error) {
 	return s.CustomRequestRepo.List(ctx, op.CompanyID, page, pageSize, status, 0)
 }
 
-// AppCustomRequestRespond 响应定制需求（转化线索由既有 ConvertLeadToCustomer 承接）
-func (s *Service) AppCustomRequestRespond(ctx context.Context, op Operator, id int64, response string) error {
+// StaffCustomRequestRespond 响应定制需求（转化线索由既有 ConvertLeadToCustomer 承接）
+func (s *Service) StaffCustomRequestRespond(ctx context.Context, op Operator, id int64, response string) error {
 	if _, err := s.CustomRequestRepo.GetByID(ctx, op.CompanyID, id); err != nil {
 		return errs.NotFound("定制需求不存在")
 	}

@@ -87,10 +87,10 @@ type ClientSmsLoginReq struct {
 	Code      string `json:"code" binding:"required"`   // 验证码
 }
 
-// ======================== 摄影师 App ========================
+// ======================== 小程序员工端 ========================
 
-// AppOverview App 工作台待办统计
-type AppOverview struct {
+// StaffOverview 员工端工作台待办统计
+type StaffOverview struct {
 	PendingConfirm       int64 `json:"pending_confirm"`        // 待确认预约
 	PendingDeposit       int64 `json:"pending_deposit"`        // 待收定金
 	PendingShoot         int64 `json:"pending_shoot"`          // 待拍摄
@@ -101,16 +101,16 @@ type AppOverview struct {
 	PendingCustomRequest int64 `json:"pending_custom_request"` // 待处理定制需求
 }
 
-// AppLeadMessageReq 发送线索沟通消息
-type AppLeadMessageReq struct {
+// StaffLeadMessageReq 发送线索沟通消息
+type StaffLeadMessageReq struct {
 	Content string `json:"content" binding:"required"` // 消息内容
 	Channel string `json:"channel"`                    // 渠道 h5/wechat/sms/phone
 	MsgType int64  `json:"msg_type"`                   // 类型 1-文本 2-追问 3-报价通知 4-作品分享
 	BizID   int64  `json:"biz_id"`                     // 关联业务ID
 }
 
-// AppSlotTemplateReq 档期时段模板
-type AppSlotTemplateReq struct {
+// StaffSlotTemplateReq 档期时段模板
+type StaffSlotTemplateReq struct {
 	PhotographerID int64  `json:"photographer_id"` // 摄影师ID（0=全店通用）
 	Weekday        int    `json:"weekday"`         // 星期几 0-周日 ... 6-周六
 	StartTime      string `json:"start_time"`      // HH:mm
@@ -118,8 +118,8 @@ type AppSlotTemplateReq struct {
 	Status         int64  `json:"status"`          // 1-启用 0-停用
 }
 
-// AppStudioSettingReq 工作室设置更新
-type AppStudioSettingReq struct {
+// StaffStudioSettingReq 工作室设置更新
+type StaffStudioSettingReq struct {
 	Slogan              string   `json:"slogan"`                // 宣传语
 	Intro               string   `json:"intro"`                 // 简介
 	HomepageSlug        string   `json:"homepage_slug"`         // 预约主页短链标识
@@ -135,7 +135,7 @@ type AppStudioSettingReq struct {
 }
 
 // ToUpdates 组装更新字段：指针非 nil 才更新（支持把数值改为 0）
-func (req AppStudioSettingReq) ToUpdates() map[string]interface{} {
+func (req StaffStudioSettingReq) ToUpdates() map[string]interface{} {
 	updates := map[string]interface{}{}
 	if req.Slogan != "" {
 		updates["slogan"] = req.Slogan
@@ -176,23 +176,23 @@ func (req AppStudioSettingReq) ToUpdates() map[string]interface{} {
 	return updates
 }
 
-// AppRescheduleAuditReq 改期审批
-type AppRescheduleAuditReq struct {
+// StaffRescheduleAuditReq 改期审批
+type StaffRescheduleAuditReq struct {
 	Approved bool   `json:"approved"` // 是否同意
 	Remark   string `json:"remark"`   // 审批备注
 }
 
-// AppBriefConfirmReq 简报项确认
-type AppBriefConfirmReq struct {
+// StaffBriefConfirmReq 简报项确认
+type StaffBriefConfirmReq struct {
 	Value string `json:"value" binding:"required"` // 确认内容
 }
 
-// AppReviewReplyReq 评价回复
-type AppReviewReplyReq struct {
+// StaffReviewReplyReq 评价回复
+type StaffReviewReplyReq struct {
 	Reply string `json:"reply" binding:"required"` // 回复内容
 }
 
-// AppCustomRequestRespondReq 定制需求响应
-type AppCustomRequestRespondReq struct {
+// StaffCustomRequestRespondReq 定制需求响应
+type StaffCustomRequestRespondReq struct {
 	Response string `json:"response"` // 响应说明
 }

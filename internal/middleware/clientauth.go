@@ -64,7 +64,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 	}
 }
 
-// StaffAuth 员工 JWT 认证中间件（摄影师 App）：
+// StaffAuth 员工 JWT 认证中间件（小程序员工区）：
 // 接受 UserType=staff 或旧令牌（空 UserType，向后兼容），注入 Operator 上下文。
 func (m *Middlewares) StaffAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

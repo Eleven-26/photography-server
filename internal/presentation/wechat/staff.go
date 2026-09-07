@@ -1,44 +1,35 @@
-package app
+package wechat
 
 import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
-	"photography-server/internal/config"
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
-// Controller 摄影师 App 端接口（订单处理 + 日程 + 线索 AI 简报 + 个人中心）。
-// 员工身份经 StaffAuth 注入 Operator；订单状态流转/收款/交付等复杂操作
+// 小程序员工区接口（订单处理 + 日程 + 线索 AI 简报 + 个人中心）。
+// 员工（摄影师/助理）通过小程序处理业务，身份经 StaffAuth 注入 Operator；订单状态流转/收款/交付等
 // 复用 PC 端既有 service 方法（同一业务规则，两端入口分开）。
-type Controller struct {
-	Svc *service.Service
-	Cfg *config.Config
+// Controller 类型与 New 构造见 wechat.go。
+
+// RegisterStaffPublic 注册员工区公开路由（验证码登录，挂 /wechat/staff）
+func (h *Controller) RegisterStaffPublic(g *gin.RouterGroup) {
+	g.POST("/auth/sms-code", h.StaffSmsCode)
+	g.POST("/auth/login", h.StaffLogin)
 }
 
-func New(svc *service.Service, cfg *config.Config) *Controller {
-	return &Controller{Svc: svc, Cfg: cfg}
-}
-
-// RegisterPublic 注册公开路由（验证码登录）
-func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
-	g.POST("/auth/sms-code", h.SmsCode)
-	g.POST("/auth/login", h.Login)
-}
-
-// RegisterAuthed 注册需登录路由（StaffAuth 注入 Operator）
-func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
+// RegisterStaffAuthed 注册员工区需登录路由（StaffAuth 注入 Operator，挂 /wechat/staff）
+func (h *Controller) RegisterStaffAuthed(g *gin.RouterGroup) {
 	// 工作台
 	g.POST("/overview", h.Overview)
 	// 订单（复用 PC 端 service）
-	g.POST("/order/list", h.OrderList)
-	g.POST("/order/detail/:id", h.OrderDetail)
+	g.POST("/order/list", h.StaffOrderList)
+	g.POST("/order/detail/:id", h.StaffOrderDetail)
 	g.POST("/order/status/:id", h.OrderStatus)
 	g.POST("/order/logs/:id", h.OrderLogs)
 	g.POST("/order/create", h.OrderCreate)
@@ -46,7 +37,7 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/payment/create/:order_id", h.PaymentCreate)
 	g.POST("/payment/list/:order_id", h.PaymentList)
 	// 交付
-	g.POST("/delivery/detail/:id", h.DeliveryDetail)
+	g.POST("/delivery/detail/:id", h.StaffDeliveryDetail)
 	g.POST("/delivery/create/:order_id", h.DeliveryCreate)
 	g.POST("/delivery/upload-samples/:id", h.DeliveryUploadSamples)
 	g.POST("/delivery/upload-retouched/:id", h.DeliveryUploadRetouched)
@@ -68,7 +59,7 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/brief/send/:id", h.BriefSend)
 	g.POST("/brief/confirm/:id", h.BriefConfirm)
 	// 定制需求
-	g.POST("/custom-request/list", h.CustomRequestList)
+	g.POST("/custom-request/list", h.StaffCustomRequestList)
 	g.POST("/custom-request/respond/:id", h.CustomRequestRespond)
 	// 档期时段模板
 	g.POST("/slot-template/list", h.SlotTemplateList)
@@ -118,7 +109,7 @@ func pathID(c *gin.Context, name string) (int64, error) {
 // ---------------------------------------------------------------------
 
 // SmsCode 发送登录验证码
-func (h *Controller) SmsCode(c *gin.Context) {
+func (h *Controller) StaffSmsCode(c *gin.Context) {
 	var req struct {
 		Mobile string `json:"mobile" binding:"required"`
 	}
@@ -133,8 +124,8 @@ func (h *Controller) SmsCode(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// Login 摄影师手机号验证码登录（按 sys_user.mobile 匹配员工）
-func (h *Controller) Login(c *gin.Context) {
+// StaffLogin 员工手机号验证码登录（按 sys_user.mobile 匹配员工）
+func (h *Controller) StaffLogin(c *gin.Context) {
 	var req struct {
 		Mobile     string `json:"mobile" binding:"required"`
 		Code       string `json:"code" binding:"required"`
@@ -171,7 +162,7 @@ func (h *Controller) Login(c *gin.Context) {
 // Overview 工作台待办统计
 func (h *Controller) Overview(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	ov, err := h.Svc.AppOverview(c.Request.Context(), op)
+	ov, err := h.Svc.StaffOverview(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -180,7 +171,7 @@ func (h *Controller) Overview(c *gin.Context) {
 }
 
 // OrderList 订单列表（query: status）
-func (h *Controller) OrderList(c *gin.Context) {
+func (h *Controller) StaffOrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, c.Query("status"), 0)
@@ -192,7 +183,7 @@ func (h *Controller) OrderList(c *gin.Context) {
 }
 
 // OrderDetail 订单详情
-func (h *Controller) OrderDetail(c *gin.Context) {
+func (h *Controller) StaffOrderDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := pathID(c, "id")
 	if err != nil {
@@ -263,7 +254,7 @@ func (h *Controller) OrderLogs(c *gin.Context) {
 // 收款 / 交付 / 改期 / 退款
 // ---------------------------------------------------------------------
 
-// PaymentCreate 录入收款（App 拍凭证上传）
+// PaymentCreate 录入收款（小程序拍照上传凭证）
 func (h *Controller) PaymentCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	orderID, err := pathID(c, "order_id")
@@ -301,7 +292,7 @@ func (h *Controller) PaymentList(c *gin.Context) {
 }
 
 // DeliveryDetail 交付单明细
-func (h *Controller) DeliveryDetail(c *gin.Context) {
+func (h *Controller) StaffDeliveryDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := pathID(c, "id")
 	if err != nil {
@@ -381,7 +372,7 @@ func (h *Controller) RescheduleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	status, _ := strconv.Atoi(c.Query("status"))
-	list, total, err := h.Svc.AppRescheduleList(c.Request.Context(), op, page, pageSize, status)
+	list, total, err := h.Svc.StaffRescheduleList(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -397,12 +388,12 @@ func (h *Controller) RescheduleAudit(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AppRescheduleAuditReq
+	var req dto.StaffRescheduleAuditReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppRescheduleAudit(c.Request.Context(), op, id, req.Approved, req.Remark); err != nil {
+	if err := h.Svc.StaffRescheduleAudit(c.Request.Context(), op, id, req.Approved, req.Remark); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -434,8 +425,8 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Approve bool   `json:"approve" binding:"required"` // 是否通过
-		Remark  string `json:"remark"`                     // 审核备注
+		Approve bool   `json:"approve"` // 是否通过（false=驳回，不使用 required 以放行布尔零值）
+		Remark  string `json:"remark"`  // 审核备注
 	}
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
@@ -501,7 +492,7 @@ func (h *Controller) LeadMessages(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	list, err := h.Svc.AppLeadMessages(c.Request.Context(), op, id)
+	list, err := h.Svc.StaffLeadMessages(c.Request.Context(), op, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -517,12 +508,12 @@ func (h *Controller) LeadMessageSend(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AppLeadMessageReq
+	var req dto.StaffLeadMessageReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	m, err := h.Svc.AppSendLeadMessage(c.Request.Context(), op, id, req)
+	m, err := h.Svc.StaffSendLeadMessage(c.Request.Context(), op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -538,7 +529,7 @@ func (h *Controller) BriefGenerate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	items, err := h.Svc.AppBriefGenerate(c.Request.Context(), op, leadID)
+	items, err := h.Svc.StaffBriefGenerate(c.Request.Context(), op, leadID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -554,7 +545,7 @@ func (h *Controller) BriefList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	items, err := h.Svc.AppBriefList(c.Request.Context(), op, leadID)
+	items, err := h.Svc.StaffBriefList(c.Request.Context(), op, leadID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -570,7 +561,7 @@ func (h *Controller) BriefSend(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppBriefSend(c.Request.Context(), op, id); err != nil {
+	if err := h.Svc.StaffBriefSend(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -585,12 +576,12 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AppBriefConfirmReq
+	var req dto.StaffBriefConfirmReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppBriefConfirm(c.Request.Context(), op, id, req.Value); err != nil {
+	if err := h.Svc.StaffBriefConfirm(c.Request.Context(), op, id, req.Value); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -602,11 +593,11 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // CustomRequestList 定制需求列表
-func (h *Controller) CustomRequestList(c *gin.Context) {
+func (h *Controller) StaffCustomRequestList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	status, _ := strconv.Atoi(c.Query("status"))
-	list, total, err := h.Svc.AppCustomRequests(c.Request.Context(), op, page, pageSize, status)
+	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -622,12 +613,12 @@ func (h *Controller) CustomRequestRespond(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AppCustomRequestRespondReq
+	var req dto.StaffCustomRequestRespondReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppCustomRequestRespond(c.Request.Context(), op, id, req.Response); err != nil {
+	if err := h.Svc.StaffCustomRequestRespond(c.Request.Context(), op, id, req.Response); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -638,7 +629,7 @@ func (h *Controller) CustomRequestRespond(c *gin.Context) {
 func (h *Controller) SlotTemplateList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
-	list, err := h.Svc.AppSlotTemplates(c.Request.Context(), op, photographerID)
+	list, err := h.Svc.StaffSlotTemplates(c.Request.Context(), op, photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -658,12 +649,12 @@ func (h *Controller) SlotTemplateSave(c *gin.Context) {
 		}
 		id = parsed
 	}
-	var req dto.AppSlotTemplateReq
+	var req dto.StaffSlotTemplateReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	m, err := h.Svc.AppSaveSlotTemplate(c.Request.Context(), op, id, req)
+	m, err := h.Svc.StaffSaveSlotTemplate(c.Request.Context(), op, id, req)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -679,7 +670,7 @@ func (h *Controller) SlotTemplateDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppDeleteSlotTemplate(c.Request.Context(), op, id); err != nil {
+	if err := h.Svc.StaffDeleteSlotTemplate(c.Request.Context(), op, id); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -691,7 +682,7 @@ func (h *Controller) ReviewList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
 	minRating, _ := strconv.Atoi(c.Query("min_rating"))
-	list, total, err := h.Svc.AppReviewList(c.Request.Context(), op, page, pageSize, minRating)
+	list, total, err := h.Svc.StaffReviewList(c.Request.Context(), op, page, pageSize, minRating)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -707,12 +698,12 @@ func (h *Controller) ReviewReply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AppReviewReplyReq
+	var req dto.StaffReviewReplyReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	if err := h.Svc.AppReviewReply(c.Request.Context(), op, id, req.Reply); err != nil {
+	if err := h.Svc.StaffReviewReply(c.Request.Context(), op, id, req.Reply); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -722,7 +713,7 @@ func (h *Controller) ReviewReply(c *gin.Context) {
 // StudioGet 工作室设置
 func (h *Controller) StudioGet(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	st, err := h.Svc.AppStudioSettingGet(c.Request.Context(), op)
+	st, err := h.Svc.StaffStudioSettingGet(c.Request.Context(), op)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -733,13 +724,13 @@ func (h *Controller) StudioGet(c *gin.Context) {
 // StudioUpdate 工作室设置更新
 func (h *Controller) StudioUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.AppStudioSettingReq
+	var req dto.StaffStudioSettingReq
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
 	updates := req.ToUpdates()
-	if err := h.Svc.AppStudioSettingUpdate(c.Request.Context(), op, updates); err != nil {
+	if err := h.Svc.StaffStudioSettingUpdate(c.Request.Context(), op, updates); err != nil {
 		response.Fail(c, err)
 		return
 	}
