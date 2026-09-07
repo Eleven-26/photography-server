@@ -1,0 +1,75 @@
+# ============================================================
+# Nacos 发布模板：data_id=photography-server-test.yaml group=DEFAULT_GROUP
+# 本文件是 Nacos 控制台内容的版本化镜像（git 留档），修改后需到控制台同步发布；
+# 运行期以控制台为准，变更需重启生效（无热更）。本地文件不参与加载。
+# 首次接入：把本文件全文粘贴到 Nacos 控制台发布该 data_id，然后启动服务。
+# 注意：不要把 nacos 连接段放进远程配置（连接信息只存在于本地 bootstrap）。
+# 来源：原本地 config/config.test.yaml（该文件从未提交 git 且已随单源改造删除，
+#       内容从历史提交 cc7abfb 恢复；容器名按测试栈 compose 互联地址保留，发布前请核对）。
+# ============================================================
+
+app:
+  mode: debug
+  port: 8080
+  timezone: Asia/Shanghai
+
+jwt:
+  secret: test-secret-abcdef-9876543210
+  issuer: photography-server
+  expire_hours: 168
+
+db:
+  host: test-db # APP_DB_HOST 可覆盖
+  port: 3306
+  user: root
+  password: test123456
+  name: photography
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  log_mode: true
+
+redis:
+  addr: test-redis:6379
+  password: ""
+  db: 0
+
+nats:
+  url: nats://test-nats:4222
+
+mongodb:
+  enable: true
+  uri: mongodb://test-mongo:27017
+  database: photography
+  username: ""
+  password: ""
+
+log:
+  level: info
+
+upload:
+  dir: /data/uploads
+  max_size_mb: 50
+
+xxljob:
+  enable: true
+  server_addr: http://xxl-job-admin:8080/xxl-job-admin
+  access_token: "" # 按测试栈 xxl-job-admin 容器创建时一致
+  executor_ip: 127.0.0.1
+  executor_port: "9999"
+  registry_key: photography-server
+  log_dir: /data/logs/xxl-job
+
+elasticsearch:
+  enable: true
+  urls:
+    - http://test-es:9200
+  username: ""
+  password: ""
+
+# Jaeger 链路通道（复用 OTel 埋点）；与 SkyWalking native 通道勿同开（双 span/双上报）
+jaeger:
+  enable: true
+  endpoint: test-jaeger:4317 # 测试栈 Jaeger OTLP gRPC 地址（若测试栈无 jaeger，改回实际 OTLP 后端）
+  service: photography-server
+  instance: ""

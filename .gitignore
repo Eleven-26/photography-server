@@ -11,6 +11,9 @@ bin
 # env
 .env
 
+# nacos SDK 本地快照与日志（cache 里是从配置中心拉取的配置明文，含运行时注入前的完整内容，严禁入库）
+.nacos/
+
 # config local
 config/config.local.yaml
 
