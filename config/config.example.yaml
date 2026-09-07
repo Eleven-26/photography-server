@@ -8,6 +8,10 @@
 # 环境选择：-p dev|test|prod 或环境变量 APP_PROFILE
 # 优先级：APP_* 环境变量 > 环境配置文件 > config.yaml
 # 环境覆盖：设置 APP_* 环境变量即可覆盖同名配置项（如 APP_DB_HOST 覆盖 db.host），无需占位符
+# 命名规则：变量名 = APP_ + 段名_键名（注意拼段名！实测约定：
+#   db.host→APP_DB_HOST；redis.addr→APP_REDIS_ADDR（单字段 host:port）；
+#   mongodb.*→APP_MONGODB_*；elasticsearch.*→APP_ELASTICSEARCH_*（多地址逗号分隔）；
+#   app.mode→APP_APP_MODE；log.level→APP_LOG_LEVEL。回归测试见 internal/config/env_mapping_test.go）
 # ============================================================
 
 app:
@@ -92,3 +96,9 @@ nacos:
   password: ""
   service_name: photography-server # 注册到 Nacos 的服务名
   register_ip: "" # 留空自动探测（容器内为容器 IP）
+  # 以下为 SDK 可调项：env（APP_NACOS_TIMEOUT_MS 等）能覆盖的前提是 key 存在于本文件
+  timeout_ms: 5000 # 请求超时
+  cache_dir: .nacos/cache # 本地快照目录
+  log_level: warn # SDK 自身日志级别
+  cluster_name: DEFAULT # 集群名
+  weight: 1 # 注册权重

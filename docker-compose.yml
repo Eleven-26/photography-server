@@ -276,15 +276,14 @@ services:
       nacos:
         condition: service_started
     environment:
-      APP_MODE: ${APP_MODE:-release}
+      APP_APP_MODE: ${APP_APP_MODE:-release} # app.mode（viper 段名拼接：段 app + 键 mode；旧名 APP_MODE 不生效）
       APP_PROFILE: ${APP_PROFILE:-prod}
       APP_DB_HOST: ${APP_DB_HOST:-mysql}
       APP_DB_PORT: ${APP_DB_PORT:-3306}
       APP_DB_USER: ${APP_DB_USER:-root}
       APP_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # 复用 MySQL 密码
       APP_DB_NAME: ${APP_DB_NAME:-photography}
-      APP_REDIS_HOST: ${APP_REDIS_HOST:-redis}
-      APP_REDIS_PORT: ${APP_REDIS_PORT:-6379}
+      APP_REDIS_ADDR: ${APP_REDIS_ADDR:-redis:6379} # redis.addr 为单字段 host:port（旧名 APP_REDIS_HOST/PORT 不生效）
       APP_NATS_URL: ${APP_NATS_URL:-nats://nats:4222}
       APP_JWT_SECRET: ${APP_JWT_SECRET}   # 必须从 .env 读取
       APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
@@ -296,15 +295,15 @@ services:
       APP_XXLJOB_EXECUTOR_PORT: ${APP_XXLJOB_EXECUTOR_PORT:-"9999"}
       APP_XXLJOB_REGISTRY_KEY: ${APP_XXLJOB_REGISTRY_KEY:-photography-server}
       APP_XXLJOB_LOG_DIR: ${APP_XXLJOB_LOG_DIR:-/app/logs/xxl-job}
-      APP_ES_ENABLE: ${APP_ES_ENABLE:-false}
-      APP_ES_URL: ${APP_ES_URL:-http://elasticsearch:9200}
-      APP_ES_USERNAME: ${APP_ES_USERNAME:-}
-      APP_ES_PASSWORD: ${APP_ES_PASSWORD:-}
-      APP_MONGO_ENABLE: ${APP_MONGO_ENABLE:-false}
-      APP_MONGO_URI: ${APP_MONGO_URI:-mongodb://mongo:27017}
-      APP_MONGO_DATABASE: ${APP_MONGO_DATABASE:-photography}
-      APP_MONGO_USERNAME: ${APP_MONGO_USERNAME:-}
-      APP_MONGO_PASSWORD: ${APP_MONGO_PASSWORD:-}
+      APP_ELASTICSEARCH_ENABLE: ${APP_ELASTICSEARCH_ENABLE:-false} # 段名 elasticsearch（旧名 APP_ES_* 不生效）
+      APP_ELASTICSEARCH_URLS: ${APP_ELASTICSEARCH_URLS:-http://elasticsearch:9200} # 多地址逗号分隔
+      APP_ELASTICSEARCH_USERNAME: ${APP_ELASTICSEARCH_USERNAME:-}
+      APP_ELASTICSEARCH_PASSWORD: ${APP_ELASTICSEARCH_PASSWORD:-}
+      APP_MONGODB_ENABLE: ${APP_MONGODB_ENABLE:-false} # 段名 mongodb（旧名 APP_MONGO_* 不生效）
+      APP_MONGODB_URI: ${APP_MONGODB_URI:-mongodb://mongo:27017}
+      APP_MONGODB_DATABASE: ${APP_MONGODB_DATABASE:-photography}
+      APP_MONGODB_USERNAME: ${APP_MONGODB_USERNAME:-}
+      APP_MONGODB_PASSWORD: ${APP_MONGODB_PASSWORD:-}
       # 链路追踪两通道（各自独立，勿同开，否则同一请求产双 span/双上报）：
       # 通道① SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 直连 OAP:11800，
       #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_JAEGER_ENABLE 须为 false；
@@ -324,6 +323,7 @@ services:
       APP_NACOS_USERNAME: ${APP_NACOS_USERNAME:-}
       APP_NACOS_PASSWORD: ${APP_NACOS_PASSWORD:-}
       APP_NACOS_SERVICE_NAME: ${APP_NACOS_SERVICE_NAME:-photography-server}
+      APP_NACOS_REGISTER_IP: ${APP_NACOS_REGISTER_IP:-} # 注册 IP，留空自动探测（容器内为容器 IP）
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -336,20 +336,27 @@ services:
 
   # ===== Nacos 配置中心 + 注册中心（可选，APP_NACOS_ENABLE=true 时 backend 才会连接）=====
   # standalone 模式 + 内嵌 Derby 存储，开箱可用；数据卷持久化便于重启后保留配置与本地快照语义一致。
-  # 控制台 http://localhost:8848/nacos（默认账号 nacos/nacos，生产务必开启鉴权并改密）。
+  # v3 控制台为独立端口（容器内 8080，宿主经 NACOS_CONSOLE_PORT 访问）；v2 旧版控制台在 http://localhost:8848/nacos。
   # 客户端 SDK 走 gRPC：9848 = 8848+1000，映射端口必须保持该偏移关系。
+  # 鉴权三件套：NACOS_AUTH_ENABLE=true 时 TOKEN / IDENTITY_KEY / IDENTITY_VALUE 缺一即 exit 255
+  # （脚本报 "env NACOS_AUTH_IDENTITY_KEY must be set."）。IDENTITY 为服务端间识别头，standalone 也必填；
+  # Go 客户端不使用它们，连接只需 APP_NACOS_USERNAME/PASSWORD。
   nacos:
-    image: nacos/nacos-server:${NACOS_VERSION:-v2.3.2}
+    image: nacos/nacos-server:${NACOS_VERSION:-v3.2.4}
     container_name: photography-nacos
     environment:
       - MODE=standalone
       - NACOS_AUTH_ENABLE=${NACOS_AUTH_ENABLE:-false} # 开启后须同步设置 APP_NACOS_USERNAME/PASSWORD
+      - NACOS_AUTH_TOKEN=${NACOS_AUTH_TOKEN:-}
+      - NACOS_AUTH_IDENTITY_KEY=${NACOS_AUTH_IDENTITY_KEY:-serverIdentity}
+      - NACOS_AUTH_IDENTITY_VALUE=${NACOS_AUTH_IDENTITY_VALUE:-}
       - JVM_XMS=${NACOS_JVM_XMS:-256m}
       - JVM_XMX=${NACOS_JVM_XMX:-512m}
       - TZ=${TZ:-Asia/Shanghai}
     ports:
-      - "${NACOS_PORT:-8848}:8848"      # 控制台 / OpenAPI
+      - "${NACOS_PORT:-8848}:8848"      # OpenAPI（v2 控制台也在 8848/nacos）
       - "${NACOS_GRPC_PORT:-9848}:9848" # gRPC（客户端 SDK 实际连接端口）
+      - "${NACOS_CONSOLE_PORT:-8850}:8080" # v3 控制台（独立端口，勿用 8080 宿主位——backend 已占）
     restart: unless-stopped
     networks:
       - backend-net

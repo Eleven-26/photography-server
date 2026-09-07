@@ -82,3 +82,9 @@ nacos:
   password: "" # APP_NACOS_PASSWORD
   service_name: photography-server # APP_NACOS_SERVICE_NAME
   register_ip: "" # APP_NACOS_REGISTER_IP，留空自动探测
+  # 以下为 SDK 可调项：env（APP_NACOS_TIMEOUT_MS 等）能覆盖的前提是 key 存在于本文件
+  timeout_ms: 5000 # APP_NACOS_TIMEOUT_MS，请求超时
+  cache_dir: .nacos/cache # APP_NACOS_CACHE_DIR，本地快照目录
+  log_level: warn # APP_NACOS_LOG_LEVEL，SDK 自身日志级别
+  cluster_name: DEFAULT # APP_NACOS_CLUSTER_NAME，集群名
+  weight: 1 # APP_NACOS_WEIGHT，注册权重
