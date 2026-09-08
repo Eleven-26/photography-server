@@ -14,6 +14,7 @@
 #                                      服务端 identity 互信头（免登录兜底，等于管理员权限，
 #                                      仅限本地 dev；容器 NACOS_AUTH_IDENTITY_KEY/VALUE 同名透传）
 #   APP_NACOS_NAMESPACE / APP_NACOS_GROUP     命名空间（默认空=public）/ 分组（默认 DEFAULT_GROUP）
+#   APP_NACOS_APP_NAME                        “归属应用”元数据（默认 photography-server）
 #
 # 注意: 推送 = 用模板内容【整体覆盖】远端该 data_id；发布前确保模板已 git commit。
 
@@ -83,6 +84,7 @@ SERVER="${NACOS_PUBLISH_SERVER:-http://127.0.0.1:8848}"
 GROUP="${APP_NACOS_GROUP:-DEFAULT_GROUP}"
 NAMESPACE="${APP_NACOS_NAMESPACE:-}"
 DATA_ID="photography-server-${PROFILE}.yaml"
+APP_NAME="${APP_NACOS_APP_NAME:-photography-server}"   # Nacos 配置“归属应用”字段
 
 # ---- 鉴权：优先用户名密码登录，未配置时退化到 identity 互信头 ----
 AUTH_DESC="未配置鉴权"
@@ -111,6 +113,7 @@ echo "服务地址 : ${SERVER}"
 echo "data_id  : ${DATA_ID}"
 echo "group    : ${GROUP}"
 echo "命名空间 : ${NAMESPACE:-（public）}"
+echo "归属应用 : ${APP_NAME}"
 echo "模板文件 : ${FILE} ($(wc -c < "$FILE") bytes)"
 echo "鉴权方式 : ${AUTH_DESC}"
 
@@ -125,6 +128,7 @@ push_config() { # 推送请求；鉴权参数经 "$@" 展开（token 或 identit
     --data-urlencode "groupName=${GROUP}" \
     ${NAMESPACE:+--data-urlencode "namespaceId=${NAMESPACE}"} \
     --data-urlencode "type=yaml" \
+    --data-urlencode "appName=${APP_NAME}" \
     --data-urlencode "content@${CURL_FILE}" \
     "$@"
 }

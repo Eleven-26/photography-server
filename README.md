@@ -188,6 +188,18 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 
 启用步骤：`docker compose up -d nacos` → 控制台 `http://localhost:8850/`（v3 独立端口，默认 admin/nacos，开启鉴权后用 `.env` 里配置的账号）→ 按 `config/nacos/photography-server-<profile>.yaml` 模板新建 YAML 配置并发布 → 确认 `.env` 的 `APP_NACOS_SERVER_ADDR/USERNAME/PASSWORD` 后启动 backend（或整栈 `docker compose up -d`，nacos 为硬依赖会先起）。
 
+**配置推送脚本**（替代控制台手贴，模板即唯一来源）：
+
+```bash
+./scripts/nacos_publish.sh dev --dry-run   # 试运行：只校验模板与鉴权，不推送
+./scripts/nacos_publish.sh dev             # 推送 config/nacos/photography-server-dev.yaml
+./scripts/nacos_publish.sh prod            # 其他环境：docker.dev / test / prod
+```
+
+- 脚本自动加载项目根 `.env`：`NACOS_PUBLISH_SERVER`、`APP_NACOS_USERNAME/PASSWORD`、`APP_NACOS_IDENTITY_KEY/VALUE`（token 鉴权被拒时自动降级）、`APP_NACOS_NAMESPACE/GROUP`
+- 推送 = 用模板内容**整体覆盖**远端该 data_id（`type=yaml`，归属应用 `appName` 取 `APP_NACOS_APP_NAME`，默认 `photography-server`）；发布前确认模板已 git commit
+- 控制台新建配置时「归属应用」填同一个 `photography-server`，保持与脚本推送的元数据一致
+
 ## 接口约定
 
 - 统一响应：`{ "code": 0, "msg": "ok", "data": ... }`
