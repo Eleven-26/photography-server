@@ -308,7 +308,7 @@ services:
     volumes:
       # 本地仅挂 bootstrap（Nacos 连接信息）；业务配置 100% 来自 Nacos（data_id 按 APP_PROFILE 区分）
       - ${BACKEND_CONFIG_FILE:-./photography-server/config/config.yaml}:/app/config/config.yaml:ro
-      - ${UPLOADS_DIR:-./uploads}:/app/uploads
+      - ${UPLOADS_DIR:-./volume/uploads}:/app/uploads
       # SDK 本地快照持久化：容器重启后即使 Nacos 短暂不可用也可用快照兜底启动
       - ${NACOS_CLIENT_CACHE_DIR:-./volume/nacos-client/cache}:/app/.nacos/cache
     restart: unless-stopped
