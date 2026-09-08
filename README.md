@@ -103,6 +103,46 @@ make docker-up / docker-down / docker-build
 
 主要配置段（都在 Nacos 上管理）：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
 
+### 敏感配置加密（字段级 `ENCv1:`）
+
+Nacos 里可以放**全部**配置：敏感值以密文存放，启动时在内存解密，明文不落盘、不打日志、不进控制台明文展示。
+
+- 格式：`jwt.secret: "ENCv1:<base64(nonce|ciphertext|tag)>"`，算法 **AES-256-GCM**（自带完整性校验，篡改即 fail-fast）
+- 解密时机：`viper.Unmarshal` 之后对 `Config` 结构体递归解密（`internal/config/cipher.go`），非密文字段原样保留
+- 主密钥（KEK）**不进 Nacos**（解密 Nacos 配置需要它，存进去是死循环），只来自部署环境信任根：
+
+| 环境 | 密钥存放位置 | 说明 |
+|---|---|---|
+| 生产（推荐） | Docker/K8s secret 文件 | `APP_CONFIG_SECRET_FILE=/run/secrets/config_secret`，容器内只读挂载，不进镜像、不进 git |
+| 生产（次选） | 云 KMS / Vault | 后续可把 KEK 换成 KMS 解密调用，业务代码不变 |
+| 本地 dev | `.env` 的 `APP_CONFIG_SECRET` | `.env` 已 gitignore，禁止提交 |
+- 未配置密钥时解密功能关闭：dev 纯明文模板可正常启动；一旦模板里出现 `ENCv1:` 而缺密钥，启动即报错
+- 轮换：`APP_CONFIG_SECRET_PREV` 放旧密钥（只参与解密），新值用 `configctl encrypt` 重新加密后下线旧密钥，无需停机
+
+工具（不进主服务二进制）：
+
+```bash
+# 1) 生成主密钥并写进 .env（本地），生产请写入 secret 文件
+export APP_CONFIG_SECRET=$(go run ./cmd/configctl keygen 2>/dev/null)
+# 2) 单值加解密
+go run ./cmd/configctl encrypt -v '明文密码'          # 输出 ENCv1:... 贴进模板
+go run ./cmd/configctl decrypt -v 'ENCv1:...'        # 排障解密
+# 3) 整份模板批量加密（保留注释与格式）
+go run ./cmd/configctl encrypt-file -f config/nacos/photography-server-test.yaml
+# 4) 检查是否残留明文敏感值（CI 可挂；dev 模板刻意明文用 --warn-only）
+go run ./cmd/configctl check -f config/nacos/photography-server-prod.yaml
+go run ./cmd/configctl check -f config/nacos/photography-server-dev.yaml --warn-only
+```
+
+HTTP 入口（方便新增字段时在线生成密文，**只加密不解密**）：
+`POST /test/config/encrypt`，body `{"values":["明文1","明文2"]}` → `{"data":{"items":[{"cipher":"ENCv1:..."}]}}`。
+与既有 `/test/*` 一致，仅 dev/test 注册（生产不暴露）；生产环境新增字段用上面的 CLI 即可。
+
+当前加密状态：`dev` 模板保持明文（本地开发免密钥）；`docker.dev` / `test` / `prod` 已改为 `ENCv1` 密文。
+`scripts/nacos_publish.sh` 推送前会自动跑 `check`（dev 自动降为 warn-only，`SKIP_CHECK=1` 可跳过）。
+
+⚠️ **生产部署前置条件**：`prod` 模板里有 `ENCv1` 密文，**部署环境必须先配置 KEK**（`APP_CONFIG_SECRET_FILE` 或 `APP_CONFIG_SECRET`），否则服务启动 fail-fast。应急可直接用 `APP_MONGODB_URI` 等 env 覆盖（env 优先级最高）。
+
 ## Docker 部署
 ```bash
 # 把配置复制出来并修改成真实值

@@ -38,7 +38,7 @@ nats:
 
 mongodb:
   enable: false # APP_MONGODB_ENABLE
-  uri: mongodb://mongo:27017 # APP_MONGODB_URI
+  uri: "ENCv1:I/clIPB2p7+HNDTaU4VyQBR7MVQkxwCr8gKXOm8t5u8ZJf9v7tRJFnXnpR8fx/zktw==" # APP_MONGODB_URI
   database: photography # APP_MONGODB_DATABASE
   username: "" # APP_MONGODB_USERNAME
   password: "" # APP_MONGODB_PASSWORD

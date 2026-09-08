@@ -197,6 +197,13 @@ func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 	}
 	profile = strings.ToLower(profile)
 
+	// 主密钥（KEK）：来自 APP_CONFIG_SECRET_FILE / APP_CONFIG_SECRET，不进 Nacos、不进 git。
+	// 未配置时不启用解密（dev 明文模板可正常启动）；配置中没有 ENCv1 密文也不会用到它。
+	cipher, err := LoadCipher()
+	if err != nil {
+		return nil, err
+	}
+
 	v := viper.New()
 	v.SetConfigFile(basePath)
 	if err := v.ReadInConfig(); err != nil {
@@ -242,6 +249,10 @@ func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 
 	var c Config
 	if err := v.Unmarshal(&c); err != nil {
+		return nil, err
+	}
+	// 敏感字段解密：ENCv1 密文 → 内存明文（就地替换，不回写、不落盘、不打日志）
+	if err := DecryptSecrets(cipher, &c); err != nil {
 		return nil, err
 	}
 	if c.App.Port == 0 {

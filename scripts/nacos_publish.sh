@@ -59,8 +59,7 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 PROFILE="${1:?用法: nacos_publish.sh <dev|docker.dev|test|prod> [--dry-run]}"
-DRY_RUN="${2:-}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DRY_RUN="${2:-}"SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILE="${SCRIPT_DIR}/../config/nacos/photography-server-${PROFILE}.yaml"
 
 # Windows 原生 curl（C:\Windows\System32\curl.exe，Git Bash 下常见 PATH 命中它）
@@ -120,6 +119,16 @@ echo "鉴权方式 : ${AUTH_DESC}"
 if [ "$DRY_RUN" = "--dry-run" ]; then
   echo "（--dry-run 未实际推送）"
   exit 0
+fi
+
+# 推送前校验：模板不得残留明文敏感值（dev 模板刻意保留明文 → --warn-only）
+if [ "${SKIP_CHECK:-}" != "1" ] && command -v go >/dev/null 2>&1; then
+  CHECK_FLAG=""
+  [ "$PROFILE" = "dev" ] && CHECK_FLAG="--warn-only"
+  if ! (cd "${SCRIPT_DIR}/.." && go run ./cmd/configctl check -f "$CURL_FILE" $CHECK_FLAG); then
+    echo "❌ 模板含明文敏感值，已阻止推送（先跑 encrypt-file 加密，或 SKIP_CHECK=1 跳过校验）"
+    exit 1
+  fi
 fi
 
 push_config() { # 推送请求；鉴权参数经 "$@" 展开（token 或 identity 头）

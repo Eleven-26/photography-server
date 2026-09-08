@@ -12,15 +12,15 @@ app:
   timezone: Asia/Shanghai
 
 jwt:
-  secret: dev-secret-1234567890
+  secret: "ENCv1:xvrLWIThdYyIVIa7EZupM13tJx/3/1i6WW5mjWPzbCFtuKdwJGguHDo5sD8h0JCqng=="
   issuer: photography-server
   expire_hours: 168
 
 db:
   host: mysql-dev
   port: 3306
-  user: root
-  password: root
+  user: "ENCv1:7nQ4E38XXUMDmgNp8Y32jz8Npn5lUbWU9d2mrnCUHi0="
+  password: "ENCv1:Ku5giYRwwghv0tSJdDHnAaAq4y/pmGVH+cX8U6HqRqE="
   name: photography
   charset: utf8mb4
   max_idle_conns: 10
@@ -37,7 +37,7 @@ nats:
 
 mongodb:
   enable: true
-  uri: mongodb://mongodb-dev:27017
+  uri: "ENCv1:+plOLK5ZmqPzL2XgPSq6onnNCCWfDwYQZGFrTnnjJClEKqRKeOF6confi619GejjRBapvkB7VQ=="
   database: photography
   username: ""
   password: ""
@@ -52,7 +52,7 @@ upload:
 xxljob:
   enable: true
   server_addr: http://xxl-job-admin-dev:9100 # xxl-job 地址
-  access_token: default_token # 确保与容器创建时一致
+  access_token: "ENCv1:NTK1u4srDibink7p+3FpC53F22Hh6drqah++qZ6aIdvbiOqJiYEqfTc=" # 确保与容器创建时一致
   executor_ip: photography-server-skywalking-dev # 注册回调的 go 程序容器名
   executor_port: "9999"
   registry_key: photography-server # 需到 Admin 后台执行器管理手动添加同名 AppName

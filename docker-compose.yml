@@ -286,6 +286,11 @@ services:
       APP_REDIS_ADDR: ${APP_REDIS_ADDR:-redis:6379} # redis.addr 为单字段 host:port（旧名 APP_REDIS_HOST/PORT 不生效）
       APP_NATS_URL: ${APP_NATS_URL:-nats://nats:4222}
       APP_JWT_SECRET: ${APP_JWT_SECRET}   # 必须从 .env 读取
+      # 配置密文主密钥（KEK）：解密 Nacos 模板里的 ENCv1: 密文。不能存 Nacos（自举死循环）。
+      # 生产更推荐文件方式：把密钥写入 secrets/config_secret（已 gitignore），
+      # 再挂 secrets 并改设 APP_CONFIG_SECRET_FILE: /run/secrets/config_secret
+      APP_CONFIG_SECRET: ${APP_CONFIG_SECRET:-}
+      APP_CONFIG_SECRET_PREV: ${APP_CONFIG_SECRET_PREV:-}   # 仅密钥轮换期使用（只解密）
       APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-warn}
       APP_XXLJOB_ENABLE: ${APP_XXLJOB_ENABLE:-true}

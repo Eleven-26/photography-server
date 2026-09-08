@@ -252,6 +252,8 @@ func registerDebug(g *gin.RouterGroup, ctl *controller.Controller) {
 	t.POST("/mongo/delete-by-id", ctl.MongoDeleteByID)
 	t.POST("/jaeger/status", ctl.JaegerStatus)
 	t.POST("/jaeger/trace", ctl.JaegerTrace)
+	// 配置密文生成（只加密不解密，未挂业务鉴权，仅非 release 注册）
+	t.POST("/config/encrypt", ctl.ConfigEncrypt)
 
 	t.POST("/test", ctl.Test)
 }

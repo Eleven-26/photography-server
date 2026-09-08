@@ -14,15 +14,15 @@ app:
   timezone: Asia/Shanghai
 
 jwt:
-  secret: test-secret-abcdef-9876543210
+  secret: "ENCv1:0nc7MRuGb1X0Ne8KOT0O0EwoM11qjGBLGySqZBATSuRWPJLOeSEFCslPRtclpOGdWnqs4GWOd04h"
   issuer: photography-server
   expire_hours: 168
 
 db:
   host: test-db # APP_DB_HOST 可覆盖
   port: 3306
-  user: root
-  password: test123456
+  user: "ENCv1:xmV63ATfDAg9xeuViXg0PqfaGWoQrmA8dfB049IrQvE="
+  password: "ENCv1:a/vg6TPIUitfFBdc+XK6Sfh4FIUwU2czCrfKfGdGYGeNB+YY//Q="
   name: photography
   charset: utf8mb4
   max_idle_conns: 10
@@ -39,7 +39,7 @@ nats:
 
 mongodb:
   enable: true
-  uri: mongodb://test-mongo:27017
+  uri: "ENCv1:YLCZxMFcgYwjdVymnDvwyp6pDZW9PREolbRQdnbnJS8Nc7cjGC0angApINQfUq2gL4Bv2zlb"
   database: photography
   username: ""
   password: ""
