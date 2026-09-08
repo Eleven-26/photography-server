@@ -221,7 +221,11 @@ func LoadWithFetcher(basePath, profile string, fetch Fetcher) (*Config, error) {
 		n := boot.Nacos.withDefaults(profile)
 		content, err := fetch(n)
 		if err != nil {
-			return nil, fmt.Errorf("拉取 Nacos 配置失败（data_id=%s group=%s）: %w", n.DataId, n.Group, err)
+			msg := fmt.Sprintf("拉取 Nacos 配置失败（data_id=%s group=%s）: %v", n.DataId, n.Group, err)
+			if n.Username == "" {
+				msg += "；当前 nacos.username 为空——服务端开启鉴权时请用 APP_NACOS_USERNAME/APP_NACOS_PASSWORD 注入（本地运行用 make run-dev 自动加载 .env）"
+			}
+			return nil, errors.New(msg)
 		}
 		if strings.TrimSpace(content) == "" {
 			return nil, fmt.Errorf("远端配置为空（data_id=%s group=%s），请检查 Nacos 控制台是否已发布该配置", n.DataId, n.Group)

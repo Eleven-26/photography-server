@@ -98,7 +98,8 @@ make docker-up / docker-down / docker-build
 - 环境差异全部体现在 Nacos 上不同的 data_id（`photography-server-<profile>.yaml`，模板见 `config/nacos/`）
 - 远程未发布的 key 即零值（仅 `app.port` / `jwt.expire_hours` / `upload.max_size_mb` 有代码兜底）；prod 下 `APP_JWT_SECRET` / `APP_DB_*` 仍强制 env 注入校验
 - 变量命名规则：`APP_` + 段名_键名（`db.host`→`APP_DB_HOST`、`mongodb.*`→`APP_MONGODB_*`、`redis.addr`→`APP_REDIS_ADDR`、`app.mode`→`APP_APP_MODE`；回归测试见 `internal/config/env_mapping_test.go`）
-- 示例：`go run ./cmd/server -c config/config.yaml -p dev`（需先本地起 Nacos 并发布 `photography-server-dev.yaml`）
+- 本地运行：`make run-dev`（**推荐**，自动 `source .env` 后以 `-p dev` 启动）；裸 `go run` 不会读 `.env`，Nacos 开鉴权时会因 `nacos.username` 为空报 `401 User not found`
+  - 等价手工命令：`set -a && . ./.env && set +a && go run ./cmd/server -c config/config.yaml -p dev`（需先本地起 Nacos 并发布 `photography-server-dev.yaml`）
 
 主要配置段（都在 Nacos 上管理）：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
 

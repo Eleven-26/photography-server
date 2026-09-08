@@ -15,7 +15,11 @@ nacos:
   namespace: "" # 留空 = public
   group: DEFAULT_GROUP
   data_id: photography-server-${profile}.yaml # ${profile} 自动替换为 dev/test/prod
-  username: "" # 服务端开启鉴权（NACOS_AUTH_ENABLE=true）时必填
+  # 开启鉴权（NACOS_AUTH_ENABLE=true）时必填，留空会导致拉取配置 401 "User not found"。
+  # 生产由 docker compose 从 .env 注入 APP_NACOS_USERNAME/PASSWORD；
+  # 本地运行用 `make run-dev`（自动 source .env）。
+  # goland启动的配置：Environmengts
+  username: ""
   password: ""
   service_name: photography-server # 注册到 Nacos 的服务名
   register_ip: "" # 留空自动探测本机 IP
