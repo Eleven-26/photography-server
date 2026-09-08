@@ -96,7 +96,8 @@ make docker-up / docker-down / docker-build
 - 环境选择：启动参数 `-p dev|test|prod`，或环境变量 `APP_PROFILE`（默认 dev）——只决定 data_id 中的 `${profile}` 占位
 - 优先级：`APP_*` 环境变量 > Nacos 远程配置 > 本地 bootstrap
 - 环境差异全部体现在 Nacos 上不同的 data_id（`photography-server-<profile>.yaml`，模板见 `config/nacos/`）
-- 远程未发布的 key 即零值（仅 `app.port` / `jwt.expire_hours` / `upload.max_size_mb` 有代码兜底）；prod 下 `APP_JWT_SECRET` / `APP_DB_*` 仍强制 env 注入校验
+- 远程未发布的 key 即零值（仅 `app.port` / `jwt.expire_hours` / `upload.max_size_mb` 有代码兜底）；prod 下 `jwt.secret` / `db.host` / `db.user` / `db.password` 缺失仍 fail-fast
+- **`.env` 只剩 4 类变量**（业务配置一律不进 `.env`）：① compose 基础设施变量（镜像版本/端口/数据卷/中间件容器自身配置）② Nacos 连接自举信息 `APP_NACOS_*` ③ 密文主密钥 `APP_CONFIG_SECRET*` ④ `APP_PROFILE`
 - 变量命名规则：`APP_` + 段名_键名（`db.host`→`APP_DB_HOST`、`mongodb.*`→`APP_MONGODB_*`、`redis.addr`→`APP_REDIS_ADDR`、`app.mode`→`APP_APP_MODE`；回归测试见 `internal/config/env_mapping_test.go`）
 - 本地运行：`make run-dev`（**推荐**，自动 `source .env` 后以 `-p dev` 启动）；裸 `go run` 不会读 `.env`，Nacos 开鉴权时会因 `nacos.username` 为空报 `401 User not found`
   - 等价手工命令：`set -a && . ./.env && set +a && go run ./cmd/server -c config/config.yaml -p dev`（需先本地起 Nacos 并发布 `photography-server-dev.yaml`）
@@ -188,7 +189,7 @@ docker compose up -d --build
 | clickhouse | 9000 | 链路追踪存储②（Jaeger 数据落库） |
 | nacos | 8848 / 9848 | 配置中心/注册中心（控制台 / SDK gRPC，9848=8848+1000 不可改） |
 
-后端容器内通过 `APP_*` 环境变量注入连接信息（见 `docker-compose.yml`），数据源均指向 compose 服务名。
+后端容器的**业务配置**（db/redis/nats/mongodb/elasticsearch/xxljob/jwt/upload/log/jaeger）全部来自 Nacos，不再用 `APP_*` 环境变量注入，连接地址在 Nacos 模板里指向 compose 服务名；容器 env 只保留 `APP_PROFILE` + `APP_NACOS_*`（连接自举）+ `APP_CONFIG_SECRET*`（密文主密钥）。
 
 ### 链路追踪（两通道各自独立）
 
@@ -197,7 +198,7 @@ docker compose up -d --build
 | 通道 | 数据形态 | 启用方式 | 查看 |
 |---|---|---|---|
 | ① SkyWalking-go(native) | agent 编译期注入，直连 OAP:11800 | `.env` 设 `SW_AGENT_ENABLE=true` 构建（不注入 agent 则本通道不生效）；运行期无开关 | Horizon「原生」数据源 + 拓扑/指标 |
-| ② OTel→Jaeger | OTLP → jaeger(collector+query 一体) → **ClickHouse**（v2.18.0 官方原生存储，alpha） | `.env` 设 `APP_JAEGER_ENABLE=true`、`APP_JAEGER_ENDPOINT=jaeger:4317`，**不注入 agent** | Jaeger UI :16686，**按 trace_id 精确检索** |
+| ② OTel→Jaeger | OTLP → jaeger(collector+query 一体) → **ClickHouse**（v2.18.0 官方原生存储，alpha） | Nacos 配置里设 `jaeger.enable: true`、`jaeger.endpoint: jaeger:4317`（应急可用 `APP_JAEGER_*` env 覆盖），**不注入 agent** | Jaeger UI :16686，**按 trace_id 精确检索** |
 
 > `APP_JAEGER_*` 对应配置段 `jaeger.*`（OTel exporter 开关/地址）。通道②的 compose 服务：`docker compose up -d clickhouse jaeger`（先拷 `config/jaeger.example.yaml` → `./jaeger/config.yaml`）；ClickHouse 建库由 `CLICKHOUSE_DB=jaeger` 自动完成，Jaeger 侧 `create_schema: true` 自动建表。数据保留用 ClickHouse TTL（jaeger 配置 `ttl`）。
 
@@ -233,13 +234,17 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 
 ```bash
 ./scripts/nacos_publish.sh dev --dry-run   # 试运行：只校验模板与鉴权，不推送
+./scripts/nacos_publish.sh dev --diff      # 对比本地模板 vs 远端（不推送）
+./scripts/nacos_publish.sh dev --pull      # 反向同步：远端内容拉回本地模板（自动备份 .bak）
 ./scripts/nacos_publish.sh dev             # 推送 config/nacos/photography-server-dev.yaml
-./scripts/nacos_publish.sh prod            # 其他环境：docker.dev / test / prod
+./scripts/nacos_publish.sh prod --force    # 远端与本地不一致时强制覆盖
 ```
 
 - 脚本自动加载项目根 `.env`：`NACOS_PUBLISH_SERVER`、`APP_NACOS_USERNAME/PASSWORD`、`APP_NACOS_IDENTITY_KEY/VALUE`（token 鉴权被拒时自动降级）、`APP_NACOS_NAMESPACE/GROUP`
-- 推送 = 用模板内容**整体覆盖**远端该 data_id（`type=yaml`，归属应用 `appName` 取 `APP_NACOS_APP_NAME`，默认 `photography-server`）；发布前确认模板已 git commit
+- 推送 = 用模板内容**整体覆盖**远端该 data_id（`type=yaml`，归属应用 `appName` 取 `APP_NACOS_APP_NAME`，默认 `photography-server`）；同一模板反复推送结果一致（幂等）
+- **防覆盖保护**：推送前比对 md5，远端已存在且与本地不一致时拒绝推送并提示（`--diff` 看差异 / `--pull` 保留远端 / `--force` 确认覆盖）
 - 控制台新建配置时「归属应用」填同一个 `photography-server`，保持与脚本推送的元数据一致
+- **真源二选一**：推荐以本地模板为准（可 git review + 推送前自动 check 明文）；若在控制台直接改，务必 `--pull` 拉回本地再提交 git，否则下次推送会覆盖丢失
 
 ## 接口约定
 

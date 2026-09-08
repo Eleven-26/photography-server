@@ -3,9 +3,19 @@
 # nacos_publish.sh — 把 config/nacos/photography-server-<profile>.yaml 推送到 Nacos
 #
 # 用法:
-#   ./scripts/nacos_publish.sh <profile> [--dry-run]
+#   ./scripts/nacos_publish.sh <profile> [模式] [--force]
 #   profile: dev | docker.dev | test | prod（即 config/nacos/ 下模板的 data_id 后缀）
-#   --dry-run: 只校验模板存在与鉴权通道，不实际推送
+#   模式（三选一，缺省=推送）:
+#     （缺省）    推送：用本地模板【整体覆盖】远端该 data_id
+#     --dry-run  只校验模板存在与鉴权通道，不实际推送
+#     --diff     对比本地模板与远端内容（不推送），用于判断控制台是否被人改过
+#     --pull     反向同步：把远端内容拉回本地模板（覆盖前自动备份 <file>.bak）
+#   --force: 远端与本地不一致时强制覆盖（默认拒绝并提示，避免控制台改动被静默覆盖）
+#
+# 推送语义：整份覆盖，不是增量合并；同一份模板反复推送结果一致（幂等）。
+# 所以本地模板与 Nacos 只能有一个真源。推荐以本地模板为准（可 git review + CI 校验）：
+#   改配置 → 改 config/nacos/photography-server-<profile>.yaml → 跑本脚本 → 重启服务
+# 若在控制台直接改过，请跑 --pull 拉回本地并提交 git，否则下次推送会把控制台改动覆盖掉。
 #
 # 环境变量（建议写进 .env，脚本会自动加载；真实密码勿提交 git）:
 #   NACOS_PUBLISH_SERVER               Nacos 地址，默认 http://127.0.0.1:8848
@@ -20,9 +30,9 @@
 
 # cd /d/www/photography-server
 
+# 示例
 # ./scripts/nacos_publish.sh dev --dry-run   # 先试运行（只校验不推送）
 # ./scripts/nacos_publish.sh dev             # 实际推送 dev 配置
-# ./scripts/nacos_publish.sh prod            # 其他环境同理：docker.dev / test / prod
 
 # 配置变更需重启服务生效（无热更）。
 set -euo pipefail
@@ -48,19 +58,34 @@ if [ -f "$ENV_FILE" ]; then
     v="$(trim "$v")"
     if [ -z "${!k:-}" ]; then export "$k=$v"; LOADED_KEYS="${LOADED_KEYS:-}${k} "; fi
   done < "$ENV_FILE"
-  # dry-run 时输出从 .env 加载到的变量名（仅 key 不含值），便于排查 .env 编码/拼写问题
-  if [ "${2:-}" = "--dry-run" ] || [ "${1:-}" = "--dry-run" ]; then
+  # dry-run / diff 时输出从 .env 加载到的变量名（仅 key 不含值），便于排查 .env 编码/拼写问题
+  case " $* " in *" --dry-run "*|*" --diff "*|*" --pull "*)
     if [ -n "${LOADED_KEYS:-}" ]; then
-      echo "（.env 已加载变量: ${LOADED_KEYS% }）"
+      echo "（.env 已加载的 Nacos 相关变量: $(printf '%s' "${LOADED_KEYS% }" | tr ' ' '\n' | grep -E 'NACOS|CONFIG_SECRET' | tr '\n' ' ')）"
     else
       echo "（⚠️ .env 存在但未解析到任何变量——检查文件编码是否为 UTF-8（非 UTF-16/BOM）、变量名拼写、以及是否以 KEY=VALUE 格式书写）"
     fi
-  fi
+  esac
 fi
 
-PROFILE="${1:?用法: nacos_publish.sh <dev|docker.dev|test|prod> [--dry-run]}"
-DRY_RUN="${2:-}"SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROFILE="${1:?用法: nacos_publish.sh <dev|docker.dev|test|prod> [--dry-run|--diff|--pull] [--force]}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILE="${SCRIPT_DIR}/../config/nacos/photography-server-${PROFILE}.yaml"
+
+# 模式解析（bash 中 VAR="x"VAR2="y" 会被并成一个赋值，务必分行写）
+MODE="push"
+FORCE="no"
+shift
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) MODE="dry-run" ;;
+    --diff)    MODE="diff" ;;
+    --pull)    MODE="pull" ;;
+    --force)   FORCE="yes" ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    *) echo "❌ 未知参数: $arg（支持 --dry-run / --diff / --pull / --force）"; exit 1 ;;
+  esac
+done
 
 # Windows 原生 curl（C:\Windows\System32\curl.exe，Git Bash 下常见 PATH 命中它）
 # 不认 MSYS 路径（/d/...），读文件参数会报 "error encountered when reading a file"。
@@ -115,10 +140,103 @@ echo "命名空间 : ${NAMESPACE:-（public）}"
 echo "归属应用 : ${APP_NAME}"
 echo "模板文件 : ${FILE} ($(wc -c < "$FILE") bytes)"
 echo "鉴权方式 : ${AUTH_DESC}"
+echo "执行模式 : ${MODE}$([ "$FORCE" = "yes" ] && echo ' + --force')"
 
-if [ "$DRY_RUN" = "--dry-run" ]; then
+# ---- 远端读取（--diff / --pull / 推送前一致性校验都依赖它）----
+pull_config() { # GET 远端配置；鉴权参数经 "$@" 展开（token 或 identity 头）
+  curl -s --noproxy '*' -G "${SERVER}/nacos/v3/admin/cs/config" \
+    --data-urlencode "dataId=${DATA_ID}" \
+    --data-urlencode "groupName=${GROUP}" \
+    ${NAMESPACE:+--data-urlencode "namespaceId=${NAMESPACE}"} \
+    "$@"
+}
+
+# 取远端正文：优先 python 精确解析 JSON（含 \n \" 转义），失败退化为 sed
+remote_content() {
+  local body="$1" out=""
+  if command -v python >/dev/null 2>&1; then
+    out="$(printf '%s' "$body" | python -c 'import sys,json
+try:
+    print(json.load(sys.stdin).get("data",{}).get("content",""),end="")
+except Exception:
+    pass' 2>/dev/null)"
+  fi
+  if [ -z "$out" ]; then
+    out="$(printf '%s' "$body" | sed -n 's/.*"content":"\(.*\)"}$/\1/p' | sed -e 's/\\n/\n/g' -e 's/\\"/"/g')"
+  fi
+  printf '%s\n' "$out"
+}
+remote_md5() { printf '%s' "$1" | sed -n 's/.*"md5":"\([^"]*\)".*/\1/p'; }
+# 行尾归一化后取 md5：本机工作区 LF、远端历史内容可能是 CRLF（curl 推送原样保存），
+# 直接比 Nacos 返回的 md5 会因行尾差异永远不等，故统一去掉 \r 再比。
+norm_md5() { tr -d '\r' | md5sum | awk '{print $1}'; }
+
+LOCAL_MD5="$(norm_md5 < "$FILE")"
+REMOTE_BODY=""
+fetch_remote() { REMOTE_BODY="$(pull_config "${AUTH_ARGS[@]}")"; }
+
+# ---- 模式：--diff（只看差异，不写任何东西）----
+if [ "$MODE" = "diff" ]; then
+  fetch_remote
+  RMD5="$(remote_md5 "$REMOTE_BODY")"
+  if [ -z "$RMD5" ]; then
+    echo "❌ 远端不存在该配置或读取失败: ${DATA_ID}"
+    echo "   响应: $(printf '%s' "$REMOTE_BODY" | head -c 200)"
+    exit 1
+  fi
+  REMOTE_MD5="$(remote_content "$REMOTE_BODY" | norm_md5)"
+  if [ "$REMOTE_MD5" = "$LOCAL_MD5" ]; then
+    echo "✅ 本地模板与远端完全一致（内容一致；Nacos 原始 md5=${RMD5}）"
+    exit 0
+  fi
+  echo "⚠️ 本地模板与远端不一致：本地 md5=${LOCAL_MD5} / 远端 md5=${REMOTE_MD5}（已忽略行尾差异）"
+  # 用进程替换直接对比，不落临时文件（本机 rm 被安全策略包装，避免误伤）
+  if command -v diff >/dev/null 2>&1; then
+    diff -u <(tr -d '\r' < "$FILE") <(remote_content "$REMOTE_BODY" | tr -d '\r') || true
+    echo "（diff -u 本地 → 远端：- 本地行 / + 远端行）"
+  fi
+  echo "→ 想保留控制台改动: $0 $PROFILE --pull"
+  echo "→ 想以本地模板为准: $0 $PROFILE --force"
+  exit 0
+fi
+
+# ---- 模式：--pull（远端 → 本地，覆盖前备份）----
+if [ "$MODE" = "pull" ]; then
+  fetch_remote
+  RMD5="$(remote_md5 "$REMOTE_BODY")"
+  if [ -z "$RMD5" ]; then
+    echo "❌ 远端不存在该配置或读取失败: ${DATA_ID}（响应: $(printf '%s' "$REMOTE_BODY" | head -c 200)）"
+    exit 1
+  fi
+  REMOTE_MD5="$(remote_content "$REMOTE_BODY" | norm_md5)"
+  if [ "$REMOTE_MD5" = "$LOCAL_MD5" ]; then
+    echo "✅ 与远端一致，无需拉取（内容一致；Nacos 原始 md5=${RMD5}）"
+    exit 0
+  fi
+  cp "$FILE" "${FILE}.bak"
+  remote_content "$REMOTE_BODY" > "$FILE"
+  echo "✅ 已拉取远端内容覆盖本地模板（原文件备份: ${FILE}.bak）"
+  echo "   远端 md5=${RMD5}；请 review 差异后提交 git"
+  exit 0
+fi
+
+if [ "$MODE" = "dry-run" ]; then
   echo "（--dry-run 未实际推送）"
   exit 0
+fi
+
+# ---- 推送前一致性校验：远端已存在且与本地不同 → 拒绝覆盖 ----
+fetch_remote
+RMD5="$(remote_md5 "$REMOTE_BODY")"
+REMOTE_MD5=""
+[ -n "$RMD5" ] && REMOTE_MD5="$(remote_content "$REMOTE_BODY" | norm_md5)"
+if [ -n "$REMOTE_MD5" ] && [ "$REMOTE_MD5" != "$LOCAL_MD5" ] && [ "$FORCE" != "yes" ]; then
+  echo "❌ 远端已存在且内容与本地模板不一致（远端 md5=${REMOTE_MD5} / 本地 md5=${LOCAL_MD5}）"
+  echo "   推送 = 整体覆盖，会丢掉远端当前内容。"
+  echo "   查看差异: $0 $PROFILE --diff"
+  echo "   保留远端: $0 $PROFILE --pull"
+  echo "   确认覆盖: $0 $PROFILE --force"
+  exit 1
 fi
 
 # 推送前校验：模板不得残留明文敏感值（dev 模板刻意保留明文 → --warn-only）

@@ -276,50 +276,25 @@ services:
       nacos:
         condition: service_started
     environment:
-      APP_APP_MODE: ${APP_APP_MODE:-release} # app.mode（viper 段名拼接：段 app + 键 mode；旧名 APP_MODE 不生效）
-      APP_PROFILE: ${APP_PROFILE:-prod}
-      APP_DB_HOST: ${APP_DB_HOST:-mysql}
-      APP_DB_PORT: ${APP_DB_PORT:-3306}
-      APP_DB_USER: ${APP_DB_USER:-root}
-      APP_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # 复用 MySQL 密码
-      APP_DB_NAME: ${APP_DB_NAME:-photography}
-      APP_REDIS_ADDR: ${APP_REDIS_ADDR:-redis:6379} # redis.addr 为单字段 host:port（旧名 APP_REDIS_HOST/PORT 不生效）
-      APP_NATS_URL: ${APP_NATS_URL:-nats://nats:4222}
-      APP_JWT_SECRET: ${APP_JWT_SECRET}   # 必须从 .env 读取
+      # 【业务配置一律不在容器 env 里】app.mode / jwt.* / db.* / redis.* / nats.* / mongodb.* /
+      # log.* / upload.* / xxljob.* / elasticsearch.* / jaeger.* 100% 来自 Nacos：
+      # data_id=photography-server-${APP_PROFILE}.yaml（模板见 config/nacos/，未发布则 fail-fast）。
+      # 排障时临时加回 APP_* 环境变量即可覆盖（viper env 优先级最高），用完删掉。
+      APP_PROFILE: ${APP_PROFILE:-prod}   # 决定拉取哪个 data_id（自举变量，必须保留）
       # 配置密文主密钥（KEK）：解密 Nacos 模板里的 ENCv1: 密文。不能存 Nacos（自举死循环）。
       # 生产更推荐文件方式：把密钥写入 secrets/config_secret（已 gitignore），
       # 再挂 secrets 并改设 APP_CONFIG_SECRET_FILE: /run/secrets/config_secret
       APP_CONFIG_SECRET: ${APP_CONFIG_SECRET:-}
       APP_CONFIG_SECRET_PREV: ${APP_CONFIG_SECRET_PREV:-}   # 仅密钥轮换期使用（只解密）
-      APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
-      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-warn}
-      APP_XXLJOB_ENABLE: ${APP_XXLJOB_ENABLE:-true}
-      APP_XXLJOB_SERVER_ADDR: ${APP_XXLJOB_SERVER_ADDR:-http://xxl-job-admin:8080}
-      APP_XXLJOB_ACCESS_TOKEN: ${XXLJOB_ACCESS_TOKEN:-}
-      APP_XXLJOB_EXECUTOR_IP: ${APP_XXLJOB_EXECUTOR_IP:-127.0.0.1}
-      APP_XXLJOB_EXECUTOR_PORT: ${APP_XXLJOB_EXECUTOR_PORT:-"9999"}
-      APP_XXLJOB_REGISTRY_KEY: ${APP_XXLJOB_REGISTRY_KEY:-photography-server}
-      APP_XXLJOB_LOG_DIR: ${APP_XXLJOB_LOG_DIR:-/app/logs/xxl-job}
-      APP_ELASTICSEARCH_ENABLE: ${APP_ELASTICSEARCH_ENABLE:-false} # 段名 elasticsearch（旧名 APP_ES_* 不生效）
-      APP_ELASTICSEARCH_URLS: ${APP_ELASTICSEARCH_URLS:-http://elasticsearch:9200} # 多地址逗号分隔
-      APP_ELASTICSEARCH_USERNAME: ${APP_ELASTICSEARCH_USERNAME:-}
-      APP_ELASTICSEARCH_PASSWORD: ${APP_ELASTICSEARCH_PASSWORD:-}
-      APP_MONGODB_ENABLE: ${APP_MONGODB_ENABLE:-false} # 段名 mongodb（旧名 APP_MONGO_* 不生效）
-      APP_MONGODB_URI: ${APP_MONGODB_URI:-mongodb://mongo:27017}
-      APP_MONGODB_DATABASE: ${APP_MONGODB_DATABASE:-photography}
-      APP_MONGODB_USERNAME: ${APP_MONGODB_USERNAME:-}
-      APP_MONGODB_PASSWORD: ${APP_MONGODB_PASSWORD:-}
+      # 以下业务段（xxljob / elasticsearch / mongodb / jaeger）已从 env 摘除，全部由 Nacos 提供，
+      # 勿再加回，避免两处配置漂移。
       # 链路追踪两通道（各自独立，勿同开，否则同一请求产双 span/双上报）：
       # 通道① SkyWalking-go（native）：SW_AGENT_ENABLE=true 构建注入 agent 后生效，agent 直连 OAP:11800，
-      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 APP_JAEGER_ENABLE 须为 false；
-      # 通道② OTel→Jaeger（复用 OTL 埋点，不注入 agent）：APP_JAEGER_ENABLE=true 且 endpoint=jaeger:4317，
-      #   数据落 ClickHouse（compose 内 clickhouse+jaeger 服务），Jaeger UI(:16686) 按 trace_id 精确检索。
-      # APP_JAEGER_* 对应 config 的 jaeger 段（OTel exporter 开关/地址）。
-      APP_JAEGER_ENABLE: ${APP_JAEGER_ENABLE:-false}
-      APP_JAEGER_ENDPOINT: ${APP_JAEGER_ENDPOINT:-jaeger:4317}
-      APP_JAEGER_SERVICE: ${APP_JAEGER_SERVICE:-photography-server}
-      APP_JAEGER_INSTANCE: ${APP_JAEGER_INSTANCE:-}
-      # Nacos 配置中心 + 注册中心（enable=true 时本地 yaml 退化为 bootstrap，业务配置从 Nacos 拉取）
+      #   数据进 native 模块（Horizon「原生」模式 + 拓扑/指标分析）；此时 jaeger.enable 须为 false；
+      # 通道② OTel→Jaeger（复用 OTel 埋点，不注入 agent）：Nacos 里 jaeger.enable=true 且
+      #   endpoint=jaeger:4317，数据落 ClickHouse，Jaeger UI(:16686) 按 trace_id 精确检索。
+      #   应急覆盖仍可用 APP_JAEGER_*（对应 config 的 jaeger 段）。
+      # Nacos 配置中心 + 注册中心：本地 yaml 只是 bootstrap，业务配置 100% 从 Nacos 拉取（无开关）
       APP_NACOS_SERVER_ADDR: ${APP_NACOS_SERVER_ADDR:-nacos:8848}
       APP_NACOS_NAMESPACE: ${APP_NACOS_NAMESPACE:-}
       APP_NACOS_GROUP: ${APP_NACOS_GROUP:-DEFAULT_GROUP}

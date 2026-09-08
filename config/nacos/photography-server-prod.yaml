@@ -1,10 +1,11 @@
 # ============================================================
 # Nacos 发布模板：data_id=photography-server-prod.yaml group=DEFAULT_GROUP
 # 本文件是 Nacos 控制台内容的版本化镜像，修改后需到控制台同步发布（重启生效）。
-# 安全基线（config.Load 校验，prod 缺失即启动失败）：
-#   APP_JWT_SECRET / APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 必须经环境变量注入，
-#   不得为空或默认弱值；密钥类配置也可发布到 Nacos（控制台有鉴权），env 仍可覆盖。
-# 敏感项在远程配置中留空占位，实际值经 APP_* env 注入。
+# 本环境为【全量配置】：业务配置（含敏感项）全部在此，容器不再注入 APP_DB_*/APP_JWT_SECRET 等
+# 业务变量（.env 只保留 compose 基础设施变量 + Nacos 连接信息 + 密文主密钥 KEK）。
+# 敏感值已用 ENCv1: 密文落地（AES-256-GCM，密钥来自 APP_CONFIG_SECRET[_FILE]，不存 Nacos）。
+# 安全基线（config.Load 校验，prod 缺失即启动失败）：jwt.secret / db.host / db.user / db.password
+# 不得为空或默认弱值——现在由本文件的密文提供；排障时仍可用 APP_* env 临时覆盖（优先级最高）。
 # ============================================================
 
 app:
@@ -13,15 +14,15 @@ app:
   timezone: Asia/Shanghai
 
 jwt:
-  secret: "" # 必须通过 APP_JWT_SECRET 注入
+  secret: "ENCv1:ALskJ6HYkWcOtO3TEZPZyFxR9s/m8kIHrnmSPL+q8ErYbV1Bdp4pRbjdgwZz+IZaMZOmOWAcKql57N/+BiyGNXBFcA==" # 密文；原值从 .env 的 APP_JWT_SECRET 迁入
   issuer: photography-server
   expire_hours: 168
 
 db:
-  host: "" # 必须通过 APP_DB_HOST 注入
+  host: mysql # compose 服务名（原 APP_DB_HOST）
   port: 3306
-  user: "" # 必须通过 APP_DB_USER 注入
-  password: "" # 必须通过 APP_DB_PASSWORD 注入
+  user: "ENCv1:2gg1A9k9jGhJLMnzvjHUwQoQr1pX6YsL04f+jR1ey7c=" # 密文；原 APP_DB_USER
+  password: "ENCv1:k40ieJLybr6jdbRy1+UGYD5uToGPMOSq8zEP5vYLaZc=" # 密文；原 APP_DB_PASSWORD
   name: photography
   charset: utf8mb4
   max_idle_conns: 20
@@ -53,7 +54,7 @@ upload:
 xxljob:
   enable: true # APP_XXLJOB_ENABLE
   server_addr: http://xxl-job-admin:8080 # APP_XXLJOB_SERVER_ADDR（容器内访问监听端口 8080；9100 是宿主映射）
-  access_token: "" # APP_XXLJOB_ACCESS_TOKEN
+  access_token: "ENCv1:L1XSnxgDuiPxAD0yHqA/KH5jo+cbqY8Jm70ZX9MUvsR1ktaqyH0pXT2oId+B2tmZ/Cy5FNVh" # 密文；原 XXLJOB_ACCESS_TOKEN
   executor_ip: 127.0.0.1 # APP_XXLJOB_EXECUTOR_IP
   executor_port: "9999" # APP_XXLJOB_EXECUTOR_PORT
   registry_key: photography-server # APP_XXLJOB_REGISTRY_KEY

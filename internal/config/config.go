@@ -279,10 +279,10 @@ func validateProd(c *Config) error {
 		return nil
 	}
 	if c.JWT.Secret == "" || c.JWT.Secret == defaultJWTSecret {
-		return errors.New("prod 环境必须通过 APP_JWT_SECRET 注入 JWT 密钥（不得为空或默认值）")
+		return errors.New("prod 环境 jwt.secret 缺失或为默认弱值：请在 Nacos 的 photography-server-prod.yaml 配置（推荐 ENCv1: 密文），或临时用 APP_JWT_SECRET 覆盖")
 	}
 	if c.DB.Host == "" || c.DB.User == "" || c.DB.Password == "" {
-		return errors.New("prod 环境必须通过 APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 注入数据库连接信息")
+		return errors.New("prod 环境 db 连接信息（host/user/password）缺失：请在 Nacos 的 photography-server-prod.yaml 配置（推荐 ENCv1: 密文），或临时用 APP_DB_HOST / APP_DB_USER / APP_DB_PASSWORD 覆盖")
 	}
 	return nil
 }
