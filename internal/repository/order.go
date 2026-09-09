@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -124,7 +125,8 @@ func (r *OrderRepo) GetUnconfirmedPayments(ctx context.Context, companyID int64,
 }
 
 func (r *OrderRepo) GetTodayStats(ctx context.Context, companyID int64) (confirmed float64, pending float64, err error) {
-	today := "2006-01-02"
+	// 必须是 Format(layout) 的结果，写成 layout 字面量会被当作实际日期拼进 SQL，导致统计恒为 0
+	today := time.Now().Format("2006-01-02")
 	q := r.tenant(companyID).WithContext(ctx).
 		Where("status = ? AND paid_at BETWEEN ? AND ?", enum.PaymentStatusConfirmed, today, today+" 23:59:59")
 	if err := q.Model(&model.OrderPayment{}).Select("COALESCE(SUM(amount),0)").Scan(&confirmed).Error; err != nil {

@@ -24,7 +24,8 @@ func New(svc *service.Service, cfg *config.Config) *Controller {
 	return &Controller{Svc: svc, Cfg: cfg}
 }
 
-// RegisterPublic 注册公开路由（无需登录；company_id 由 query/header 指定租户）
+// RegisterPublic 注册公开路由（无需登录；租户由 slug 短链标识定位——query slug / X-Slug 头，
+// 服务端反查 company_id，#29 移除裸 company_id 防遍历枚举）
 func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
 	g.POST("/auth/sms-code", h.SmsCode)
 	g.POST("/auth/login", h.Login)
@@ -60,27 +61,30 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/custom-request/list", h.CustomRequestList)
 }
 
-// clientCompanyID 公开接口的租户定位：query company_id 优先，其次 X-Company-Id 头
-func clientCompanyID(c *gin.Context) int64 {
-	if v := c.Query("company_id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
-			return id
-		}
+// slugFrom 提取客户端公开接口的预约主页短链标识：query slug 与 X-Slug 头二选一（头优先）。
+// slug 形如 "sunset-studio"，为工作室预约主页 URL/二维码携带的不可枚举标识（#29），
+// 服务端据此反查 company_id，绝不接受客户端直传裸 company_id。
+func slugFrom(c *gin.Context) string {
+	if v := c.GetHeader("X-Slug"); v != "" {
+		return v
 	}
-	if v := c.GetHeader("X-Company-Id"); v != "" {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
-			return id
-		}
-	}
-	return 0
+	return c.Query("slug")
 }
 
-func requireCompanyID(c *gin.Context) (int64, error) {
-	id := clientCompanyID(c)
-	if id <= 0 {
-		return 0, errs.BadRequest("缺少工作室标识（company_id）")
+// requireCompany 按 slug 反查并校验租户（数据库不存在/未配置 slug 时返回业务错误）
+func (h *Controller) requireCompany(c *gin.Context) (int64, error) {
+	slug := slugFrom(c)
+	if slug == "" {
+		return 0, errs.BadRequest("缺少工作室标识（slug）")
 	}
-	return id, nil
+	companyID, err := h.Svc.ResolveCompanyBySlug(c.Request.Context(), slug)
+	if err != nil {
+		return 0, errs.Internal("")
+	}
+	if companyID <= 0 {
+		return 0, errs.BadRequest("预约主页不存在或未配置短链标识，请联系工作室")
+	}
+	return companyID, nil
 }
 
 // bindJSON 绑定 JSON 请求体
@@ -131,24 +135,34 @@ func (h *Controller) SmsCode(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// Login 客户手机号验证码登录（未注册自动建档），openid 为小程序场景透传
+// Login 客户手机号验证码登录（未注册自动建档），openid 为小程序场景透传。
+// 租户定位：body slug（可选）→ query slug / X-Slug 头 → 服务端反查 company_id（#29）
 func (h *Controller) Login(c *gin.Context) {
 	var req struct {
-		CompanyID int64  `json:"company_id"`
-		Mobile    string `json:"mobile" binding:"required"`
-		Code      string `json:"code" binding:"required"`
-		OpenID    string `json:"openid"`
+		Slug   string `json:"slug"` // 预约主页短链标识（也可放 query/头）
+		Mobile string `json:"mobile" binding:"required"`
+		Code   string `json:"code" binding:"required"`
+		OpenID string `json:"openid"`
 	}
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	companyID := req.CompanyID
-	if companyID <= 0 {
-		companyID = clientCompanyID(c)
+	slug := req.Slug
+	if slug == "" {
+		slug = slugFrom(c)
+	}
+	if slug == "" {
+		response.Fail(c, errs.BadRequest("缺少工作室标识（slug）"))
+		return
+	}
+	companyID, err := h.Svc.ResolveCompanyBySlug(c.Request.Context(), slug)
+	if err != nil {
+		response.Fail(c, errs.Internal(""))
+		return
 	}
 	if companyID <= 0 {
-		response.Fail(c, errs.BadRequest("缺少工作室标识（company_id）"))
+		response.Fail(c, errs.BadRequest("预约主页不存在或未配置短链标识，请联系工作室"))
 		return
 	}
 	customer, token, err := h.Svc.CustomerSmsLogin(c.Request.Context(), companyID, req.Mobile, req.Code, req.OpenID)
@@ -164,7 +178,7 @@ func (h *Controller) Login(c *gin.Context) {
 
 // PackageList 套餐列表（已上架）
 func (h *Controller) PackageList(c *gin.Context) {
-	companyID, err := requireCompanyID(c)
+	companyID, err := h.requireCompany(c)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -180,7 +194,7 @@ func (h *Controller) PackageList(c *gin.Context) {
 
 // PackageDetail 套餐详情
 func (h *Controller) PackageDetail(c *gin.Context) {
-	companyID, err := requireCompanyID(c)
+	companyID, err := h.requireCompany(c)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -200,7 +214,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 
 // StudioInfo 工作室预约主页信息
 func (h *Controller) StudioInfo(c *gin.Context) {
-	companyID, err := requireCompanyID(c)
+	companyID, err := h.requireCompany(c)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -215,7 +229,7 @@ func (h *Controller) StudioInfo(c *gin.Context) {
 
 // SlotList 指定日期可约时段（query: date、photographer_id 可选）
 func (h *Controller) SlotList(c *gin.Context) {
-	companyID, err := requireCompanyID(c)
+	companyID, err := h.requireCompany(c)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -237,13 +251,18 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 		return
 	}
 	cu := middleware.GetClientUser(c)
-	companyID := clientCompanyID(c)
+	var companyID int64
 	if cu != nil {
+		// 已登录：租户取令牌内绑定的公司（可信，不信任客户端请求参数）
 		companyID = cu.CompanyID
-	}
-	if companyID <= 0 {
-		response.Fail(c, errs.BadRequest("缺少工作室标识（company_id）"))
-		return
+	} else {
+		// 游客：按 slug 反查（#29）
+		var err error
+		companyID, err = h.requireCompany(c)
+		if err != nil {
+			response.Fail(c, err)
+			return
+		}
 	}
 	m, err := h.Svc.ClientSubmitCustomRequest(c.Request.Context(), companyID, cu, req)
 	if err != nil {

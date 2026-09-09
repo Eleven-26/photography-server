@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -36,8 +37,12 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 	if req.NewDate == "" || req.NewTime == "" {
 		return nil, errs.BadRequest("请选择新的拍摄日期与时段")
 	}
+	// #20：仅"确实没有待确认改期单"（ErrRecordNotFound）才放行；
+	// 查询出错（DB 抖动）直接返回，避免约束在故障期失效导致重复改期单
 	if _, err := s.RescheduleRepo.GetPendingByOrder(ctx, cu.CompanyID, orderID); err == nil {
 		return nil, errs.BadRequest("已有待确认的改期申请，请耐心等待")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
 	}
 
 	// 距原拍摄开始的小时数 → 费用档位
@@ -124,12 +129,12 @@ func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID
 		return nil, errs.BadRequest(errs.ErrRefundNoTime)
 	}
 
-	// 按距拍摄时间试算可退金额
+	// 按距拍摄时间试算可退金额（#16：统一 domain.ParseShootDate，本地时区解析）
 	shootDate := ""
 	if o.ShootDate != nil {
 		shootDate = *o.ShootDate
 	}
-	shootTime, _ := time.Parse("2006-01-02", shootDate)
+	shootTime, _ := domain.ParseShootDate(shootDate)
 	hours := time.Until(shootTime).Hours()
 	preview := domain.CalcRefundPreview(time.Duration(hours) * time.Hour)
 	refundAmt := domain.Round2(o.PaidAmt * preview.Ratio)
@@ -174,8 +179,11 @@ func (s *Service) ClientReviewCreate(ctx context.Context, cu *ClientUser, orderI
 	if req.Rating < 1 || req.Rating > 5 {
 		return nil, errs.BadRequest("评分需在 1-5 之间")
 	}
+	// #20：仅"确实未评价过"（ErrRecordNotFound）才放行，查询出错直接返回
 	if _, err := s.ReviewRepo.GetByOrderID(ctx, cu.CompanyID, orderID); err == nil {
 		return nil, errs.BadRequest("该订单已评价过")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
 	}
 	now := time.Now()
 	name := cu.Name
@@ -235,6 +243,11 @@ func (s *Service) ClientSelectPhotos(ctx context.Context, cu *ClientUser, delive
 	if d.Stage != enum.DeliveryStageSelecting {
 		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
 	}
+	// #23：加片费一旦确认已进入订单尾款，选片即锁定——防止"确认后改选变少"造成
+	// 订单金额与选择结果脱钩（改选不冲销已入账金额）。如需调整请联系工作室处理。
+	if d.ExtraConfirmed == 1 {
+		return errs.BadRequest("已确认加片费用，选片已锁定；如需调整请联系工作室")
+	}
 	if d.SelectDeadline != nil && *d.SelectDeadline != "" {
 		if deadline, err := time.ParseInLocation("2006-01-02 15:04:05", *d.SelectDeadline, time.Local); err == nil {
 			if time.Now().After(deadline) {
@@ -284,7 +297,9 @@ func (s *Service) ClientSelectPhotos(ctx context.Context, cu *ClientUser, delive
 	})
 }
 
-// ClientConfirmExtra 客户确认加片费用：加片金额计入尾款
+// ClientConfirmExtra 客户确认加片费用：加片金额计入尾款。
+// 幂等（#22）：确认动作由事务内 CAS（UPDATE ... WHERE extra_confirmed=0）抢占，
+// 并发双击/重复请求只有一个能真正累加金额；其余请求读到已确认状态后幂等返回成功。
 func (s *Service) ClientConfirmExtra(ctx context.Context, cu *ClientUser, deliveryID int64) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, cu.CompanyID, deliveryID)
 	if err != nil {
@@ -298,19 +313,31 @@ func (s *Service) ClientConfirmExtra(ctx context.Context, cu *ClientUser, delive
 		return err
 	}
 	if d.ExtraConfirmed == 1 {
-		return nil
+		return nil // 已确认：幂等成功
 	}
+	extraFee := d.ExtraFee
 	return repository.Tx(func(tx *gorm.DB) error {
-		if err := s.DeliveryRepo.WithTx(tx).Update(ctx, cu.CompanyID, deliveryID, map[string]interface{}{
-			"extra_confirmed": 1,
-		}); err != nil {
+		// 1. CAS 抢占确认位：只有 extra_confirmed=0 → 1 的行受影响
+		ok, err := s.DeliveryRepo.WithTx(tx).CasConfirmExtra(ctx, cu.CompanyID, deliveryID)
+		if err != nil {
 			return err
 		}
-		// 加片费进订单尾款（addon_amount 累加，final_amt 同步）
+		if !ok {
+			// 并发下已被其他请求确认：重读确认状态，幂等返回
+			d2, err := s.DeliveryRepo.WithTx(tx).GetByID(ctx, cu.CompanyID, deliveryID)
+			if err != nil {
+				return err
+			}
+			if d2.ExtraConfirmed == 1 {
+				return nil
+			}
+			return errs.Conflict("加片确认状态异常，请刷新后重试")
+		}
+		// 2. 加片费进订单尾款（addon_amount 累加，final_amt/total_amt 同步）
 		if err := s.OrderRepo.WithTx(tx).Update(ctx, cu.CompanyID, o.ID, map[string]interface{}{
-			"addon_amount": gorm.Expr("addon_amount + ?", d.ExtraFee),
-			"final_amt":    gorm.Expr("final_amt + ?", d.ExtraFee),
-			"total_amt":    gorm.Expr("total_amt + ?", d.ExtraFee),
+			"addon_amount": gorm.Expr("addon_amount + ?", extraFee),
+			"final_amt":    gorm.Expr("final_amt + ?", extraFee),
+			"total_amt":    gorm.Expr("total_amt + ?", extraFee),
 		}); err != nil {
 			return err
 		}

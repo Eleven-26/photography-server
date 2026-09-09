@@ -196,3 +196,10 @@ func (c *NatsClient) IsJetStreamEnabled() bool {
 func (c *NatsClient) IsConnected() bool {
 	return c != nil && c.nc != nil && c.nc.IsConnected()
 }
+
+// CloseNATS 关闭 NATS 连接（服务优雅退出时调用；调用前应先停止 mq.Consumer 停止消费）
+func CloseNATS() {
+	if natsConn != nil {
+		natsConn.Close()
+	}
+}

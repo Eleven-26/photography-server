@@ -107,8 +107,16 @@ func orDefaultInt64(v, def int64) int64 {
 	return v
 }
 
-func (s *Service) writeOrderLog(ctx context.Context, orderID int64, action string, from, to interface{}, content string, op Operator) error {
-	log := model.OrderLog{
+// orderLog 构造订单操作日志实体。
+// 必须带上 TenantBase：OrderLog 内嵌 TenantBase，写入走 conn().Create（不注入租户），
+// 而读取走 tenant(companyID) 过滤。漏填 CompanyID 会导致日志以 company_id=0 入库，
+// 按真实租户查询时永远为空——订单流水追溯整体失效。
+func orderLog(orderID int64, action string, from, to interface{}, content string, op Operator) *model.OrderLog {
+	return &model.OrderLog{
+		TenantBase: model.TenantBase{
+			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
+			CompanyID: op.CompanyID,
+		},
 		OrderID:      orderID,
 		Action:       action,
 		FromStatus:   fmt.Sprintf("%v", from),
@@ -117,18 +125,12 @@ func (s *Service) writeOrderLog(ctx context.Context, orderID int64, action strin
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
 	}
-	return s.OrderRepo.CreateLog(ctx, &log)
+}
+
+func (s *Service) writeOrderLog(ctx context.Context, orderID int64, action string, from, to interface{}, content string, op Operator) error {
+	return s.OrderRepo.CreateLog(ctx, orderLog(orderID, action, from, to, content, op))
 }
 
 func (s *Service) writeOrderLogTx(ctx context.Context, tx *gorm.DB, orderID int64, action string, from, to interface{}, content string, op Operator) error {
-	log := model.OrderLog{
-		OrderID:      orderID,
-		Action:       action,
-		FromStatus:   fmt.Sprintf("%v", from),
-		ToStatus:     fmt.Sprintf("%v", to),
-		Content:      content,
-		OperatorID:   op.UserID,
-		OperatorName: op.Username,
-	}
-	return s.OrderRepo.WithTx(tx).CreateLog(ctx, &log)
+	return s.OrderRepo.WithTx(tx).CreateLog(ctx, orderLog(orderID, action, from, to, content, op))
 }

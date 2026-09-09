@@ -43,6 +43,19 @@ func (r *DeliveryRepo) Update(ctx context.Context, companyID, deliveryID int64, 
 	return r.tenant(companyID).WithContext(ctx).Model(&model.Delivery{}).Where("id = ?", deliveryID).Updates(updates).Error
 }
 
+// CasConfirmExtra 客户确认加片（CAS）：仅当 extra_confirmed=0 时置 1，返回是否真正完成翻转。
+// 用于防并发双击/重复请求把加片费重复累加进订单金额（#22）：调用方事务内先 CAS 抢占，
+// 未抢到（RowsAffected=0）说明已被并发请求确认，不再累加金额。
+func (r *DeliveryRepo) CasConfirmExtra(ctx context.Context, companyID, deliveryID int64) (bool, error) {
+	res := r.tenant(companyID).WithContext(ctx).Model(&model.Delivery{}).
+		Where("id = ? AND extra_confirmed = 0", deliveryID).
+		Update("extra_confirmed", 1)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
 func (r *DeliveryRepo) CreateItem(ctx context.Context, item *model.DeliveryItem) error {
 	return r.conn().WithContext(ctx).Create(item).Error
 }

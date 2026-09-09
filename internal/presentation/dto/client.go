@@ -81,10 +81,10 @@ type ClientSmsCodeReq struct {
 
 // ClientSmsLoginReq 客户端验证码登录（H5/小程序共用）
 type ClientSmsLoginReq struct {
-	CompanyID int64  `json:"company_id"`                // 工作室ID（多租户路由定位）
-	Mobile    string `json:"mobile" binding:"required"` // 手机号
-	OpenID    string `json:"openid"`                    // 小程序openid（选填）
-	Code      string `json:"code" binding:"required"`   // 验证码
+	Slug   string `json:"slug"`                      // 预约主页短链标识（#29：租户定位用 slug，服务端反查 company_id）
+	Mobile string `json:"mobile" binding:"required"` // 手机号
+	OpenID string `json:"openid"`                    // 小程序openid（选填）
+	Code   string `json:"code" binding:"required"`   // 验证码
 }
 
 // ======================== 小程序员工端 ========================

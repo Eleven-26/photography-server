@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 
 	"photography-server/internal/domain"
 	"photography-server/internal/infrastructure"
@@ -25,9 +27,16 @@ type ClientUser struct {
 }
 
 // smsCodeKey 验证码 Redis 键前缀，5 分钟过期
-const smsCodeKey = "sms:code:%s:%s" // scene:phone
-
-const smsCodeTTL = 5 * time.Minute
+const (
+	smsCodeKey = "sms:code:%s:%s" // scene:phone
+	smsCdKey   = "sms:cd:%s:%s"   // 发送冷却：scene:phone
+	smsDayKey  = "sms:day:%s:%s"  // 当日发送次数：scene:phone
+	smsFailKey = "sms:fail:%s:%s" // 校验失败次数：scene:phone
+	smsCodeTTL = 5 * time.Minute
+	smsCdTTL   = 60 * time.Second // 同一手机号发送冷却
+	smsDayMax  = 10               // 同一手机号单日发送上限
+	smsFailMax = 5                // 校验失败次数上限，超限作废
+)
 
 // redis 访问器：统一走 infrastructure 单例（service 不持有基础设施句柄，与分层纪律一致）
 func (s *Service) redis() *redis.Client {
@@ -36,31 +45,84 @@ func (s *Service) redis() *redis.Client {
 
 // SendSmsCode 发送短信验证码。验证码写入 Redis（5 分钟有效）；
 // 实际短信通道未接入（占位），验证码会记录到服务端日志以便联调。
+// 限流：同一手机号 60s 冷却 + 单日上限，防止短信轰炸与 Redis 内存被打满。
 func (s *Service) SendSmsCode(ctx context.Context, scene, mobile string) error {
 	if len(mobile) != 11 {
 		return errs.BadRequest("手机号格式错误")
 	}
+	rdb := s.redis()
+	if rdb == nil {
+		return errs.Internal("短信服务暂不可用，请稍后再试")
+	}
+
+	// 1. 冷却检查：上次发送未满 60s 拒绝
+	cdKey := fmt.Sprintf(smsCdKey, scene, mobile)
+	if n, err := rdb.Exists(ctx, cdKey).Result(); err == nil && n > 0 {
+		return errs.BadRequest("发送过于频繁，请稍后再试")
+	}
+	// 2. 当日次数检查（含本次，先占位防并发穿透）
+	dayKey := fmt.Sprintf(smsDayKey, scene, mobile)
+	dayCount, err := rdb.Incr(ctx, dayKey).Result()
+	if err != nil {
+		return errs.Internal("")
+	}
+	if dayCount == 1 {
+		rdb.Expire(ctx, dayKey, 24*time.Hour)
+	}
+	if dayCount > smsDayMax {
+		return errs.BadRequest("今日发送次数已达上限")
+	}
+
 	code, err := genSmsCode()
 	if err != nil {
 		return errs.Internal("")
 	}
 	key := fmt.Sprintf(smsCodeKey, scene, mobile)
-	if err := s.redis().Set(ctx, key, code, smsCodeTTL).Err(); err != nil {
+	if err := rdb.Set(ctx, key, code, smsCodeTTL).Err(); err != nil {
 		return errs.Internal("")
 	}
+	// 3. 写入冷却标记
+	rdb.Set(ctx, cdKey, "1", smsCdTTL)
 	// TODO(P1): 接入真实短信通道；当前仅记录日志用于开发联调
 	fmt.Printf("[sms] scene=%s mobile=%s code=%s\n", scene, mobile, code)
 	return nil
 }
 
-// verifySmsCode 校验并消费验证码（一次性）
+// verifySmsCode 校验并消费验证码（一次性，原子）。
+// 用 GETDEL 原子完成"读取+删除"：并发/重放场景下验证码只会被消费一次，
+// 避免旧实现 Del 失败导致同一验证码可重复使用。
 func (s *Service) verifySmsCode(ctx context.Context, scene, mobile, code string) error {
+	rdb := s.redis()
+	if rdb == nil {
+		return errs.Internal("短信服务暂不可用，请稍后再试")
+	}
+	// 失败次数上限：超过则作废验证码，防暴力枚举
+	failKey := fmt.Sprintf(smsFailKey, scene, mobile)
+	if n, _ := rdb.Get(ctx, failKey).Int(); n >= smsFailMax {
+		rdb.Del(ctx, fmt.Sprintf(smsCodeKey, scene, mobile))
+		return errs.BadRequest("验证码错误次数过多，请重新获取")
+	}
+
 	key := fmt.Sprintf(smsCodeKey, scene, mobile)
-	val, err := s.redis().Get(ctx, key).Result()
-	if err != nil || val != code {
+	val, err := rdb.GetDel(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
 		return errs.BadRequest("验证码错误或已过期")
 	}
-	s.redis().Del(ctx, key)
+	if err != nil {
+		return errs.Internal("")
+	}
+	if val != code {
+		n, _ := rdb.Incr(ctx, failKey).Result()
+		if n == 1 {
+			rdb.Expire(ctx, failKey, smsCodeTTL)
+		}
+		if n >= smsFailMax {
+			rdb.Del(ctx, key)
+		}
+		return errs.BadRequest("验证码错误或已过期")
+	}
+	// 校验通过：清除失败计数（一次性消费已由 GETDEL 保证）
+	rdb.Del(ctx, failKey)
 	return nil
 }
 
@@ -80,9 +142,17 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 		return nil, "", err
 	}
 	c, err := s.CustomerRepo.GetByMobile(ctx, companyID, mobile)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// 数据库故障等非"不存在"错误直接返回，不能误判为未注册去重复建档
+		return nil, "", errs.Internal("")
+	}
 	if err != nil {
 		// 首次登录自动注册客户档案
 		c = &model.Customer{
+			TenantBase: model.TenantBase{
+				Base:      model.Base{CreatedAt: time.Now(), UpdatedAt: time.Now()},
+				CompanyID: companyID,
+			},
 			Code:       domain.GenCode("CU"),
 			Name:       maskMobile(mobile),
 			Mobile:     mobile,
@@ -91,8 +161,6 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 			IsVerified: 1,
 			OpenID:     openid,
 		}
-		c.CreatedAt = time.Now()
-		c.UpdatedAt = time.Now()
 		if err := s.CustomerRepo.Create(ctx, c); err != nil {
 			return nil, "", err
 		}
@@ -102,6 +170,8 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 			updates["openid"] = openid
 		}
 		_ = s.CustomerRepo.Update(ctx, companyID, c.ID, updates)
+		// 登录成功把状态置回活跃：失效认证缓存，避免"流失中"的旧画像在 TTL 内继续拦截
+		invalidateCustomerCache(ctx, companyID, c.ID)
 	}
 	token, err := s.customerToken(c)
 	if err != nil {

@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
+
+	"gorm.io/gorm"
 
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
@@ -16,6 +20,24 @@ import (
 // clientCatalog 客户端（H5/小程序）公开目录能力：
 // 套餐浏览、工作室信息、可约时段、定制需求提交。companyID 由路由/租户上下文提供，
 // 无需客户登录即可访问（预约前浏览）。
+
+// ResolveCompanyBySlug 按预约主页短链标识（slug）反查公司 ID——客户端公开接口的租户定位，
+// 替代"客户端直传 company_id"（裸数字可被遍历枚举全平台工作室，审查报告 #29）。
+// 返回 companyID=0 表示 slug 不存在或未配置；其他错误原样返回。
+func (s *Service) ResolveCompanyBySlug(ctx context.Context, slug string) (int64, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return 0, nil
+	}
+	st, err := s.StudioSettingRepo.GetBySlug(ctx, slug)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return st.CompanyID, nil
+}
 
 // ClientPackages 已上架套餐列表（客户预约主页）
 func (s *Service) ClientPackages(ctx context.Context, companyID int64, page, pageSize int, category string) ([]model.Package, int64, error) {
@@ -46,7 +68,7 @@ func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string,
 	if date == "" {
 		return nil, errs.BadRequest("请选择日期")
 	}
-	d, err := time.ParseInLocation("2006-01-02", date, time.Local)
+	d, err := domain.ParseShootDate(date) // #16：统一本地时区解析
 	if err != nil {
 		return nil, errs.BadRequest("日期格式错误，应为 2006-01-02")
 	}

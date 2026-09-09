@@ -21,7 +21,7 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	}
 
 	engine := gin.New()
-	engine.Use(middleware.CORS(), middleware.Recovery(), middleware.RequestLog())
+	engine.Use(middleware.CORS(cfg.App.CORSOrigins), middleware.Recovery(), middleware.RequestLog())
 	// Jaeger 链路通道（OTel → Jaeger，复用 OTel 埋点）：未启用时返回 nil，请求路径零影响
 	if tm := middleware.JaegerTrace(cfg.Jaeger.Service); tm != nil {
 		engine.Use(tm)
@@ -39,8 +39,10 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	middleware.Init(cfg)
 	mw := middleware.Get()
 
-	// 静态资源：上传文件
-	engine.Static("/uploads", svc.UploadDir)
+	// 静态资源：上传文件（鉴权下载，禁止匿名枚举客户样片/成片/凭证）
+	// 访问需携带有效登录令牌（员工或客户均可）；文件名服务端生成不可枚举（见 service/upload.go）
+	uploads := engine.Group("/uploads", mw.AssetAuth())
+	uploads.Static("/", svc.UploadDir)
 
 	//api := engine.Group("/api")
 	api := engine.Group("")
@@ -77,12 +79,24 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	wcStaffAuth := api.Group("/wechat/staff", mw.StaffAuth(), mw.OperationLog())
 	wcCtl.RegisterStaffAuthed(wcStaffAuth)
 
-	// 调试路由：仅非 release（dev/test）环境注册，生产环境不暴露基础设施操作能力
-	if cfg.App.Mode != "release" {
+	// 调试路由（Redis/NATS/ES/Mongo 读写删除 + 配置密文生成，无业务鉴权）：
+	// 以 profile（服务端启动参数/APP_PROFILE，可信）白名单为准——只有 dev/test/docker.dev 注册；
+	// 生产（prod）无论 app.mode 是否误配为 debug/空 都不暴露（旧实现按 mode!="release" 黑名单判断，
+	// mode 为空即等于非 release → 生产误配会全量暴露，是 P0 隐患）。
+	if debugProfile(cfg.App.Profile) {
 		registerDebug(api, ctl)
 	}
 
 	return engine
+}
+
+// debugProfile 判断当前 profile 是否允许注册调试路由
+func debugProfile(profile string) bool {
+	switch profile {
+	case "dev", "test", "docker.dev":
+		return true
+	}
+	return false
 }
 
 // registerCommon 注册所有客户端共用的业务路由

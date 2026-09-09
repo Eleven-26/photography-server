@@ -1,7 +1,10 @@
 package jwtpkg
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -25,20 +28,30 @@ type Claims struct {
 }
 
 func Generate(secret string, issuer string, expireHours int, c Claims) (string, error) {
+	now := time.Now()
+	jti, err := newJTI()
+	if err != nil {
+		return "", err
+	}
 	c.RegisteredClaims = jwt.RegisteredClaims{
 		Issuer:    issuer,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expireHours) * time.Hour)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Subject:   strconv.FormatInt(c.UserID, 10), // 主体=用户ID，便于服务端识别
+		ID:        jti,                             // jti：唯一令牌 ID，登出/吊销时入黑名单
+		ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(expireHours) * time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(now),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
 	return token.SignedString([]byte(secret))
 }
 
+// Parse 解析并校验 JWT。
+// WithValidMethods 显式锁定 HS256，彻底排除"算法混淆"攻击面（攻击者换 alg 头
+// 诱导服务端用对称密钥验签的经典漏洞）。
 func Parse(secret, issuer, tokenString string) (*Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
-	}, jwt.WithIssuer(issuer))
+	}, jwt.WithIssuer(issuer), jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
 		return nil, err
 	}
@@ -46,4 +59,17 @@ func Parse(secret, issuer, tokenString string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 	return claims, nil
+}
+
+// BlacklistKey 登出/吊销黑名单键（value=userID，TTL=令牌剩余有效期）。
+// 旧令牌（签发时无 jti）无吊销能力，靠过期自然失效。
+func BlacklistKey(jti string) string { return "jwt:bl:" + jti }
+
+// newJTI 生成随机令牌 ID（crypto/rand 16 字节 hex），不可枚举、不可预测
+func newJTI() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

@@ -50,6 +50,18 @@ func main() {
 	logger.Init(cfg.Log.Level)
 	logger.Infof("running profile: %s", cfg.App.Profile)
 
+	// 业务时区（#16）：统一用配置的 timezone 设置 time.Local——domain.ParseShootDate、
+	// 各处 ParseInLocation(..., time.Local)、DSN loc=Local 全部依赖它，保证退款/改期档位
+	// 与日期边界按业务时区计算，而不是容器 TZ 兜底。
+	if cfg.App.Timezone != "" {
+		if loc, err := time.LoadLocation(cfg.App.Timezone); err != nil {
+			logger.Warnf("timezone %q 无效（%v），使用系统时区", cfg.App.Timezone, err)
+		} else {
+			time.Local = loc
+			logger.Infof("timezone set to %s", cfg.App.Timezone)
+		}
+	}
+
 	// Jaeger 链路通道（OTel SDK → Jaeger，复用 OTel 埋点）；未启用时跳过，Jaeger 不可达不影响启动。
 	// 注意：必须先于 InitMySQL —— GORM 的 OTel 插件在安装时捕获全局 TracerProvider，
 	// 顺序颠倒会导致 SQL span 走 noop provider，永远不产生数据。
@@ -65,10 +77,13 @@ func main() {
 	}
 	logger.Infof("ping database ok")
 
-	bootstrap()
+	bootstrap(cfg.App.Profile) // #25：prod 环境内部禁用（见 bootstrap.go）
 
+	// Redis 提升为硬依赖（#12）：验证码登录、JWT 登出黑名单、认证画像缓存全部依赖 Redis，
+	// 旧实现失败仅 warn 后继续启动，会让服务"看似正常但客户端全部无法登录/登出"。
+	// 与 MySQL 同级 fail-fast；NATS/ES/Mongo/XXL 仍为可选（失败降级不影响主流程）。
 	if err := infrastructure.InitRedis(&cfg.Redis); err != nil {
-		logger.Warnf("redis not available, skipping: %v", err)
+		panic(fmt.Sprintf("连接 Redis 失败（验证码登录/令牌吊销/认证缓存为硬依赖）: %v", err))
 	}
 
 	if err := infrastructure.InitNATS(&cfg.NATS); err != nil {
@@ -91,9 +106,10 @@ func main() {
 		infrastructure.RunXxlJob()
 	}
 
-	// 启动 NATS 消费者
+	// 启动 NATS 消费者（实例外提：优雅退出时先 Stop 再关连接）
+	var consumer *mq.Consumer
 	if nc := infrastructure.NATS(); nc != nil {
-		consumer := mq.New(nc)
+		consumer = mq.New(nc)
 		consumer.Start()
 	}
 
@@ -101,7 +117,15 @@ func main() {
 	svc := service.New(cfg.Upload.Dir, cfg.JWT.Secret, cfg.JWT.Issuer)
 	engine := router.New(cfg, svc)
 
-	srv := &http.Server{Handler: engine}
+	// HTTP Server 超时（#26）：防 Slowloris 类慢速攻击用极少量连接长期占满 goroutine/文件描述符。
+	// ReadHeaderTimeout 必设（读请求头自身无业务超时兜底）；WriteTimeout 覆盖整请求写响应。
+	srv := &http.Server{
+		Handler:           engine,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
 	// 先 Listen 成功再启动 serve，保证后续 Nacos 注册的实例一定可服务
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.App.Port))
@@ -126,11 +150,29 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Infof("shutting down...")
+
+	// ---- 优雅关闭（#27）：顺序 = 停止入口 → 停消费者 → 停 HTTP → flush 链路 → 关基础设施 ----
+	// 1. 先停 NATS 消费者（防止关闭期间仍在消费/回包）
+	if consumer != nil {
+		consumer.Stop()
+	}
+	// 2. HTTP 停止接收新请求并等待在途请求完成（5s 上限）
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Errorf("shutdown error: %v", err)
 	}
-	infrastructure.CloseJaeger(ctx)
+	// 3. 独立短 ctx flush Jaeger span（不复用上面可能已耗尽的 5s 上下文，避免末批链路数据丢失）
+	jctx, jcancel := context.WithTimeout(context.Background(), 3*time.Second)
+	infrastructure.CloseJaeger(jctx)
+	jcancel()
+	cancel()
+	// 4. 基础设施连接与后台执行器
+	infrastructure.CloseXxlJob()
+	infrastructure.CloseNATS()
+	infrastructure.CloseRedis()
+	infrastructure.CloseES()
+	infrastructure.MongoDisconnect(context.Background())
 	infrastructure.CloseNacos()
+	infrastructure.CloseMySQL()
+	logger.Infof("shutdown complete")
 }

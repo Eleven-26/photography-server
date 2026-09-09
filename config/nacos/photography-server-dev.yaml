@@ -11,6 +11,9 @@ app:
   mode: debug
   port: 8080
   timezone: Asia/Shanghai
+  cors_origins:
+    - http://localhost:5173 # Vite 开发服务器（SLOT 管理端）
+    - http://127.0.0.1:5173
 
 jwt:
   secret: dev-secret-1234567890

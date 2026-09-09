@@ -12,6 +12,10 @@ app:
   mode: release
   port: 8080
   timezone: Asia/Shanghai
+  # CORS 可信来源白名单（精确 Origin，含 scheme://host[:port]）——只回显命中项并允许凭据。
+  # 生产部署前必须替换为真实前端域名；小程序/App 等无 Origin 的客户端不受影响。
+  cors_origins:
+    - https://admin.example.com
 
 jwt:
   secret: "ENCv1:ALskJ6HYkWcOtO3TEZPZyFxR9s/m8kIHrnmSPL+q8ErYbV1Bdp4pRbjdgwZz+IZaMZOmOWAcKql57N/+BiyGNXBFcA==" # 密文；原值从 .env 的 APP_JWT_SECRET 迁入

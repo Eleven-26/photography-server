@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -37,11 +38,39 @@ func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*d
 	}, nil
 }
 
+// CreateOrder 管理端创建订单。
+// 校验（#21）：
+//  1. 套餐必须属于本公司且为启用状态；
+//  2. 客户必须属于本公司（防跨租户挂单）；
+//  3. AddonAmount 不得为负（防把订单总额压到极低/负）；
+//  4. 金额以"分"计算并由 Total-Deposit 推导 Final（#24），快照同步客户姓名/手机号。
 func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCreateReq) (*model.Order, error) {
 	pkg, err := s.PackageRepo.GetByID(ctx, op.CompanyID, req.PackageID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
+	if pkg.Status != enum.PackageStatusActive {
+		return nil, errs.BadRequest("套餐已下架，不可下单")
+	}
+	if req.AddonAmount < 0 {
+		return nil, errs.BadRequest("加选金额不能为负")
+	}
+
+	// 客户归属校验 + 快照：客户必须属于当前公司
+	customerName, customerMobile := "", ""
+	if req.CustomerID > 0 {
+		cu, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, req.CustomerID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errs.BadRequest("客户不存在或不属于当前工作室")
+			}
+			return nil, err
+		}
+		customerName, customerMobile = cu.Name, cu.Mobile
+	}
+
+	// 金额以"分"计算：Deposit + Final == Total 精确相等
+	deposit, final, total := domain.SplitOrderAmounts(pkg.BasePrice, pkg.DepositRate, req.AddonAmount)
 
 	o := model.Order{
 		TenantBase: model.TenantBase{
@@ -51,15 +80,18 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 		Code:           domain.GenCode("SL"),
 		StoreID:        op.StoreID,
 		CustomerID:     req.CustomerID,
+		CustomerName:   customerName,
+		CustomerMobile: customerMobile,
+		LeadID:         req.LeadID,
 		QuoteID:        req.QuoteID,
 		PackageID:      req.PackageID,
 		PackageName:    pkg.Name,
 		PackageVersion: pkg.Version,
 		BasePrice:      pkg.BasePrice,
 		AddonAmount:    req.AddonAmount,
-		DepositAmt:     domain.Round2(pkg.BasePrice * pkg.DepositRate / 100),
-		FinalAmt:       domain.Round2(pkg.BasePrice - pkg.BasePrice*pkg.DepositRate/100 + req.AddonAmount),
-		TotalAmt:       domain.Round2(pkg.BasePrice + req.AddonAmount),
+		DepositAmt:     deposit,
+		FinalAmt:       final,
+		TotalAmt:       total,
 		ShootDate:      strPtr(req.ShootDate),
 		ShootTime:      req.ShootTime,
 		ShootAddress:   req.ShootAddress,
@@ -68,7 +100,7 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 		Remark:         req.Remark,
 		OwnerID:        orDefaultInt64(req.OwnerID, op.UserID),
 		Status:         enum.OrderStatusPendingDeposit,
-		PaymentStatus:  enum.PaymentStatusPending,
+		PaymentStatus:  enum.PaymentStatusUnpaid,
 	}
 
 	err = repository.Tx(func(tx *gorm.DB) error {
@@ -93,7 +125,7 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 			StoreID:        op.StoreID,
 			OrderID:        o.ID,
 			CustomerID:     req.CustomerID,
-			CustomerName:   "",
+			CustomerName:   customerName,
 			Date:           req.ShootDate,
 			TimeRange:      req.ShootTime,
 			ProjectType:    pkg.Category,
@@ -144,29 +176,40 @@ func (s *Service) UpdateOrder(ctx context.Context, op Operator, id int64, req dt
 	})
 }
 
+// ChangeOrderStatus 订单状态流转（完成/取消等终态路径统一走事务）。
+// 修复（#18）：四次独立写库（status/finished_at/档期释放/操作日志）收进同一事务，
+// 任一步失败整体回滚——避免"订单已取消但档期仍锁定"、"已完成但 finished_at 为空"；
+// 事务内加行锁重读订单并二次校验状态机，消除校验与更新间的 TOCTOU。
 func (s *Service) ChangeOrderStatus(ctx context.Context, op Operator, id int64, to enum.OrderStatus, content string) error {
-	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
-	if err != nil {
-		return errs.NotFound(errs.ErrOrderNotFound)
-	}
-	from := o.Status
-	if !domain.OrderCanTransit(from, to) {
-		return errs.BadRequest(errs.ErrOrderStatusInvalid)
-	}
+	return repository.Tx(func(tx *gorm.DB) error {
+		// 1. 事务内行锁读取：基于锁后快照做状态机校验，防并发绕过
+		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(ctx, op.CompanyID, id)
+		if err != nil {
+			return errs.NotFound(errs.ErrOrderNotFound)
+		}
+		from := o.Status
+		if !domain.OrderCanTransit(from, to) {
+			return errs.BadRequest(errs.ErrOrderStatusInvalid)
+		}
 
-	if err := s.OrderRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{"status": to, "updated_by": op.UserID}); err != nil {
-		return err
-	}
+		updates := map[string]interface{}{"status": to, "updated_by": op.UserID}
+		if to == enum.OrderStatusCompleted {
+			updates["finished_at"] = time.Now().Format("2006-01-02 15:04:05")
+		}
+		if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, id, updates); err != nil {
+			return err
+		}
 
-	if to == enum.OrderStatusCompleted {
-		now := time.Now().Format("2006-01-02 15:04:05")
-		s.OrderRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{"finished_at": now})
-	}
-	if to == enum.OrderStatusCancelled {
-		s.OrderRepo.UpdateCalendarBlockStatus(ctx, op.CompanyID, id, enum.BlockStatusCancelled)
-	}
+		if to == enum.OrderStatusCancelled {
+			// 2. 取消订单同步释放档期锁（同事务，失败即回滚，避免档期无效占用）
+			if err := s.OrderRepo.WithTx(tx).UpdateCalendarBlockStatus(ctx, op.CompanyID, id, enum.BlockStatusCancelled); err != nil {
+				return err
+			}
+		}
 
-	return s.writeOrderLog(ctx, id, "change_status", from, to, content, op)
+		// 3. 操作日志
+		return s.writeOrderLogTx(ctx, tx, id, "change_status", from, to, content, op)
+	})
 }
 
 func (s *Service) CancelOrder(ctx context.Context, op Operator, id int64, reason string) error {

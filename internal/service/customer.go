@@ -53,7 +53,7 @@ func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req
 	if err != nil {
 		return errs.NotFound(errs.ErrCustomerNotFound)
 	}
-	return s.CustomerRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
+	if err := s.CustomerRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"store_id":   req.StoreID,
 		"name":       req.Name,
 		"mobile":     req.Mobile,
@@ -67,11 +67,20 @@ func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req
 		"remark":     req.Remark,
 		"avatar":     req.Avatar,
 		"updated_by": op.UserID,
-	})
+	}); err != nil {
+		return err
+	}
+	// 状态（含停用/流失）变更：失效客户认证画像缓存，使停用即时生效（#30）
+	invalidateCustomerCache(ctx, op.CompanyID, id)
+	return nil
 }
 
 func (s *Service) DeleteCustomer(ctx context.Context, op Operator, id int64) error {
-	return s.CustomerRepo.Delete(ctx, op.CompanyID, id)
+	if err := s.CustomerRepo.Delete(ctx, op.CompanyID, id); err != nil {
+		return err
+	}
+	invalidateCustomerCache(ctx, op.CompanyID, id)
+	return nil
 }
 
 func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*dto.CustomerStatsResp, error) {

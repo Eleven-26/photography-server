@@ -12,6 +12,9 @@ app:
   mode: debug
   port: 8080
   timezone: Asia/Shanghai
+  cors_origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
 
 jwt:
   secret: "ENCv1:0nc7MRuGb1X0Ne8KOT0O0EwoM11qjGBLGySqZBATSuRWPJLOeSEFCslPRtclpOGdWnqs4GWOd04h"

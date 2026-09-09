@@ -67,6 +67,17 @@ func ESIsConnected() bool {
 // ErrESNotConnected ES 未连接错误
 var ErrESNotConnected = &ESError{Msg: "elasticsearch not connected"}
 
+// CloseES 释放 ES 底层连接（服务优雅退出时调用）
+func CloseES() {
+	if esClient == nil {
+		return
+	}
+	if tr, ok := esClient.Transport.(interface{ CloseIdleConnections() }); ok {
+		tr.CloseIdleConnections()
+	}
+	esClient = nil
+}
+
 type ESError struct {
 	Msg string
 }

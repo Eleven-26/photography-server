@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
@@ -61,5 +63,39 @@ func (s *Service) ChangePassword(ctx context.Context, op Operator, oldPwd, newPw
 	if err != nil {
 		return errs.Internal("")
 	}
-	return s.AuthRepo.UpdatePassword(ctx, op.UserID, string(hash))
+	if err := s.AuthRepo.UpdatePassword(ctx, op.UserID, string(hash)); err != nil {
+		return err
+	}
+	// 改密后立即使该用户所有已签发令牌失效（认证画像缓存 60s 内仍可能放行旧会话，
+	// 主动删除让"改密=踢下线"即时生效）
+	invalidateStaffCache(ctx, op.UserID)
+	return nil
+}
+
+// Logout 登出：把令牌 jti 写入黑名单，使其立即失效（替代"无状态 JWT 登出仅返回成功"）。
+// 旧令牌无 jti 无法吊销，靠过期自然失效；Redis 不可用时尽力而为（fail-open，同中间件策略）。
+func (s *Service) Logout(ctx context.Context, token string) error {
+	if token == "" {
+		return nil
+	}
+	claims, err := jwtpkg.Parse(s.JWTSecret, s.JWTIssuer, token)
+	if err != nil {
+		return nil // 无效令牌视为已登出
+	}
+	if claims.ID == "" {
+		return nil
+	}
+	rdb := infrastructure.Redis()
+	if rdb == nil {
+		return nil
+	}
+	ttl := time.Until(claims.ExpiresAt.Time)
+	if ttl <= 0 {
+		return nil
+	}
+	// 写失败返回错误：登出动作未完成，前端应提示重试（避免"登出成功但 token 仍有效"）
+	if err := rdb.Set(ctx, jwtpkg.BlacklistKey(claims.ID), claims.UserID, ttl).Err(); err != nil {
+		return errs.Internal("")
+	}
+	return nil
 }

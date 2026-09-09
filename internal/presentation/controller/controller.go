@@ -29,6 +29,15 @@ func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 	return nil
 }
 
+// bearerToken 从 Authorization: Bearer 头取令牌（登出/吊销等场景用）
+func bearerToken(c *gin.Context) string {
+	auth := c.GetHeader("Authorization")
+	if len(auth) > 7 && auth[:7] == "Bearer " {
+		return auth[7:]
+	}
+	return ""
+}
+
 // bindQuery 绑定查询参数
 func (h *Controller) bindQuery(c *gin.Context, obj interface{}) error {
 	if err := c.ShouldBindQuery(obj); err != nil {

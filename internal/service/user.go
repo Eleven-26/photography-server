@@ -54,7 +54,7 @@ func (s *Service) UpdateUser(ctx context.Context, op Operator, id int64, req dto
 	if err != nil {
 		return errs.NotFound(errs.ErrUserNotFound)
 	}
-	return s.UserRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
+	if err := s.UserRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"store_id":   req.StoreID,
 		"nickname":   req.Nickname,
 		"mobile":     req.Mobile,
@@ -63,14 +63,23 @@ func (s *Service) UpdateUser(ctx context.Context, op Operator, id int64, req dto
 		"role_id":    req.RoleID,
 		"status":     req.Status,
 		"updated_by": op.UserID,
-	})
+	}); err != nil {
+		return err
+	}
+	// 状态/角色可能变更：失效认证画像缓存，停用即时生效（#30）
+	invalidateStaffCache(ctx, id)
+	return nil
 }
 
 func (s *Service) DeleteUser(ctx context.Context, op Operator, id int64) error {
 	if id == op.UserID {
 		return errs.BadRequest(errs.ErrUserSelfDelete)
 	}
-	return s.UserRepo.Delete(ctx, op.CompanyID, id)
+	if err := s.UserRepo.Delete(ctx, op.CompanyID, id); err != nil {
+		return err
+	}
+	invalidateStaffCache(ctx, id)
+	return nil
 }
 
 func (s *Service) ResetPassword(ctx context.Context, op Operator, id int64, pwd string) error {
@@ -82,7 +91,11 @@ func (s *Service) ResetPassword(ctx context.Context, op Operator, id int64, pwd 
 	if err != nil {
 		return errs.Internal("")
 	}
-	return s.UserRepo.UpdatePassword(ctx, op.CompanyID, id, string(hash))
+	if err := s.UserRepo.UpdatePassword(ctx, op.CompanyID, id, string(hash)); err != nil {
+		return err
+	}
+	invalidateStaffCache(ctx, id)
+	return nil
 }
 
 // -------- 角色 --------

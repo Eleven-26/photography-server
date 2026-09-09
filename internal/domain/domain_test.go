@@ -130,19 +130,77 @@ func TestRound2(t *testing.T) {
 	}
 }
 
+// #24：金额按"分"整数拆分，恒有 Deposit + Final == Total（精确相等，无 1 分尾差）
+func TestSplitOrderAmounts(t *testing.T) {
+	cases := []struct {
+		base    float64
+		rate    float64
+		addon   float64
+		deposit float64
+		final   float64
+		total   float64
+	}{
+		{1000, 30, 0, 300, 700, 1000},
+		{1299, 30, 0, 389.7, 909.3, 1299},    // 1299*0.3=389.7 精确
+		{0.1, 50, 0, 0.05, 0.05, 0.1},        // 分以下金额不放大
+		{1000, 30, 200, 300, 900, 1200},      // 加选进总额，尾款 = 总额 - 定金
+		{1999.99, 30, 1.01, 600, 1401, 2001}, // 1999.99*0.3=599.997 → 600；尾款推导 2001-600=1401
+	}
+	for _, c := range cases {
+		dep, fin, tot := SplitOrderAmounts(c.base, c.rate, c.addon)
+		if dep != c.deposit || fin != c.final || tot != c.total {
+			t.Errorf("SplitOrderAmounts(%v,%v,%v) = (%v,%v,%v), want (%v,%v,%v)",
+				c.base, c.rate, c.addon, dep, fin, tot, c.deposit, c.final, c.total)
+		}
+		// 恒等式：任意用例下 Deposit+Final 必须精确等于 Total
+		if dep+fin != tot {
+			t.Errorf("恒等式不成立: deposit(%v)+final(%v)!=total(%v)", dep, fin, tot)
+		}
+	}
+}
+
+// #19：支付状态由金额推导，只有全额收齐/全额退清才变更
+func TestDerivePaymentStatus(t *testing.T) {
+	// 全额收齐 → 已确认
+	if st, ok := DerivePaymentStatus(1000, 0, 1000); !ok || st != enum.PaymentStatusConfirmed {
+		t.Errorf("全额收齐应推导为已确认(%v)，got %v ok=%v", enum.PaymentStatusConfirmed, st, ok)
+	}
+	// 部分收款（定金）→ 不推导，保持原状态
+	if _, ok := DerivePaymentStatus(300, 0, 1000); ok {
+		t.Error("部分收款不应推导为终态")
+	}
+	// 全额退清 → 已退款
+	if st, ok := DerivePaymentStatus(1000, 1000, 1000); !ok || st != enum.PaymentStatusRefunded {
+		t.Errorf("全额退清应推导为已退款(%v)，got %v ok=%v", enum.PaymentStatusRefunded, st, ok)
+	}
+	// 部分退款 → 不推导
+	if _, ok := DerivePaymentStatus(1000, 300, 1000); ok {
+		t.Error("部分退款不应推导为终态")
+	}
+}
+
 func TestGenCode(t *testing.T) {
-	re := regexp.MustCompile(`^SL-\d{6}-\d{4}$`)
+	// 新格式（#17）：prefix-YYMMDD-8位十六进制随机串（crypto/rand 4字节，碰撞概率 ~1/2^32）
+	re := regexp.MustCompile(`^SL-\d{6}-[0-9a-f]{8}$`)
 	code := GenCode("SL")
 	if !re.MatchString(code) {
-		t.Errorf("GenCode(\"SL\") = %q, want format SL-YYMMDD-XXXX", code)
+		t.Errorf("GenCode(\"SL\") = %q, want format SL-YYMMDD-xxxxxxxx", code)
 	}
 	// 前缀必须原样透传
 	if code[:3] != "SL-" {
 		t.Errorf("GenCode prefix mismatch: %q", code)
 	}
-	// 同一毫秒内生成可能重复（随机数 0000-9999），此处只验证长度与形态
-	// 形态：prefix(2) + '-' + YYMMDD(6) + '-' + 4位随机数 = 14 字符
-	if len(code) != 14 {
-		t.Errorf("GenCode length = %d, want 14", len(code))
+	// 形态：prefix(2) + '-' + YYMMDD(6) + '-' + 8位随机hex = 18 字符
+	if len(code) != 18 {
+		t.Errorf("GenCode length = %d, want 18", len(code))
+	}
+	// 同前缀连续生成不得重复（2^32 空间，连续 1000 次碰撞可忽略，用于回归检查随机位实现）
+	seen := map[string]bool{}
+	for i := 0; i < 1000; i++ {
+		c := GenCode("SL")
+		if seen[c] {
+			t.Fatalf("GenCode collision: %q", c)
+		}
+		seen[c] = true
 	}
 }

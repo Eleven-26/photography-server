@@ -68,3 +68,12 @@ func Ping() error {
 	}
 	return sqlDB.Ping()
 }
+
+// CloseMySQL 关闭 MySQL 连接池（服务优雅退出时调用）
+func CloseMySQL() {
+	if dbInstance != nil {
+		if sqlDB, err := dbInstance.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}
+}

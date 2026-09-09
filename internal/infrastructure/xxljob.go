@@ -53,3 +53,10 @@ func RunXxlJob() {
 	}()
 	logger.Infof("xxl-job executor started")
 }
+
+// CloseXxlJob 停止 XXL-JOB 执行器（服务优雅退出时调用，注销注册并停止任务调度）
+func CloseXxlJob() {
+	if xxlExecutor != nil {
+		xxlExecutor.Stop()
+	}
+}

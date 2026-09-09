@@ -37,7 +37,11 @@ nacos:
 `
 
 // remoteConf 模拟 Nacos 控制台发布的业务配置
+// 注意：prod 基线校验要求 app.mode 显式非空（validateProd，#5），故 fixture 带上 mode: release；
+// dev/test 环境不校验该字段，dev 用例不受影响。
 const remoteConf = `
+app:
+  mode: release
 jwt:
   secret: remote-secret
   issuer: remote-issuer

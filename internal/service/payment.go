@@ -14,13 +14,32 @@ import (
 	"photography-server/internal/repository"
 )
 
+// paymentTypeSet 收款类型白名单
+var paymentTypeSet = map[string]bool{"deposit": true, "final": true, "addon": true}
+
+// CreatePayment 录入收款记录。
+// 约束（#8）：
+//  1. amount 必须 > 0（负数/零直接拒绝，binding:"required" 对 float64 只保证非零不够）；
+//  2. Type 必须为 deposit/final/addon 白名单；
+//  3. 申请金额不得超过订单剩余应收（total_amt - paid_amt），防止超额收款；
+//  4. 累计校验在确认收款事务内加行锁再做最终判定（见 ConfirmPayment）。
 func (s *Service) CreatePayment(ctx context.Context, op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
+	if req.Amount <= 0 {
+		return nil, errs.BadRequest("收款金额必须大于 0")
+	}
+	if !paymentTypeSet[req.Type] {
+		return nil, errs.BadRequest("收款类型不合法（deposit/final/addon）")
+	}
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
 		return nil, errs.BadRequest(errs.ErrOrderCompleted)
+	}
+	// 金额上限：已收 + 本次 <= 订单总额（留 0.5 分舍入余量）
+	if o.PaidAmt+req.Amount > o.TotalAmt+domain.FenEps() {
+		return nil, errs.BadRequest("收款金额超过订单剩余应收")
 	}
 
 	p := model.OrderPayment{
@@ -58,10 +77,14 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 	return repository.Tx(func(tx *gorm.DB) error {
 		now := time.Now().Format("2006-01-02 15:04:05")
 
-		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认）
+		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认/超额收款）
 		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(ctx, op.CompanyID, p.OrderID)
 		if err != nil {
 			return errs.NotFound(errs.ErrOrderNotFound)
+		}
+		// 1.1 收款确认时按最新订单快照二次校验：已收 + 本次不得超额（录入后订单可能被退款/改价）
+		if o.PaidAmt+p.Amount > o.TotalAmt+domain.FenEps() {
+			return errs.BadRequest("确认后收款将超过订单剩余应收，请核对金额")
 		}
 
 		// 2. 收款记录置为已确认（CAS：仅当仍为待核验时生效，防并发重复确认）
@@ -78,10 +101,15 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 		}
 
 		// 3. 累加订单已收金额（带租户过滤，同一事务连接）
-		if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, p.OrderID, map[string]interface{}{
-			"paid_amt":       gorm.Expr("paid_amt + ?", p.Amount),
-			"payment_status": enum.PaymentStatusConfirmed,
-		}); err != nil {
+		newPaid := o.PaidAmt + p.Amount
+		updates := map[string]interface{}{
+			"paid_amt": gorm.Expr("paid_amt + ?", p.Amount),
+		}
+		// 3.1 payment_status 由金额推导：全额收齐才标"已确认"，部分收款保持原状态
+		if st, ok := domain.DerivePaymentStatus(newPaid, o.RefundAmt, o.TotalAmt); ok {
+			updates["payment_status"] = st
+		}
+		if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, p.OrderID, updates); err != nil {
 			return err
 		}
 
@@ -95,7 +123,7 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 			}
 		}
 		if (p.Type == "final" || p.Type == "addon") && o.Status == enum.OrderStatusPendingDelivery {
-			if o.PaidAmt+p.Amount >= o.TotalAmt {
+			if newPaid >= o.TotalAmt-domain.FenEps() {
 				if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, p.OrderID, map[string]interface{}{"status": enum.OrderStatusCompleted, "finished_at": now}); err != nil {
 					return err
 				}

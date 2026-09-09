@@ -49,7 +49,12 @@ func (h *Controller) ChangePassword(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// Logout 登出（无状态 JWT，仅返回成功）
+// Logout 登出：jti 进黑名单使当前令牌立即失效（#15），替代旧"无状态 JWT 仅返回成功"
 func (h *Controller) Logout(c *gin.Context) {
+	token := bearerToken(c)
+	if err := h.Svc.Logout(c.Request.Context(), token); err != nil {
+		response.Fail(c, err)
+		return
+	}
 	response.OKNil(c)
 }

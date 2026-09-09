@@ -311,6 +311,17 @@ func (r *StudioSettingRepo) GetByCompany(ctx context.Context, companyID int64) (
 	return &m, nil
 }
 
+// GetBySlug 按预约主页短链标识反查工作室设置（跨租户全局查询，不经 tenant 过滤）。
+// slug 是面向客户公开的不可枚举标识（预约主页 URL/二维码），服务端反查 company_id，
+// 替代"客户端直接传 company_id"的裸租户定位（审查报告 #29）。
+func (r *StudioSettingRepo) GetBySlug(ctx context.Context, slug string) (*model.StudioSetting, error) {
+	var m model.StudioSetting
+	if err := r.conn().WithContext(ctx).Where("homepage_slug = ?", slug).Order("id ASC").First(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 // GetOrCreate 取工作室设置，不存在则创建默认配置（保证三端读取总有值）
 func (r *StudioSettingRepo) GetOrCreate(ctx context.Context, companyID int64) (*model.StudioSetting, error) {
 	m, err := r.GetByCompany(ctx, companyID)

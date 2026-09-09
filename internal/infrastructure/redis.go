@@ -35,3 +35,10 @@ func InitRedis(c *config.Redis) error {
 func Redis() *redis.Client {
 	return rdbInstance
 }
+
+// CloseRedis 关闭 Redis 连接（服务优雅退出时调用）
+func CloseRedis() {
+	if rdbInstance != nil {
+		rdbInstance.Close()
+	}
+}

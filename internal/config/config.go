@@ -117,11 +117,12 @@ type XxlJob struct {
 }
 
 type App struct {
-	Name     string `mapstructure:"name"`
-	Mode     string `mapstructure:"mode"`
-	Port     int    `mapstructure:"port"`
-	Timezone string `mapstructure:"timezone"`
-	Profile  string `mapstructure:"profile"`
+	Name        string   `mapstructure:"name"`
+	Mode        string   `mapstructure:"mode"`
+	Port        int      `mapstructure:"port"`
+	Timezone    string   `mapstructure:"timezone"`
+	Profile     string   `mapstructure:"profile"`
+	CORSOrigins []string `mapstructure:"cors_origins"` // CORS 可信来源白名单（精确 Origin，如 http://localhost:5173）
 }
 
 type JWT struct {
@@ -277,6 +278,11 @@ const defaultJWTSecret = "photography-server-jwt-secret-change-me"
 func validateProd(c *Config) error {
 	if c.App.Profile != "prod" {
 		return nil
+	}
+	// 调试路由已按 profile 白名单收紧（router.debugProfile），此处兜底要求 mode 显式声明，
+	// 避免 gin 以默认 debug 模式启动、日志冗余或模式语义混乱
+	if c.App.Mode == "" {
+		return errors.New("prod 环境 app.mode 缺失：请在 Nacos 的 photography-server-prod.yaml 配置 app.mode: release")
 	}
 	if c.JWT.Secret == "" || c.JWT.Secret == defaultJWTSecret {
 		return errors.New("prod 环境 jwt.secret 缺失或为默认弱值：请在 Nacos 的 photography-server-prod.yaml 配置（推荐 ENCv1: 密文），或临时用 APP_JWT_SECRET 覆盖")
