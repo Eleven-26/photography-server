@@ -10,12 +10,26 @@ import (
 	"photography-server/internal/pkg/logger"
 )
 
-// bootstrap 首次启动时初始化默认租户数据（公司/门店/角色/超级管理员）
-// 默认账号 admin，密码 admin123456。若 docs/sql/dml.sql 已导入则自动跳过。
-func bootstrap() {
+// bootstrap 首次启动时初始化默认租户数据（公司/门店/角色/超级管理员）。
+// 仅限非生产环境（dev/test/docker.dev）：生产初始化必须走 docs/sql/dml.sql 手工导入，
+// 禁止在库空时自动创建固定口令超管（#25）。
+// 默认账号 admin；非生产默认密码 admin123456（仅本地/测试联调，登录后请尽快改密）。
+func bootstrap(profile string) {
+	// #25：prod 一律不做自动 bootstrap——库空时自动建号 = 固定口令超管直接上线，
+	// 即便库已有数据，初始化也不应在生产重复出现；生产初始化统一走受控的 dml.sql。
+	if profile == "prod" {
+		logger.Warnf("bootstrap disabled in prod: 请使用 docs/sql/dml.sql 手工初始化租户与超管，禁止自动创建固定口令账号")
+		return
+	}
+
 	db := infrastructure.MySQL()
 	var companyCount int64
-	if err := db.Model(&model.SysCompany{}).Count(&companyCount).Error; err == nil && companyCount > 0 {
+	if err := db.Model(&model.SysCompany{}).Count(&companyCount).Error; err != nil {
+		// #25：Count 出错必须中止，不能在数据库异常状态下写入初始化数据
+		logger.Errorf("bootstrap abort: 检查公司数据失败: %v", err)
+		return
+	}
+	if companyCount > 0 {
 		logger.Infof("bootstrap skipped: company already exists")
 		return
 	}
@@ -105,5 +119,6 @@ func bootstrap() {
 		logger.Errorf("bootstrap fail: commit: %v", err)
 		return
 	}
-	logger.Infof("bootstrap done: company=%d store=%d roles=%d admin=admin/admin123456", company.ID, store.ID, len(roles))
+	// #25：日志不打印口令；默认口令仅限非生产（prod 已在函数入口禁用自动 bootstrap）
+	logger.Infof("bootstrap done: company=%d store=%d roles=%d admin username=admin（默认口令仅限非生产，请登录后立即修改）", company.ID, store.ID, len(roles))
 }
