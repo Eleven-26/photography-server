@@ -12,7 +12,6 @@ import (
 	"gorm.io/gorm"
 
 	"photography-server/internal/domain"
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
@@ -35,9 +34,9 @@ const (
 	smsFailMax = 5                // 校验失败次数上限，超限作废
 )
 
-// redis 访问器：统一走 infrastructure 单例（service 不持有基础设施句柄，与分层纪律一致）
+// redis 访问器：返回组合根注入的 Redis 客户端（#40 起不再读取 infrastructure 单例）
 func (s *Service) redis() *redis.Client {
-	return infrastructure.Redis()
+	return s.rdb
 }
 
 // SendSmsCode 发送短信验证码。验证码写入 Redis（5 分钟有效）；
@@ -170,7 +169,7 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 			logger.Warnf("CustomerSmsLogin: update customer failed, customerID=%d, err=%v", c.ID, err)
 		}
 		// 登录成功把状态置回活跃：失效认证缓存，避免"流失中"的旧画像在 TTL 内继续拦截
-		invalidateCustomerCache(ctx, companyID, c.ID)
+		s.invalidateCustomerCache(ctx, companyID, c.ID)
 	}
 	token, err := s.customerToken(c)
 	if err != nil {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/logger"
 )
@@ -99,7 +98,7 @@ func (m *Middlewares) OperationLog() gin.HandlerFunc {
 		// （Jaeger 通道由 gorm OTel 插件产生 SQL span，native 通道由注入 agent 增强 database/sql，
 		//   两者都依赖 ctx 里带有父 span，此约定为两条通道共用的前提）。
 		// gin 请求处理链未结束时 Request.Context() 仍有效，可直接复用。
-		if err := infrastructure.MySQL().WithContext(c.Request.Context()).Create(&log).Error; err != nil {
+		if err := m.DB.WithContext(c.Request.Context()).Create(&log).Error; err != nil {
 			logger.Warnf("operation log write failed: %v", err)
 		}
 	}

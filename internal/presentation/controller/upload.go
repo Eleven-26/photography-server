@@ -10,7 +10,7 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // UploadFile 图片/视频上传（multipart/form-data: file 字段）

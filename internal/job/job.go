@@ -10,14 +10,14 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/pkg/logger"
 )
 
-// Register 注册所有定时任务到 XXL-JOB 执行器
-func Register(executor xxl.Executor) {
-	executor.RegTask("job.test", traced("job.test", TestJob))
-	executor.RegTask("job.health_check", traced("job.health_check", HealthCheckJob))
+// Register 注册所有定时任务到 XXL-JOB 执行器。
+// tracer 由组合根注入（#40；链路未启用时为 nil，traced 退化为直调，零开销）。
+func Register(executor xxl.Executor, tracer trace.Tracer) {
+	executor.RegTask("job.test", traced(tracer, "job.test", TestJob))
+	executor.RegTask("job.health_check", traced(tracer, "job.health_check", HealthCheckJob))
 	logger.Infof("xxl-job tasks registered")
 }
 
@@ -30,9 +30,8 @@ func Register(executor xxl.Executor) {
 // 注意：SkyWalking-go（native）通道走编译期 agent 自动埋点，不覆盖 xxl-job（无 HTTP/SQL 之外的
 // 自动插件），该通道下 xxl 的 native 手动埋点为 P1 待办。
 // 用法：executor.RegTask("job.xxx", traced("job.xxx", XxxJob))
-func traced(handler string, fn xxl.TaskFunc) xxl.TaskFunc {
+func traced(tr trace.Tracer, handler string, fn xxl.TaskFunc) xxl.TaskFunc {
 	return func(cxt context.Context, param *xxl.RunReq) string {
-		tr := infrastructure.JaegerTracer()
 		if tr == nil {
 			return fn(cxt, param)
 		}

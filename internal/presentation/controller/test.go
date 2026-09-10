@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"photography-server/internal/enum"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,15 +14,15 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"photography-server/internal/infrastructure"
+	"photography-server/internal/enum"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // 注意：本文件是 dev/test 环境专用的「基础设施调试控制台」。
-// 所有处理器直连 infrastructure 单例（Redis/NATS/ES/Mongo），不经过 service 层，
-// 也未挂业务鉴权。路由注册由 router.registerDebug 负责，且仅非 release 环境生效；
-// 请勿在本文件新增任何业务逻辑或将其暴露到生产环境。
+// 所有处理器通过注入的 App 容器（h.App）访问 Redis/NATS/ES/Mongo，不经过 service 层，
+// 也不再直连 infrastructure 包级单例（#40）。路由注册由 router.registerDebug 负责，
+// 且仅非 release 环境生效；请勿在本文件新增任何业务逻辑或将其暴露到生产环境。
 
 // ======================== Redis 示例 ========================
 
@@ -41,13 +40,13 @@ func (h *Controller) RedisSet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if infrastructure.Redis() == nil {
+	if h.App.Redis == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
 	ttl := time.Duration(req.TTL) * time.Second
-	if err := infrastructure.Redis().Set(ctx, req.Key, req.Value, ttl).Err(); err != nil {
+	if err := h.App.Redis.Set(ctx, req.Key, req.Value, ttl).Err(); err != nil {
 		response.Fail(c, errs.Internal("redis set 失败: "+err.Error()))
 		return
 	}
@@ -66,12 +65,12 @@ func (h *Controller) RedisGet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if infrastructure.Redis() == nil {
+	if h.App.Redis == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
-	val, err := infrastructure.Redis().Get(ctx, req.Key).Result()
+	val, err := h.App.Redis.Get(ctx, req.Key).Result()
 	if err != nil {
 		response.Fail(c, errs.Internal("redis get 失败: "+err.Error()))
 		return
@@ -87,12 +86,12 @@ func (h *Controller) RedisDel(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if infrastructure.Redis() == nil {
+	if h.App.Redis == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx := context.Background()
-	n, err := infrastructure.Redis().Del(ctx, req.Key).Result()
+	n, err := h.App.Redis.Del(ctx, req.Key).Result()
 	if err != nil {
 		response.Fail(c, errs.Internal("redis del 失败: "+err.Error()))
 		return
@@ -103,13 +102,13 @@ func (h *Controller) RedisDel(c *gin.Context) {
 // RedisPing 测试 Redis 连通性
 // POST /test/redis/ping
 func (h *Controller) RedisPing(c *gin.Context) {
-	if infrastructure.Redis() == nil {
+	if h.App.Redis == nil {
 		response.Fail(c, errs.Internal("redis 未连接"))
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := infrastructure.Redis().Ping(ctx).Err(); err != nil {
+	if err := h.App.Redis.Ping(ctx).Err(); err != nil {
 		response.Fail(c, errs.Internal("redis ping 失败: "+err.Error()))
 		return
 	}
@@ -131,11 +130,11 @@ func (h *Controller) NATSPub(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if infrastructure.GetNatsClient() == nil {
+	if h.App.NatsCli == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	if err := infrastructure.GetNatsClient().Publish(c.Request.Context(), req.Subject, []byte(req.Msg)); err != nil {
+	if err := h.App.NatsCli.Publish(c.Request.Context(), req.Subject, []byte(req.Msg)); err != nil {
 		response.Fail(c, errs.Internal("nats pub 失败: "+err.Error()))
 		return
 	}
@@ -150,7 +149,7 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	client := infrastructure.GetNatsClient()
+	client := h.App.NatsCli
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
@@ -182,11 +181,11 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	if infrastructure.GetNatsClient() == nil {
+	if h.App.NatsCli == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	data, err := infrastructure.GetNatsClient().Request(c.Request.Context(), req.Subject, []byte(req.Msg), 3*time.Second)
+	data, err := h.App.NatsCli.Request(c.Request.Context(), req.Subject, []byte(req.Msg), 3*time.Second)
 	if err != nil {
 		response.Fail(c, errs.Internal("nats request 超时或失败: "+err.Error()))
 		return
@@ -197,12 +196,12 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 // NATSStatus 检查 NATS 连接状态
 // POST /test/nats/status
 func (h *Controller) NATSStatus(c *gin.Context) {
-	client := infrastructure.GetNatsClient()
+	client := h.App.NatsCli
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
 	}
-	nc := infrastructure.NATS()
+	nc := h.App.NATS
 	status := "disconnected"
 	if nc.IsConnected() {
 		status = "connected"
@@ -224,7 +223,7 @@ func (h *Controller) NATSPubPull(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	client := infrastructure.GetNatsClient()
+	client := h.App.NatsCli
 	if client == nil {
 		response.Fail(c, errs.Internal("nats 未连接"))
 		return
@@ -256,11 +255,11 @@ func (h *Controller) Test(c *gin.Context) {
 // ESStatus 检查 ES 连接状态
 // POST /test/es/status
 func (h *Controller) ESStatus(c *gin.Context) {
-	if infrastructure.ES() == nil {
+	if h.App.ES == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
-	res, err := infrastructure.ES().Info()
+	res, err := h.App.ES.Info()
 	if err != nil {
 		response.Fail(c, errs.Internal("elasticsearch info 失败: "+err.Error()))
 		return
@@ -280,7 +279,7 @@ type esIndexReq struct {
 // ESIndex 创建文档
 // POST /test/es/index
 func (h *Controller) ESIndex(c *gin.Context) {
-	if infrastructure.ES() == nil {
+	if h.App.ES == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -290,7 +289,7 @@ func (h *Controller) ESIndex(c *gin.Context) {
 		return
 	}
 	data, _ := json.Marshal(req.Body)
-	res, err := infrastructure.ES().API.Index(req.Index, bytes.NewReader(data))
+	res, err := h.App.ES.API.Index(req.Index, bytes.NewReader(data))
 	if err != nil {
 		response.Fail(c, errs.Internal("es index 失败: "+err.Error()))
 		return
@@ -313,7 +312,7 @@ type esSearchReq struct {
 // 注意：Elasticsearch 7.0+ 已移除 _all 字段，不能再对其做 match 查询。
 // 默认对 title/content 做多字段匹配，也可通过 fields 参数指定字段。
 func (h *Controller) ESSearch(c *gin.Context) {
-	if infrastructure.ES() == nil {
+	if h.App.ES == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -342,9 +341,9 @@ func (h *Controller) ESSearch(c *gin.Context) {
 		return
 	}
 
-	res, err := infrastructure.ES().API.Search(
-		infrastructure.ES().API.Search.WithIndex(req.Index),
-		infrastructure.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
+	res, err := h.App.ES.API.Search(
+		h.App.ES.API.Search.WithIndex(req.Index),
+		h.App.ES.API.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		response.Fail(c, errs.Internal("es search 失败: "+err.Error()))
@@ -366,7 +365,7 @@ type esListReq struct {
 // ESList 查询所有文档（match_all）
 // POST /test/es/list
 func (h *Controller) ESList(c *gin.Context) {
-	if infrastructure.ES() == nil {
+	if h.App.ES == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -400,9 +399,9 @@ func (h *Controller) ESList(c *gin.Context) {
 		return
 	}
 
-	res, err := infrastructure.ES().API.Search(
-		infrastructure.ES().API.Search.WithIndex(req.Index),
-		infrastructure.ES().API.Search.WithBody(bytes.NewReader(queryBytes)),
+	res, err := h.App.ES.API.Search(
+		h.App.ES.API.Search.WithIndex(req.Index),
+		h.App.ES.API.Search.WithBody(bytes.NewReader(queryBytes)),
 	)
 	if err != nil {
 		response.Fail(c, errs.Internal("es list 失败: "+err.Error()))
@@ -423,7 +422,7 @@ type esDeleteReq struct {
 // ESDelete 删除文档
 // POST /test/es/delete
 func (h *Controller) ESDelete(c *gin.Context) {
-	if infrastructure.ES() == nil {
+	if h.App.ES == nil {
 		response.Fail(c, errs.Internal("elasticsearch 未连接"))
 		return
 	}
@@ -432,7 +431,7 @@ func (h *Controller) ESDelete(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	res, err := infrastructure.ES().API.Delete(req.Index, req.ID)
+	res, err := h.App.ES.API.Delete(req.Index, req.ID)
 	if err != nil {
 		response.Fail(c, errs.Internal("es delete 失败: "+err.Error()))
 		return
@@ -449,13 +448,13 @@ func (h *Controller) ESDelete(c *gin.Context) {
 // MongoStatus 检查 MongoDB 连接状态
 // POST /test/mongo/status
 func (h *Controller) MongoStatus(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := infrastructure.Mongo().Ping(ctx, nil); err != nil {
+	if err := h.App.Mongo.Ping(ctx, nil); err != nil {
 		response.Fail(c, errs.Internal("mongodb ping 失败: "+err.Error()))
 		return
 	}
@@ -470,7 +469,7 @@ type mongoInsertReq struct {
 // MongoInsert 插入单个文档
 // POST /test/mongo/insert
 func (h *Controller) MongoInsert(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -481,7 +480,7 @@ func (h *Controller) MongoInsert(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := infrastructure.MongoDatabase().Collection(req.Collection).InsertOne(ctx, req.Doc)
+	res, err := h.App.MongoDB.Collection(req.Collection).InsertOne(ctx, req.Doc)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo insert 失败: "+err.Error()))
 		return
@@ -497,7 +496,7 @@ type mongoInsertManyReq struct {
 // MongoInsertMany 批量插入文档
 // POST /test/mongo/insert-many
 func (h *Controller) MongoInsertMany(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -512,7 +511,7 @@ func (h *Controller) MongoInsertMany(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := infrastructure.MongoDatabase().Collection(req.Collection).InsertMany(ctx, docs)
+	res, err := h.App.MongoDB.Collection(req.Collection).InsertMany(ctx, docs)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo insert-many 失败: "+err.Error()))
 		return
@@ -530,7 +529,7 @@ type mongoFindReq struct {
 // MongoFind 查询文档（支持分页）
 // POST /test/mongo/find
 func (h *Controller) MongoFind(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -549,7 +548,7 @@ func (h *Controller) MongoFind(c *gin.Context) {
 	if filter == nil {
 		filter = bson.M{}
 	}
-	coll := infrastructure.MongoDatabase().Collection(req.Collection)
+	coll := h.App.MongoDB.Collection(req.Collection)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -591,7 +590,7 @@ type mongoFindOneReq struct {
 // MongoFindOne 查询单个文档
 // POST /test/mongo/find-one
 func (h *Controller) MongoFindOne(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -603,7 +602,7 @@ func (h *Controller) MongoFindOne(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var doc map[string]interface{}
-	err := infrastructure.MongoDatabase().Collection(req.Collection).FindOne(ctx, req.Filter).Decode(&doc)
+	err := h.App.MongoDB.Collection(req.Collection).FindOne(ctx, req.Filter).Decode(&doc)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo find-one 失败: "+err.Error()))
 		return
@@ -620,7 +619,7 @@ type mongoUpdateReq struct {
 // MongoUpdate 更新文档（单个）
 // POST /test/mongo/update
 func (h *Controller) MongoUpdate(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -631,7 +630,7 @@ func (h *Controller) MongoUpdate(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := infrastructure.MongoDatabase().Collection(req.Collection).UpdateOne(ctx, req.Filter, req.Update)
+	res, err := h.App.MongoDB.Collection(req.Collection).UpdateOne(ctx, req.Filter, req.Update)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo update 失败: "+err.Error()))
 		return
@@ -651,7 +650,7 @@ type mongoDeleteReq struct {
 // MongoDelete 删除文档（可删多个）
 // POST /test/mongo/delete
 func (h *Controller) MongoDelete(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -662,7 +661,7 @@ func (h *Controller) MongoDelete(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := infrastructure.MongoDatabase().Collection(req.Collection).DeleteMany(ctx, req.Filter)
+	res, err := h.App.MongoDB.Collection(req.Collection).DeleteMany(ctx, req.Filter)
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo delete 失败: "+err.Error()))
 		return
@@ -678,7 +677,7 @@ type mongoDeleteIDReq struct {
 // MongoDeleteByID 按 ObjectID 删除文档
 // POST /test/mongo/delete-by-id
 func (h *Controller) MongoDeleteByID(c *gin.Context) {
-	if !infrastructure.MongoIsConnected() {
+	if !h.App.MongoConnected() {
 		response.Fail(c, errs.Internal("mongodb 未连接"))
 		return
 	}
@@ -694,7 +693,7 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := infrastructure.MongoDatabase().Collection(req.Collection).DeleteOne(ctx, bson.M{"_id": oid})
+	res, err := h.App.MongoDB.Collection(req.Collection).DeleteOne(ctx, bson.M{"_id": oid})
 	if err != nil {
 		response.Fail(c, errs.Internal("mongo delete-by-id 失败: "+err.Error()))
 		return
@@ -716,7 +715,7 @@ func currentTraceID(c *gin.Context) string {
 // JaegerStatus 检查 Jaeger（OTel）通道追踪状态，并回传当前请求的 trace_id 便于 UI 检索
 // POST /test/jaeger/status
 func (h *Controller) JaegerStatus(c *gin.Context) {
-	if !infrastructure.JaegerEnabled() {
+	if !h.App.JaegerEnabled() {
 		response.Fail(c, errs.Internal("jaeger 未启用（enable=false 或初始化失败）"))
 		return
 	}
@@ -739,7 +738,7 @@ type jaegerTraceReq struct {
 // 前置条件：jaeger.enable=true 且 endpoint=jaeger:4317 可达；请求本身已被 trace 中间件覆盖。
 // POST /test/jaeger/trace
 func (h *Controller) JaegerTrace(c *gin.Context) {
-	tracer := infrastructure.JaegerTracer()
+	tracer := h.App.Tracer
 	if tracer == nil {
 		response.Fail(c, errs.Internal("jaeger 未启用"))
 		return
@@ -773,7 +772,7 @@ func (h *Controller) JaegerTrace(c *gin.Context) {
 	if req.WithDB {
 		// 带参数的 SQL：gorm 插件经 Dialector.Explain 填充参数后记录；
 		// ctx 显式透传给 gorm（WithContext），保证 db span 挂到本请求链路而非独立 trace
-		if db := infrastructure.MySQL(); db != nil {
+		if db := h.App.DB; db != nil {
 			var marker string
 			err := db.WithContext(ctx).Raw("SELECT ? AS trace_marker", fmt.Sprintf("verify-%d", req.SleepMs)).Row().Scan(&marker)
 			if err != nil {

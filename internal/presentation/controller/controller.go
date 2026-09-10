@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/app"
 	"photography-server/internal/common"
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/errs"
@@ -16,10 +17,12 @@ import (
 type Controller struct {
 	Svc *service.Service
 	Cfg *config.Config
+	// App 依赖容器，仅供非 release 环境注册的调试路由（/test/*）使用（#40 由组合根注入）。
+	App *app.App
 }
 
-func New(svc *service.Service, cfg *config.Config) *Controller {
-	return &Controller{Svc: svc, Cfg: cfg}
+func New(svc *service.Service, cfg *config.Config, a *app.App) *Controller {
+	return &Controller{Svc: svc, Cfg: cfg, App: a}
 }
 
 // bindJSON 绑定 JSON 请求体

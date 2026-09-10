@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/app"
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
@@ -16,7 +17,8 @@ import (
 // 客户端分组：pc-管理后台 miniapp-小程序管理后台 wechat-客户小程序 h5-客户H5
 // 端入口分开：管理端接口仅注册在 pc/miniapp；微信小程序为移动端统一入口（当前无独立 App），
 // 客户区挂 /wechat（客户认证）、员工区挂 /wechat/staff（员工认证）；客户 H5 挂 /h5（客户认证）。
-func New(cfg *config.Config, svc *service.Service) *gin.Engine {
+// mw / a 由组合根（main）构造后注入（#40），路由层不再触碰基础设施单例。
+func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a *app.App) *gin.Engine {
 	if cfg.App.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -27,7 +29,7 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 	// 预解析 body 存入 context 并回填，供 params.Str/Int/Int64 读取；非 JSON 请求原样放行
 	engine.Use(params.Middleware())
 	// Jaeger 链路通道（OTel → Jaeger，复用 OTel 埋点）：未启用时返回 nil，请求路径零影响
-	if tm := middleware.JaegerTrace(cfg.Jaeger.Service); tm != nil {
+	if tm := mw.JaegerTrace(); tm != nil {
 		engine.Use(tm)
 		// 把 entry span 的 trace_id 回写响应头 X-Trace-Id，便于日志/UI 检索；需注册在 otelgin 之后
 		engine.Use(middleware.TraceID())
@@ -39,9 +41,7 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 		engine.Use(middleware.TraceID())
 	}
 
-	ctl := controller.New(svc, cfg)
-	middleware.Init(cfg)
-	mw := middleware.Get()
+	ctl := controller.New(svc, cfg, a)
 
 	// 静态资源：上传文件（鉴权下载，禁止匿名枚举客户样片/成片/凭证）
 	// 访问需携带有效登录令牌（员工或客户均可）；文件名服务端生成不可枚举（见 service/upload.go）

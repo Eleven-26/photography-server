@@ -2,6 +2,7 @@ package mq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/pkg/logger"
 )
 
@@ -26,9 +26,11 @@ type natsHandler func(ctx context.Context, msg *nats.Msg)
 type Consumer struct {
 	nc       *nats.Conn
 	js       nats.JetStreamContext
+	tracer   trace.Tracer
 	subs     []*nats.Subscription
 	pullSubs []*pullSub
 	stopCh   chan struct{}
+	stopOnce sync.Once
 	wg       sync.WaitGroup
 }
 
@@ -38,10 +40,11 @@ type pullSub struct {
 	handler nats.MsgHandler
 }
 
-// New 创建消费者实例
-func New(nc *nats.Conn) *Consumer {
+// New 创建消费者实例。tracer 由组合根注入（#40；链路未启用时为 nil，traced 退化为直调）。
+func New(nc *nats.Conn, tracer trace.Tracer) *Consumer {
 	c := &Consumer{
 		nc:     nc,
+		tracer: tracer,
 		subs:   make([]*nats.Subscription, 0),
 		stopCh: make(chan struct{}),
 	}
@@ -56,74 +59,91 @@ func New(nc *nats.Conn) *Consumer {
 	return c
 }
 
-// Start 启动所有消费者
-func (c *Consumer) Start() {
+// Start 启动所有消费者。
+//
+// 返回非 nil 表示至少有一个核心订阅未能建立——这正是「服务看起来正常、但异步流程
+// （订单状态变更、通知推送、支付回调）全部停摆」的静默故障场景（#45.4）。
+// 调用方必须把它当作致命错误处理，而不是仅记日志继续启动。
+//
+// 说明：JetStream 不可用（连的是普通 NATS）时按既定策略降级为告警，不计入错误——
+// 该部署形态下持久化订阅本就无法建立，不应阻断启动；但若 JS 可用而个别订阅失败，
+// 属于真实故障，必须上报。
+func (c *Consumer) Start() error {
 	if c.nc == nil {
-		logger.Warnf("nats not connected, consumer skipped")
-		return
+		return errors.New("nats 未连接，消费者无法启动（异步流程将全部停摆）")
 	}
 
+	var failures []error
+
 	// ===== 非持久化消息消费 =====
-	c.subscribe("test.msg", handleTestMsg)
-	c.subscribe("order.status.change", handleOrderStatusChange)
-	c.subscribe("notification.push", handleNotificationPush)
+	failures = append(failures, c.subscribe("test.msg", handleTestMsg))
+	failures = append(failures, c.subscribe("order.status.change", handleOrderStatusChange))
+	failures = append(failures, c.subscribe("notification.push", handleNotificationPush))
 
 	// ===== JetStream Push 消费（回调自动处理） =====
-	c.jsSubscribe("photography.test.persistent", handleTestPersistent)
-	c.jsSubscribe("photography.order.created.persistent", handleOrderCreatedPersistent)
-	c.jsSubscribe("photography.payment.callback.persistent", handlePaymentCallbackPersistent)
+	failures = append(failures, c.jsSubscribe("photography.test.persistent", handleTestPersistent))
+	failures = append(failures, c.jsSubscribe("photography.order.created.persistent", handleOrderCreatedPersistent))
+	failures = append(failures, c.jsSubscribe("photography.payment.callback.persistent", handlePaymentCallbackPersistent))
 
 	// ===== JetStream Pull 消费（循环拉取） =====
-	c.jsPullSubscribe("photography.test.pull", handleTestPull)
-	c.jsPullSubscribe("photography.order.pull", handleOrderPull)
+	failures = append(failures, c.jsPullSubscribe("photography.test.pull", handleTestPull))
+	failures = append(failures, c.jsPullSubscribe("photography.order.pull", handleOrderPull))
 
 	// 启动 Pull 消费循环
 	c.startPullLoop()
 
 	logger.Infof("nats consumers started, push: %d, pull: %d", len(c.subs), len(c.pullSubs))
+
+	if err := errors.Join(failures...); err != nil {
+		return fmt.Errorf("nats 部分消费者启动失败（异步流程不完整）: %w", err)
+	}
+	return nil
 }
 
-// Stop 停止所有订阅
+// Stop 停止所有订阅。幂等：重复调用不会 panic（close 已关闭的 channel 会 panic）。
 func (c *Consumer) Stop() {
-	close(c.stopCh)
-	c.wg.Wait()
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+		c.wg.Wait()
 
-	for _, sub := range c.subs {
-		if sub.IsValid() {
-			sub.Unsubscribe()
+		for _, sub := range c.subs {
+			if sub.IsValid() {
+				sub.Unsubscribe()
+			}
 		}
-	}
-	for _, ps := range c.pullSubs {
-		if ps.sub.IsValid() {
-			ps.sub.Unsubscribe()
+		for _, ps := range c.pullSubs {
+			if ps.sub.IsValid() {
+				ps.sub.Unsubscribe()
+			}
 		}
-	}
-	c.subs = nil
-	c.pullSubs = nil
-	logger.Infof("nats consumers stopped")
+		c.subs = nil
+		c.pullSubs = nil
+		logger.Infof("nats consumers stopped")
+	})
 }
 
 // ======================== 订阅方法 ========================
 
-// subscribe 非持久化订阅
-func (c *Consumer) subscribe(subject string, handler natsHandler) {
-	sub, err := c.nc.Subscribe(subject, traced(subject, handler))
+// subscribe 非持久化订阅，失败返回 error（由 Start 汇总上报）
+func (c *Consumer) subscribe(subject string, handler natsHandler) error {
+	sub, err := c.nc.Subscribe(subject, c.traced(subject, handler))
 	if err != nil {
 		logger.Errorf("nats subscribe [%s] failed: %v", subject, err)
-		return
+		return fmt.Errorf("subscribe %s: %w", subject, err)
 	}
 	c.subs = append(c.subs, sub)
 	logger.Infof("nats subscribed: %s", subject)
+	return nil
 }
 
 // jsSubscribe JetStream Push 订阅（回调自动处理，服务启动一次即可）
-func (c *Consumer) jsSubscribe(subject string, handler natsHandler) {
+func (c *Consumer) jsSubscribe(subject string, handler natsHandler) error {
 	if c.js == nil {
 		logger.Warnf("jetStream not available, skip push subscribe [%s]", subject)
-		return
+		return nil
 	}
 	durable := durableName(subject)
-	sub, err := c.js.Subscribe(subject, traced(subject, handler),
+	sub, err := c.js.Subscribe(subject, c.traced(subject, handler),
 		nats.Durable(durable),
 		nats.ManualAck(),
 		nats.DeliverAll(),
@@ -132,17 +152,18 @@ func (c *Consumer) jsSubscribe(subject string, handler natsHandler) {
 	)
 	if err != nil {
 		logger.Errorf("jetStream push subscribe [%s] failed: %v", subject, err)
-		return
+		return fmt.Errorf("js push subscribe %s: %w", subject, err)
 	}
 	c.subs = append(c.subs, sub)
 	logger.Infof("jetStream push subscribed: %s (durable: %s)", subject, durable)
+	return nil
 }
 
 // jsPullSubscribe JetStream Pull 订阅（注册到列表，由 startPullLoop 循环拉取）
-func (c *Consumer) jsPullSubscribe(subject string, handler natsHandler) {
+func (c *Consumer) jsPullSubscribe(subject string, handler natsHandler) error {
 	if c.js == nil {
 		logger.Warnf("jetStream not available, skip pull subscribe [%s]", subject)
-		return
+		return nil
 	}
 	durable := durableName(subject)
 	sub, err := c.js.PullSubscribe(subject, durable,
@@ -152,10 +173,11 @@ func (c *Consumer) jsPullSubscribe(subject string, handler natsHandler) {
 	)
 	if err != nil {
 		logger.Errorf("jetStream pull subscribe [%s] failed: %v", subject, err)
-		return
+		return fmt.Errorf("js pull subscribe %s: %w", subject, err)
 	}
-	c.pullSubs = append(c.pullSubs, &pullSub{sub: sub, handler: traced(subject, handler)})
+	c.pullSubs = append(c.pullSubs, &pullSub{sub: sub, handler: c.traced(subject, handler)})
 	logger.Infof("jetStream pull subscribed: %s (durable: %s)", subject, durable)
+	return nil
 }
 
 // startPullLoop 启动 Pull 消费循环（每秒拉取一次）
@@ -207,9 +229,9 @@ func durableName(subject string) string {
 // 追踪未启用时原样调用业务 handler，零开销。
 // 注意：SkyWalking-go（native）通道的消息 Header 无 OTel traceparent（agent 未注入），
 // 该通道下 MQ 透传需按 sw8 header 格式手动接入，为 P1 待办。
-func traced(subject string, handler natsHandler) nats.MsgHandler {
+func (c *Consumer) traced(subject string, handler natsHandler) nats.MsgHandler {
 	return func(msg *nats.Msg) {
-		tr := infrastructure.JaegerTracer()
+		tr := c.tracer
 		if tr == nil {
 			handler(context.Background(), msg)
 			return

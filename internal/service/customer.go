@@ -91,7 +91,7 @@ func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req
 		return err
 	}
 	// 状态（含停用/流失）变更：失效客户认证画像缓存，使停用即时生效（#30）
-	invalidateCustomerCache(ctx, op.CompanyID, id)
+	s.invalidateCustomerCache(ctx, op.CompanyID, id)
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (s *Service) DeleteCustomer(ctx context.Context, op Operator, id int64) err
 	if err := s.CustomerRepo.Delete(ctx, op.CompanyID, id); err != nil {
 		return err
 	}
-	invalidateCustomerCache(ctx, op.CompanyID, id)
+	s.invalidateCustomerCache(ctx, op.CompanyID, id)
 	return nil
 }
 

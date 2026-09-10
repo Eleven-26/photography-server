@@ -6,12 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/domain"
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // ClientUserKey 客户端用户上下文键，同时用于 gin.Context 与 request context
@@ -25,15 +24,15 @@ func GetClientUser(c *gin.Context) *domain.ClientUser {
 }
 
 // loadCustomerProfile 加载客户认证画像（优先缓存，回源 DB fail-open），见 auth.go loadStaffProfile 注释
-func loadCustomerProfile(ctx context.Context, companyID, customerID int64) (*authcache.CustomerProfile, error) {
-	rdb := infrastructure.Redis()
+func (m *Middlewares) loadCustomerProfile(ctx context.Context, companyID, customerID int64) (*authcache.CustomerProfile, error) {
+	rdb := m.Redis
 	if rdb != nil {
 		if p, hit, err := authcache.GetCustomer(ctx, rdb, companyID, customerID); err == nil && hit {
 			return p, nil
 		}
 	}
 	var u model.Customer
-	if err := infrastructure.MySQL().WithContext(ctx).Where("company_id = ?", companyID).First(&u, customerID).Error; err != nil {
+	if err := m.DB.WithContext(ctx).Where("company_id = ?", companyID).First(&u, customerID).Error; err != nil {
 		return nil, err
 	}
 	p := &authcache.CustomerProfile{
@@ -63,7 +62,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if tokenRevoked(c.Request.Context(), claims.ID) {
+		if m.tokenRevoked(c.Request.Context(), claims.ID) {
 			response.Fail(c, errs.Unauthorized("登录已失效，请重新登录"))
 			c.Abort()
 			return
@@ -74,7 +73,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		u, err := loadCustomerProfile(c.Request.Context(), claims.CompanyID, claims.UserID)
+		u, err := m.loadCustomerProfile(c.Request.Context(), claims.CompanyID, claims.UserID)
 		if err != nil {
 			response.Fail(c, errs.Unauthorized(""))
 			c.Abort()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"photography-server/internal/domain"
@@ -16,13 +17,16 @@ import (
 type Operator = domain.Operator
 
 // Service 业务服务根结构，按领域拆分到不同文件。
-// 分层纪律：service 只依赖 repository（数据访问唯一入口），
-// 不持有任何基础设施句柄；开启事务统一走 repository.Tx(...)。
-// JWTSecret/JWTIssuer：客户端三端签发 JWT 所需（由 config.JWT 注入，只读）。
+// 分层纪律：service 只依赖 repository（数据访问唯一入口）与组合根注入的依赖，
+// 不再读取任何 infrastructure 包级单例（#40）；开启事务统一走 repository.Tx(...)。
+// service 不持有 DB 句柄——事务连接全程由 repository 管理。
+// UploadDir / JWTSecret / JWTIssuer / rdb 均为只读依赖，由 main 在启动时注入。
+// 说明：rdb（Redis）用于验证码、登录限流、令牌吊销与认证画像缓存，属会话/缓存基础设施。
 type Service struct {
 	UploadDir        string
 	JWTSecret        string
 	JWTIssuer        string
+	rdb              *redis.Client
 	AuthRepo         *repository.AuthRepo
 	UserRepo         *repository.UserRepo
 	CustomerRepo     *repository.CustomerRepo
@@ -48,11 +52,14 @@ type Service struct {
 	DeviceRepo        *repository.DeviceRepo
 }
 
-func New(uploadDir, jwtSecret, jwtIssuer string) *Service {
+// New 构造业务服务。依赖（上传目录 / JWT 参数 / Redis 客户端）由组合根注入，
+// service 不自行获取任何全局基础设施句柄（#40）。
+func New(uploadDir, jwtSecret, jwtIssuer string, rdb *redis.Client) *Service {
 	return &Service{
 		UploadDir:         uploadDir,
 		JWTSecret:         jwtSecret,
 		JWTIssuer:         jwtIssuer,
+		rdb:               rdb,
 		AuthRepo:          repository.NewAuthRepo(),
 		UserRepo:          repository.NewUserRepo(),
 		CustomerRepo:      repository.NewCustomerRepo(),

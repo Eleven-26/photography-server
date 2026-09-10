@@ -67,7 +67,7 @@ func (s *Service) UpdateUser(ctx context.Context, op Operator, id int64, req dto
 		return err
 	}
 	// 状态/角色可能变更：失效认证画像缓存，停用即时生效（#30）
-	invalidateStaffCache(ctx, id)
+	s.invalidateStaffCache(ctx, id)
 	return nil
 }
 
@@ -78,7 +78,7 @@ func (s *Service) DeleteUser(ctx context.Context, op Operator, id int64) error {
 	if err := s.UserRepo.Delete(ctx, op.CompanyID, id); err != nil {
 		return err
 	}
-	invalidateStaffCache(ctx, id)
+	s.invalidateStaffCache(ctx, id)
 	return nil
 }
 
@@ -94,7 +94,7 @@ func (s *Service) ResetPassword(ctx context.Context, op Operator, id int64, pwd 
 	if err := s.UserRepo.UpdatePassword(ctx, op.CompanyID, id, string(hash)); err != nil {
 		return err
 	}
-	invalidateStaffCache(ctx, id)
+	s.invalidateStaffCache(ctx, id)
 	return nil
 }
 

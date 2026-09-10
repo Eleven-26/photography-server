@@ -70,10 +70,3 @@ func (r *PackageRepo) Update(ctx context.Context, companyID, id int64, updates m
 func (r *PackageRepo) Delete(ctx context.Context, companyID, id int64) error {
 	return r.tenant(companyID).WithContext(ctx).Delete(&model.Package{}, id).Error
 }
-
-// CountOrdersByPackage 统计引用该套餐的订单数
-func (r *PackageRepo) CountOrdersByPackage(ctx context.Context, companyID, packageID int64) (int64, error) {
-	var count int64
-	err := r.tenant(companyID).WithContext(ctx).Model(&model.Order{}).Where("package_id = ?", packageID).Count(&count).Error
-	return count, err
-}

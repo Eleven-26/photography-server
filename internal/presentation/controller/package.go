@@ -3,9 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/presentation/dto"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) PackageList(c *gin.Context) {
@@ -69,6 +70,10 @@ func (h *Controller) PackageUpdate(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// PackageStatus 套餐上架/下线（PC 卡片开关）。
+// 注意：前端 `setPackageStatus(id, status: number)` 传的是数字（enum.PackageStatus），
+// 原实现声明 `Status string` + `binding:"required"`，JSON 反序列化会直接抛
+// "cannot unmarshal number into Go struct field .status of type string"，即用户看到的类型错误。
 func (h *Controller) PackageStatus(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := pathID(c)
@@ -77,15 +82,16 @@ func (h *Controller) PackageStatus(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Status string `json:"status" binding:"required"`
+		Status int `json:"status" binding:"required"`
 	}
 	if err := h.bindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
-	_ = op
-	_ = id
-	_ = req
+	if err := h.Svc.ChangePackageStatus(c.Request.Context(), op, id, enum.PackageStatus(req.Status)); err != nil {
+		response.Fail(c, err)
+		return
+	}
 	response.OKNil(c)
 }
 

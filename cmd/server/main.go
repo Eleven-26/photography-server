@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"photography-server/internal/presentation/job"
 	"syscall"
 	"time"
 
@@ -21,11 +20,14 @@ import (
 	//   ② OTel→Jaeger：不注入 agent，jaeger.enable=true 时启用 OTel exporter（下方 InitJaeger）。
 	_ "github.com/apache/skywalking-go"
 
+	"photography-server/internal/app"
 	"photography-server/internal/config"
 	"photography-server/internal/infrastructure"
+	"photography-server/internal/job"
 	"photography-server/internal/middleware"
+	"photography-server/internal/mq"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/mq"
+	"photography-server/internal/repository"
 	"photography-server/internal/router"
 	"photography-server/internal/service"
 )
@@ -77,7 +79,7 @@ func main() {
 	}
 	logger.Infof("ping database ok")
 
-	bootstrap(cfg.App.Profile) // #25：prod 环境内部禁用（见 bootstrap.go）
+	bootstrap(cfg.App.Profile, infrastructure.MySQL()) // #25：prod 环境内部禁用（见 bootstrap.go）
 
 	// Redis 提升为硬依赖（#12）：验证码登录、JWT 登出黑名单、认证画像缓存全部依赖 Redis，
 	// 旧实现失败仅 warn 后继续启动，会让服务"看似正常但客户端全部无法登录/登出"。
@@ -101,21 +103,33 @@ func main() {
 	if err := infrastructure.InitXxlJob(cfg); err != nil {
 		logger.Warnf("xxl-job not available, skipping: %v", err)
 	}
+
+	// ---- 组合根装配（#40）----
+	// 至此所有 Init* 已完成，把句柄一次性装入依赖容器，再显式注入各层。
+	// 单例的读写都收敛在本函数内；repository/service/middleware/job/mq/presentation
+	// 均通过注入获取依赖，不再 import infrastructure。
+	deps := app.New(cfg)
+	repository.Init(deps.DB)
+
 	if executor := infrastructure.XxlExecutor(); executor != nil {
-		job.Register(executor)
+		job.Register(executor, deps.Tracer)
 		infrastructure.RunXxlJob()
 	}
 
-	// 启动 NATS 消费者（实例外提：优雅退出时先 Stop 再关连接）
+	// 启动 NATS 消费者（实例外提：优雅退出时先 Stop 再关连接）。
+	// Start 返回错误说明订阅未完整建立——此时服务看似正常但异步流程（订单状态变更、
+	// 通知推送、支付回调）全部停摆（#45.4），必须 fail-fast 暴露，而不是记日志继续跑。
 	var consumer *mq.Consumer
-	if nc := infrastructure.NATS(); nc != nil {
-		consumer = mq.New(nc)
-		consumer.Start()
+	if deps.NATS != nil {
+		consumer = mq.New(deps.NATS, deps.Tracer)
+		if err := consumer.Start(); err != nil {
+			panic(fmt.Sprintf("启动 NATS 消费者失败: %v", err))
+		}
 	}
 
-	middleware.Init(cfg)
-	svc := service.New(cfg.Upload.Dir, cfg.JWT.Secret, cfg.JWT.Issuer)
-	engine := router.New(cfg, svc)
+	mw := middleware.New(middleware.Deps{Cfg: cfg, DB: deps.DB, Redis: deps.Redis, Tracer: deps.Tracer})
+	svc := service.New(cfg.Upload.Dir, cfg.JWT.Secret, cfg.JWT.Issuer, deps.Redis)
+	engine := router.New(cfg, svc, mw, deps)
 
 	// HTTP Server 超时（#26）：防 Slowloris 类慢速攻击用极少量连接长期占满 goroutine/文件描述符。
 	// ReadHeaderTimeout 必设（读请求头自身无业务超时兜底）；WriteTimeout 覆盖整请求写响应。

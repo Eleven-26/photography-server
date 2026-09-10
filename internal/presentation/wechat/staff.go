@@ -10,7 +10,7 @@ import (
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // 小程序员工区接口（订单处理 + 日程 + 线索 AI 简报 + 个人中心）。

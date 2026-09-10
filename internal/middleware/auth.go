@@ -6,12 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/domain"
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // extractToken 从 Authorization: Bearer 中提取令牌
@@ -24,13 +23,13 @@ func extractToken(c *gin.Context) string {
 }
 
 // tokenRevoked 检查 jti 是否已被吊销（登出黑名单）。
-// Redis 不可用（rdb==nil）或查询出错时 fail-open 放行——吊销依赖 Redis 是尽力而为；
+// Redis 不可用（m.Redis==nil）或查询出错时 fail-open 放行——吊销依赖 Redis 是尽力而为；
 // 登录链路本身强依赖 Redis，Redis 长期不可用时服务已按 fail-fast 拒启（见 main.go）。
-func tokenRevoked(ctx context.Context, jti string) bool {
+func (m *Middlewares) tokenRevoked(ctx context.Context, jti string) bool {
 	if jti == "" {
 		return false // 旧令牌无 jti，无吊销能力
 	}
-	rdb := infrastructure.Redis()
+	rdb := m.Redis
 	if rdb == nil {
 		return false
 	}
@@ -40,15 +39,15 @@ func tokenRevoked(ctx context.Context, jti string) bool {
 
 // loadStaffProfile 加载员工认证画像：优先 Redis 缓存（60s TTL），未命中回源 DB。
 // 缓存命中但画像不全时同样回源 DB 覆盖（fail-open，保证租户/角色字段正确）。
-func loadStaffProfile(ctx context.Context, userID int64) (*authcache.StaffProfile, error) {
-	rdb := infrastructure.Redis()
+func (m *Middlewares) loadStaffProfile(ctx context.Context, userID int64) (*authcache.StaffProfile, error) {
+	rdb := m.Redis
 	if rdb != nil {
 		if p, hit, err := authcache.GetStaff(ctx, rdb, userID); err == nil && hit {
 			return p, nil
 		}
 	}
 	var u model.SysUser
-	if err := infrastructure.MySQL().WithContext(ctx).First(&u, userID).Error; err != nil {
+	if err := m.DB.WithContext(ctx).First(&u, userID).Error; err != nil {
 		return nil, err
 	}
 	p := &authcache.StaffProfile{
@@ -82,7 +81,7 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	if tokenRevoked(c.Request.Context(), claims.ID) {
+	if m.tokenRevoked(c.Request.Context(), claims.ID) {
 		response.Fail(c, errs.Unauthorized("登录已失效，请重新登录"))
 		c.Abort()
 		return
@@ -94,7 +93,7 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 		return
 	}
 
-	u, err := loadStaffProfile(c.Request.Context(), claims.UserID)
+	u, err := m.loadStaffProfile(c.Request.Context(), claims.UserID)
 	if err != nil {
 		response.Fail(c, errs.Unauthorized(""))
 		c.Abort()

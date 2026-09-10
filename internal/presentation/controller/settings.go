@@ -5,7 +5,7 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/presentation/dto"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) Workspace(c *gin.Context) {

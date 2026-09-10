@@ -6,7 +6,7 @@ import (
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) UserList(c *gin.Context) {

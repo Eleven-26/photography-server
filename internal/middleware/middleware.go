@@ -1,34 +1,42 @@
 package middleware
 
 import (
-	"sync"
-
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel/trace"
+	"gorm.io/gorm"
 
 	"photography-server/internal/config"
 	"photography-server/internal/service"
 )
 
+// Deps 中间件所需的依赖，由组合根（main）注入（#40）。
+// 改造前中间件直接调用 infrastructure.MySQL()/Redis()/JaegerEnabled() 全局单例。
+type Deps struct {
+	Cfg    *config.Config
+	DB     *gorm.DB
+	Redis  *redis.Client
+	Tracer trace.Tracer // nil = 链路未启用
+}
+
+// Middlewares 中间件集合：显式持有注入的连接句柄，不读取任何包级单例。
 type Middlewares struct {
-	Cfg *config.Config
+	Cfg    *config.Config
+	DB     *gorm.DB
+	Redis  *redis.Client
+	Tracer trace.Tracer
 }
 
-var (
-	mwInstance *Middlewares
-	mwOnce     sync.Once
-)
-
-// Init 初始化中间件单例
-func Init(cfg *config.Config) {
-	mwOnce.Do(func() {
-		mwInstance = &Middlewares{Cfg: cfg}
-	})
-}
-
-// Get 获取中间件单例
-// 注意：未调用 Init() 时返回 nil，调用方需做 nil 检查
-func Get() *Middlewares {
-	return mwInstance
+// New 构造中间件集合。
+// 替代原 Init/Get 单例：原实现由 router.New 与 main 各调用一次、依赖 sync.Once 兜底，
+// 初始化时序隐式耦合；现在由组合根构造一次再显式传入 router。
+func New(deps Deps) *Middlewares {
+	return &Middlewares{
+		Cfg:    deps.Cfg,
+		DB:     deps.DB,
+		Redis:  deps.Redis,
+		Tracer: deps.Tracer,
+	}
 }
 
 type ctxKey string

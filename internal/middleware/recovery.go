@@ -1,4 +1,4 @@
-﻿package middleware
+package middleware
 
 import (
 	"runtime/debug"
@@ -7,7 +7,7 @@ import (
 
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // Recovery 统一异常恢复，返回 JSON 错误

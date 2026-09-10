@@ -6,7 +6,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
@@ -16,7 +15,7 @@ import (
 // Login 登录。ctx 由 controller 传入（c.Request.Context()），透传给 repo 使 SQL 挂到当前链路。
 // 修复 #45.2：添加失败限流，防止暴力破解
 func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
-	rdb := infrastructure.Redis()
+	rdb := s.redis()
 
 	// 检查 IP 是否被锁定（失败 10 次）
 	if rdb != nil {
@@ -120,7 +119,7 @@ func (s *Service) ChangePassword(ctx context.Context, op Operator, oldPwd, newPw
 	}
 	// 改密后立即使该用户所有已签发令牌失效（认证画像缓存 60s 内仍可能放行旧会话，
 	// 主动删除让"改密=踢下线"即时生效）
-	invalidateStaffCache(ctx, op.UserID)
+	s.invalidateStaffCache(ctx, op.UserID)
 	return nil
 }
 
@@ -137,7 +136,7 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	if claims.ID == "" {
 		return nil
 	}
-	rdb := infrastructure.Redis()
+	rdb := s.redis()
 	if rdb == nil {
 		return nil
 	}

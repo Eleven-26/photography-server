@@ -5,7 +5,7 @@ import (
 
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/response"
+	"photography-server/internal/presentation/response"
 )
 
 // AssetAuth 静态资源（/uploads）访问鉴权中间件（#9）：
@@ -27,7 +27,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if tokenRevoked(c.Request.Context(), claims.ID) {
+		if m.tokenRevoked(c.Request.Context(), claims.ID) {
 			response.Fail(c, errs.Unauthorized("登录已失效，请重新登录"))
 			c.Abort()
 			return
@@ -35,7 +35,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 
 		// 员工令牌（含旧版无 utype 的向后兼容）：校验员工存在且启用
 		if claims.UserType == "" || claims.UserType == jwtpkg.UserTypeStaff {
-			u, err := loadStaffProfile(c.Request.Context(), claims.UserID)
+			u, err := m.loadStaffProfile(c.Request.Context(), claims.UserID)
 			if err != nil {
 				response.Fail(c, errs.Unauthorized(""))
 				c.Abort()
@@ -51,7 +51,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 		}
 		// 客户令牌：校验客户存在且未流失（2-活跃）
 		if claims.UserType == jwtpkg.UserTypeCustomer {
-			u, err := loadCustomerProfile(c.Request.Context(), claims.CompanyID, claims.UserID)
+			u, err := m.loadCustomerProfile(c.Request.Context(), claims.CompanyID, claims.UserID)
 			if err != nil {
 				response.Fail(c, errs.Unauthorized(""))
 				c.Abort()
