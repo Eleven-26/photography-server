@@ -14,15 +14,60 @@ import (
 )
 
 // Login 登录。ctx 由 controller 传入（c.Request.Context()），透传给 repo 使 SQL 挂到当前链路。
+// 修复 #45.2：添加失败限流，防止暴力破解
 func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
+	rdb := infrastructure.Redis()
+
+	// 检查 IP 是否被锁定（失败 10 次）
+	if rdb != nil {
+		ipLockKey := "login:ip:" + ip + "_locked"
+		if locked, _ := rdb.Exists(ctx, ipLockKey).Result(); locked > 0 {
+			return nil, errs.BadRequest("登录失败次数过多，请 15 分钟后再试")
+		}
+	}
+
+	// 检查用户名是否被锁定（失败 5 次）
+	if rdb != nil {
+		userLockKey := "login:user:" + req.Username + "_locked"
+		if locked, _ := rdb.Exists(ctx, userLockKey).Result(); locked > 0 {
+			return nil, errs.BadRequest("账号已被锁定，请 15 分钟后再试")
+		}
+	}
+
 	u, err := s.AuthRepo.GetByUsername(ctx, req.Username)
 	if err != nil {
+		// 统一错误消息，不泄露账号是否存在
 		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
+
+	// 账号停用也返回统一错误，避免泄露账号状态
 	if u.Status != 1 {
-		return nil, errs.Forbidden(errs.ErrAccountDisabled)
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
+
 	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)) != nil {
+		// 密码错误，记录失败次数
+		if rdb != nil {
+			// IP 维度计数
+			ipKey := "login:ip:" + ip
+			ipCount, _ := rdb.Incr(ctx, ipKey).Result()
+			if ipCount == 1 {
+				rdb.Expire(ctx, ipKey, 15*time.Minute)
+			}
+			if ipCount >= 10 {
+				rdb.Set(ctx, ipKey+"_locked", "1", 15*time.Minute)
+			}
+
+			// 用户名维度计数
+			userKey := "login:user:" + req.Username
+			userCount, _ := rdb.Incr(ctx, userKey).Result()
+			if userCount == 1 {
+				rdb.Expire(ctx, userKey, 15*time.Minute)
+			}
+			if userCount >= 5 {
+				rdb.Set(ctx, userKey+"_locked", "1", 15*time.Minute)
+			}
+		}
 		return nil, errs.BadRequest(errs.ErrAccountWrong)
 	}
 
@@ -38,6 +83,13 @@ func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours 
 	}
 
 	s.AuthRepo.UpdateLoginInfo(ctx, u.ID, ip)
+
+	// 登录成功，清除失败计数
+	if rdb != nil {
+		rdb.Del(ctx, "login:ip:"+ip)
+		rdb.Del(ctx, "login:user:"+req.Username)
+	}
+
 	u.Password = ""
 	return &dto.LoginResp{Token: token, User: *u}, nil
 }

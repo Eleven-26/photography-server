@@ -13,3 +13,4 @@ Makefile
 .env
 .env.example
 .workbuddy
+.doc
