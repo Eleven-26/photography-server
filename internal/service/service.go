@@ -6,19 +6,14 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/model"
 	"photography-server/internal/repository"
 )
 
 // Operator 当前操作人（由认证中间件注入）
-type Operator struct {
-	UserID    int64
-	Username  string
-	Nickname  string
-	CompanyID int64
-	StoreID   int64
-	RoleID    int64
-}
+// 重构 #32：类型别名，实际定义在 domain 包
+type Operator = domain.Operator
 
 // Service 业务服务根结构，按领域拆分到不同文件。
 // 分层纪律：service 只依赖 repository（数据访问唯一入口），

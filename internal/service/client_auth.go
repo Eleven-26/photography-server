@@ -20,12 +20,8 @@ import (
 )
 
 // ClientUser 客户端（H5/小程序）登录上下文，由 CustomerAuth 中间件注入
-type ClientUser struct {
-	CustomerID int64
-	CompanyID  int64
-	Mobile     string
-	Name       string
-}
+// 重构 #32：类型别名，实际定义在 domain 包
+type ClientUser = domain.ClientUser
 
 // smsCodeKey 验证码 Redis 键前缀，5 分钟过期
 const (

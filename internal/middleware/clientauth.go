@@ -5,13 +5,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 // ClientUserKey 客户端用户上下文键，同时用于 gin.Context 与 request context
@@ -86,7 +86,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		cu := &service.ClientUser{
+		cu := &domain.ClientUser{
 			CustomerID: claims.UserID,
 			CompanyID:  claims.CompanyID,
 			Mobile:     u.Mobile,

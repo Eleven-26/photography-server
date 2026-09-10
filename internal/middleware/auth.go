@@ -5,13 +5,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/infrastructure"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
 	"photography-server/internal/response"
-	"photography-server/internal/service"
 )
 
 // extractToken 从 Authorization: Bearer 中提取令牌
@@ -105,7 +105,7 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	op := service.Operator{
+	op := domain.Operator{
 		UserID:    claims.UserID,
 		Username:  u.Username,
 		Nickname:  u.Nickname,
