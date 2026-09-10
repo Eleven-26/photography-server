@@ -173,6 +173,17 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	od.POST("/cancel/:id", ctl.OrderCancel)
 	od.POST("/logs/:id", ctl.OrderLogs)
 
+	// 订单加项（妆造/时效/服务/精修）：增删改同事务重算订单金额
+	od.POST("/addon/list/:order_id", ctl.OrderAddonList)
+	od.POST("/addon/create/:order_id", ctl.OrderAddonCreate)
+	od.POST("/addon/update/:id", ctl.OrderAddonUpdate)
+	od.POST("/addon/delete/:id", ctl.OrderAddonDelete)
+
+	// 改期：PC 不直接改订单拍摄日期（会漏掉档期锁重排），统一走改期单链路
+	od.POST("/reschedule/list/:order_id", ctl.OrderRescheduleList)
+	od.POST("/reschedule/apply/:order_id", ctl.OrderRescheduleApply)
+	od.POST("/reschedule/audit/:id", ctl.OrderRescheduleAudit)
+
 	// 收款
 	pm := g.Group("/payment")
 	pm.POST("/create/:order_id", ctl.PaymentCreate)

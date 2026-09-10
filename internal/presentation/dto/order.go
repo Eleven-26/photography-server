@@ -34,6 +34,24 @@ type OrderStatusReq struct {
 	Content string `json:"content"`                   // 状态变更说明
 }
 
+// OrderAddonReq 订单加项创建/更新
+type OrderAddonReq struct {
+	Name      string  `json:"name" binding:"required"` // 加项名称
+	Category  string  `json:"category"`                // 分类 makeup-妆造 urgency-时效 service-服务 retouch-精修
+	Price     float64 `json:"price"`                   // 单价
+	Qty       int     `json:"qty"`                     // 数量（<=0 按 1 计）
+	Confirmed int     `json:"confirmed"`               // 客户是否确认 0-待确认 1-已确认
+	Remark    string  `json:"remark"`                  // 备注
+}
+
+// RescheduleApplyReq 管理端发起改期（摄影师/管理员代客户申请）
+type RescheduleApplyReq struct {
+	NewDate     string `json:"new_date" binding:"required"` // 新拍摄日期
+	NewTime     string `json:"new_time" binding:"required"` // 新拍摄时段
+	ReasonLabel string `json:"reason_label"`                // 改期原因分类
+	Reason      string `json:"reason"`                      // 改期原因说明
+}
+
 // ======================== 响应 ========================
 
 // OrderDetail 订单详情
@@ -43,6 +61,9 @@ type OrderDetail struct {
 	Refunds  interface{} `json:"refunds"`  // 退款记录
 	Logs     interface{} `json:"logs"`     // 操作日志
 	Delivery interface{} `json:"delivery"` // 交付信息
+	// AllowedTransitions 当前状态允许流转到的目标状态（领域状态机输出）。
+	// 前端据此渲染「阶段推进」按钮，避免在客户端重复实现状态机导致规则漂移。
+	AllowedTransitions []int `json:"allowed_transitions"`
 }
 
 // PaymentCreateReq 创建收款

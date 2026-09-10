@@ -23,6 +23,7 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 	response.OK(c, d)
 }
 
+// DeliveryItems 交付文件明细（:id 为 order_id，与 /delivery/detail/:id 语义一致）
 func (h *Controller) DeliveryItems(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := pathID(c)
@@ -30,9 +31,12 @@ func (h *Controller) DeliveryItems(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	_ = op
-	_ = id
-	response.OK(c, []interface{}{})
+	list, err := h.Svc.ListDeliveryItemsByOrder(c.Request.Context(), op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
 }
 
 // DeliveryUploadSamples 上传样片 body: {items:[{url,...}]}

@@ -42,12 +42,20 @@ func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*d
 		logger.Warnf("GetOrderDetail: GetByOrderID failed, orderID=%d, err=%v", id, err)
 	}
 
+	// 允许的下一状态：由领域状态机输出，前端据此渲染阶段推进按钮（单一事实源）
+	allowed := domain.OrderAllowedTransitions(o.Status)
+	transitions := make([]int, 0, len(allowed))
+	for _, st := range allowed {
+		transitions = append(transitions, int(st))
+	}
+
 	return &dto.OrderDetail{
-		Order:    o,
-		Payments: payments,
-		Refunds:  refunds,
-		Logs:     logs,
-		Delivery: delivery,
+		Order:              o,
+		Payments:           payments,
+		Refunds:            refunds,
+		Logs:               logs,
+		Delivery:           delivery,
+		AllowedTransitions: transitions,
 	}, nil
 }
 

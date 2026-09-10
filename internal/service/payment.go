@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -139,6 +140,26 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 
 func (s *Service) ListPayments(ctx context.Context, op Operator, orderID int64) ([]model.OrderPayment, error) {
 	return s.OrderRepo.ListPayments(ctx, op.CompanyID, orderID)
+}
+
+// DeletePayment 删除未确认的收款记录。
+// 已确认收款已计入订单已收金额，直接删除会造成"钱收了但账面没记录"，
+// 因此只允许删除待核验/待支付状态；已确认的冲销必须走退款流程（refund/apply）。
+func (s *Service) DeletePayment(ctx context.Context, op Operator, id int64) error {
+	p, err := s.OrderRepo.GetPaymentByID(ctx, op.CompanyID, id)
+	if err != nil {
+		return errs.NotFound(errs.ErrPaymentNotFound)
+	}
+	if p.Status == enum.PaymentStatusConfirmed || p.Status == enum.PaymentStatusRefunded {
+		return errs.BadRequest("已确认的收款不可删除，请走退款流程")
+	}
+	return repository.Tx(func(tx *gorm.DB) error {
+		if err := s.OrderRepo.WithTx(tx).DeletePayment(ctx, op.CompanyID, id); err != nil {
+			return err
+		}
+		return s.writeOrderLogTx(ctx, tx, p.OrderID, "delete_payment", 0, 0,
+			fmt.Sprintf("删除未确认收款 %s（¥%.2f）", p.Code, p.Amount), op)
+	})
 }
 
 func (s *Service) GetUnconfirmedPayments(ctx context.Context, op Operator, page, pageSize int) ([]model.OrderPayment, int64, error) {

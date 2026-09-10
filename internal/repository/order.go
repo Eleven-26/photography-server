@@ -84,6 +84,12 @@ func (r *OrderRepo) UpdatePayment(ctx context.Context, companyID, paymentID int6
 	return r.tenant(companyID).WithContext(ctx).Model(&model.OrderPayment{}).Where("id = ?", paymentID).Updates(updates).Error
 }
 
+// DeletePayment 软删除未确认的收款记录（多租户过滤）
+func (r *OrderRepo) DeletePayment(ctx context.Context, companyID, paymentID int64) error {
+	return r.tenant(companyID).WithContext(ctx).
+		Where("id = ?", paymentID).Delete(&model.OrderPayment{}).Error
+}
+
 // ConfirmPaymentPending 条件更新（CAS）：仅当收款记录仍为“待核验”时置为已确认。
 // 返回 false 表示该记录已被并发处理（重复点击确认不会导致金额重复累加）。
 func (r *OrderRepo) ConfirmPaymentPending(ctx context.Context, companyID, paymentID int64, updates map[string]interface{}) (bool, error) {

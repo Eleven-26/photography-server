@@ -187,6 +187,19 @@ func (r *AddonRepo) ListByOrder(ctx context.Context, companyID, orderID int64) (
 	return list, err
 }
 
+func (r *AddonRepo) GetByID(ctx context.Context, companyID, id int64) (*model.OrderAddon, error) {
+	var m model.OrderAddon
+	if err := r.tenant(companyID).WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func (r *AddonRepo) Delete(ctx context.Context, companyID, id int64) error {
+	return r.tenant(companyID).WithContext(ctx).
+		Where("id = ?", id).Delete(&model.OrderAddon{}).Error
+}
+
 func (r *AddonRepo) Update(ctx context.Context, companyID, id int64, updates map[string]interface{}) error {
 	return r.tenant(companyID).WithContext(ctx).Model(&model.OrderAddon{}).
 		Where("id = ?", id).Updates(updates).Error
