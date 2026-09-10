@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"gorm.io/gorm"
@@ -42,6 +43,35 @@ type Overview struct {
 	TodayConfirmed float64 `json:"today_confirmed"` // 今日确认到账金额（同 today_amount）
 	TodayPending   float64 `json:"today_pending"`   // 今日申报待核验金额
 	UnreadNotify   int64   `json:"unread_notify"`   // 当前登录人未读通知数
+
+	// —— P2 新增聚合口径（原型工作台）——
+	MonthLeads     int64        `json:"month_leads"`     // 本月新增线索数
+	MonthDealRate  float64      `json:"month_deal_rate"` // 本月成交率 %（本月新增订单 / 本月新增线索）
+	AvailableSlots int64        `json:"available_slots"` // 未来 7 天剩余可约时段数
+	TodayShoots    []TodayShoot `json:"today_shoots"`    // 今日拍摄列表
+	TodoItems      []TodoItem   `json:"todo_items"`      // 待办清单
+}
+
+// TodayShoot 今日拍摄条目（工作台「今日拍摄」列表）
+type TodayShoot struct {
+	ID           int64  `json:"id"`
+	Code         string `json:"code"`
+	CustomerName string `json:"customer_name"`
+	PackageName  string `json:"package_name"`
+	ShootTime    string `json:"shoot_time"`
+	ShootAddress string `json:"shoot_address"`
+	Photographer string `json:"photographer"`
+	Status       int    `json:"status"`
+}
+
+// TodoItem 待办条目（工作台「待办清单」）。Count 为 0 的条目在 service 层过滤掉，
+// 前端只渲染真正需要处理的事项。
+type TodoItem struct {
+	Key   string `json:"key"`   // 唯一标识，前端用作 v-for key
+	Label string `json:"label"` // 展示文案
+	Count int64  `json:"count"` // 待处理数量
+	Route string `json:"route"` // 点击跳转的前端路由
+	Tone  string `json:"tone"`  // 视觉色调：warning / danger / normal
 }
 
 // GetOverview 聚合多条统计 SQL。ctx 透传后所有查询均挂到当前请求链路。
@@ -142,7 +172,103 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 		return nil, err
 	}
 
+	// 本月新增线索：作为成交率分母（与「本月新增订单」取同一时间窗，口径可解释）
+	if err := q().Model(&model.Lead{}).
+		Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&ov.MonthLeads).Error; err != nil {
+		return nil, err
+	}
+	if ov.MonthLeads > 0 {
+		ov.MonthDealRate = math.Round(float64(ov.MonthOrders)/float64(ov.MonthLeads)*1000) / 10
+	}
+
+	// 今日拍摄列表（待拍摄 / 拍摄中，按时间排序）
+	if err := q().Model(&model.Order{}).
+		Select("id, code, customer_name, package_name, shoot_time, shoot_address, photographer, status").
+		Where("shoot_date = ? AND status IN ?", dayStart.Format("2006-01-02"),
+			[]int{int(enum.OrderStatusPendingShoot), int(enum.OrderStatusShooting)}).
+		Order("shoot_time ASC").Scan(&ov.TodayShoots).Error; err != nil {
+		return nil, err
+	}
+
+	// 未来 7 天剩余可约时段
+	slots, err := r.availableSlots(ctx, companyID, dayStart, 7)
+	if err != nil {
+		return nil, err
+	}
+	ov.AvailableSlots = slots
+
+	// 待办清单：复用上面的计数，只保留 count > 0 的条目
+	ov.TodoItems = buildTodoItems(&ov)
+
 	return &ov, nil
+}
+
+// availableSlots 计算自 start 起 days 天内的剩余可约时段数。
+// 口径：某天存在启用中的档期模板即计 1 个可约时段，减去该天已锁定（未取消）的档期块，
+// 负数归零；多条模板（不同摄影师/时段）按条累加。
+func (r *DashboardRepo) availableSlots(ctx context.Context, companyID int64, start time.Time, days int) (int64, error) {
+	q := func() *gorm.DB { return r.tenant(companyID).WithContext(ctx) }
+
+	var templates []model.SlotTemplate
+	if err := q().Model(&model.SlotTemplate{}).Where("status = ?", 1).Find(&templates).Error; err != nil {
+		return 0, err
+	}
+	if len(templates) == 0 {
+		return 0, nil
+	}
+
+	end := start.AddDate(0, 0, days)
+	type dateCount struct {
+		Date string `gorm:"column:date"`
+		Cnt  int64  `gorm:"column:cnt"`
+	}
+	var locks []dateCount
+	if err := q().Model(&model.CalendarBlock{}).
+		Select("date, COUNT(*) AS cnt").
+		Where("status = ? AND date >= ? AND date < ?",
+			int(enum.BlockStatusLocked), start.Format("2006-01-02"), end.Format("2006-01-02")).
+		Group("date").Scan(&locks).Error; err != nil {
+		return 0, err
+	}
+	lockByDate := make(map[string]int64, len(locks))
+	for _, l := range locks {
+		lockByDate[l.Date] = l.Cnt
+	}
+
+	var total int64
+	for i := 0; i < days; i++ {
+		d := start.AddDate(0, 0, i)
+		wd := int(d.Weekday()) // 0=周日，与 SlotTemplate.Weekday 取值一致
+		var n int64
+		for _, tpl := range templates {
+			if tpl.Weekday == wd {
+				n++
+			}
+		}
+		n -= lockByDate[d.Format("2006-01-02")]
+		if n > 0 {
+			total += n
+		}
+	}
+	return total, nil
+}
+
+// buildTodoItems 由概览计数组装待办清单（count 为 0 的条目不返回）
+func buildTodoItems(ov *Overview) []TodoItem {
+	candidates := []TodoItem{
+		{Key: "overdue_lead", Label: "逾期未跟进线索", Count: ov.OverdueLeads, Route: "/leads", Tone: "danger"},
+		{Key: "pending_payment", Label: "待核验收款", Count: ov.PendingPayments, Route: "/finance", Tone: "warning"},
+		{Key: "pending_delivery", Label: "待交付订单", Count: ov.PendingDeliveries, Route: "/delivery", Tone: "warning"},
+		{Key: "pending_retouch", Label: "精修进行中", Count: ov.PendingRetouch, Route: "/delivery", Tone: "normal"},
+		{Key: "pending_deposit", Label: "待收定金", Count: ov.PendingDeposit, Route: "/orders", Tone: "normal"},
+	}
+	out := make([]TodoItem, 0, len(candidates))
+	for _, it := range candidates {
+		if it.Count > 0 {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func (r *DashboardRepo) GetCalendarBlocks(ctx context.Context, companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {

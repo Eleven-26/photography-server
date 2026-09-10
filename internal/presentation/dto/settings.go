@@ -1,5 +1,7 @@
 package dto
 
+import "photography-server/internal/model"
+
 // ======================== 请求 ========================
 
 // CompanyUpdateReq 更新公司信息
@@ -26,10 +28,10 @@ type PaymentMethodReq struct {
 
 // ======================== 响应 ========================
 
-// WorkspaceResp 工作台数据
+// WorkspaceResp 工作空间数据（设置页首屏）
 type WorkspaceResp struct {
-	Company  interface{} `json:"company"`         // 公司信息
-	Stores   interface{} `json:"stores"`          // 门店列表
-	Roles    interface{} `json:"roles"`           // 角色列表
-	Payments interface{} `json:"payment_methods"` // 收款方式列表
+	Company  model.SysCompany      `json:"company"`         // 公司信息
+	Stores   []model.SysStore      `json:"stores"`          // 门店列表
+	Roles    []model.SysRole       `json:"roles"`           // 角色列表
+	Payments []model.PaymentMethod `json:"payment_methods"` // 收款方式列表
 }

@@ -1,5 +1,7 @@
 package dto
 
+import "photography-server/internal/model"
+
 // ======================== 客户端（H5/小程序） ========================
 
 // ClientSlot 可约时段
@@ -20,16 +22,16 @@ type ClientBookingReq struct {
 	Remark       string `json:"remark"`                        // 备注
 }
 
-// ClientOrderDetail 客户端订单详情
+// ClientOrderDetail 客户端订单详情。各子项为具体类型，字段契约在编译期校验。
 type ClientOrderDetail struct {
-	Order       interface{} `json:"order"`       // 订单信息
-	Payments    interface{} `json:"payments"`    // 收款记录
-	Refunds     interface{} `json:"refunds"`     // 退款记录
-	Logs        interface{} `json:"logs"`        // 操作日志
-	Delivery    interface{} `json:"delivery"`    // 交付信息
-	Reschedules interface{} `json:"reschedules"` // 改期单
-	Addons      interface{} `json:"addons"`      // 加项
-	Review      interface{} `json:"review"`      // 评价
+	Order       *model.Order            `json:"order"`       // 订单信息
+	Payments    []model.OrderPayment    `json:"payments"`    // 收款记录
+	Refunds     []model.OrderRefund     `json:"refunds"`     // 退款记录
+	Logs        []model.OrderLog        `json:"logs"`        // 操作日志
+	Delivery    *model.Delivery         `json:"delivery"`    // 交付信息（未创建交付单时为 null）
+	Reschedules []model.OrderReschedule `json:"reschedules"` // 改期单
+	Addons      []model.OrderAddon      `json:"addons"`      // 加项
+	Review      *model.OrderReview      `json:"review"`      // 评价（未评价时为 null）
 }
 
 // ClientRescheduleReq 客户改期申请

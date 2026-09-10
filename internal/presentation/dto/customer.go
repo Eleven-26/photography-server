@@ -19,6 +19,10 @@ type CustomerCreateReq struct {
 	Status   enum.CustomerStatus `json:"status"`                  // 状态 1-潜在 2-活跃 3-流失
 	Remark   string              `json:"remark"`                  // 备注
 	Avatar   string              `json:"avatar"`                  // 头像URL
+	// AllowNotifications 用指针：创建时不传默认允许(1)，显式传 0 表示不允许。
+	AllowNotifications *int   `json:"allow_notifications"` // 通知许可 0-不允许 1-允许
+	PreferStyle        string `json:"prefer_style"`        // 偏好风格
+	PreferScene        string `json:"prefer_scene"`        // 常用场景
 }
 
 // CustomerUpdateReq 更新客户
@@ -36,6 +40,11 @@ type CustomerUpdateReq struct {
 	Status   enum.CustomerStatus `json:"status"`   // 状态 1-潜在 2-活跃 3-流失
 	Remark   string              `json:"remark"`   // 备注
 	Avatar   string              `json:"avatar"`   // 头像URL
+	// AllowNotifications 用指针：nil 表示未传（保持原值），显式 0 表示关闭通知。
+	// 若用值类型，「关闭通知」会被零值语义吞掉而静默回退（同 Asset.featured 的历史缺陷）。
+	AllowNotifications *int   `json:"allow_notifications"` // 通知许可 0-不允许 1-允许
+	PreferStyle        string `json:"prefer_style"`        // 偏好风格
+	PreferScene        string `json:"prefer_scene"`        // 常用场景
 }
 
 // ======================== 响应 ========================
@@ -49,4 +58,8 @@ type CustomerStatsResp struct {
 	Inactive     int64 `json:"inactive"`       // 非活跃数（status=3）
 	GoldUp       int64 `json:"gold_up"`        // 黄金及以上等级数
 	NewThisMonth int64 `json:"new_this_month"` // 本月新增
+
+	// —— 复购口径（原型「复购客户 / 复购率」）——
+	RepurchaseCount int64   `json:"repurchase_count"` // 复购客户数（下单 ≥ 2 次）
+	RepurchaseRate  float64 `json:"repurchase_rate"`  // 复购率 %（分母为有过下单的客户）
 }

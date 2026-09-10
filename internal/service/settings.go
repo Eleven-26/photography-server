@@ -11,14 +11,9 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-type Workspace struct {
-	Company  model.SysCompany      `json:"company"`
-	Stores   []model.SysStore      `json:"stores"`
-	Roles    []model.SysRole       `json:"roles"`
-	Payments []model.PaymentMethod `json:"payment_methods"`
-}
-
-func (s *Service) Workspace(ctx context.Context, op Operator) (*Workspace, error) {
+// Workspace 工作空间首屏数据：公司信息 + 门店 + 角色 + 收款方式。
+// 响应结构在 dto 包显式声明（对外契约），本层只负责组装。
+func (s *Service) Workspace(ctx context.Context, op Operator) (*dto.WorkspaceResp, error) {
 	c, err := s.SettingsRepo.GetCompany(ctx, op.CompanyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -26,7 +21,7 @@ func (s *Service) Workspace(ctx context.Context, op Operator) (*Workspace, error
 		}
 		return nil, err
 	}
-	w := &Workspace{Company: *c}
+	w := &dto.WorkspaceResp{Company: *c}
 	w.Stores, err = s.SettingsRepo.ListStores(ctx, op.CompanyID)
 	if err != nil {
 		return nil, err

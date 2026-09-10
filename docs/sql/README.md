@@ -20,7 +20,8 @@ docs/sql/
 │   ├── ddl-初版.sql              #   0. 初版基线结构（等价于上线时的 ddl.sql 快照）
 │   ├── dml-初版.sql              #   0. 初版基线数据
 │   ├── upgrade_client_20260907.sql      # 1. 客户端三端能力（+9 表、9 处 ALTER）
-│   └── upgrade_p1_pc_modules_20260910.sql # 2. P1 交付工作台/工作室设置（sys_company +2 列、biz_delivery +2 列）
+│   ├── upgrade_p1_pc_modules_20260910.sql # 2. P1 交付工作台/工作室设置（sys_company +2 列、biz_delivery +2 列）
+│   └── upgrade_p2_customer_pref_20260910.sql # 3. P2 客户偏好与通知许可（crm_customer +3 列、level 默认值修正）
 └── README.md                   # 本文件
 ```
 
@@ -119,5 +120,5 @@ docker exec $DB mysql -u$U -p$P -e "DROP DATABASE IF EXISTS _v_full; DROP DATABA
 | 项 | 值 |
 |---|---|
 | 全量表数 | 29 |
-| 增量次数 | 2（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`） |
-| 最近校验 | 2026-09-10 ✅ 列 575 行 / 索引 175 行 / 表 29 行，全部零差异 |
+| 增量次数 | 3（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`、`upgrade_p2_customer_pref_20260910`） |
+| 最近校验 | 2026-09-10 ✅ 列 578 行 / 索引 175 行 / 表 29 行，全部零差异 |

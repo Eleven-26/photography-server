@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"math"
 	"time"
 
 	"gorm.io/gorm"
@@ -68,6 +70,9 @@ type CustomerStats struct {
 	Inactive     int64
 	GoldUp       int64
 	NewThisMonth int64
+	// —— 复购口径（原型「复购客户 / 复购率」）——
+	RepurchaseCount int64   // 复购客户数（order_count >= 2）
+	RepurchaseRate  float64 // 复购率 %（分母为「有下单的客户」，避免新客稀释）
 }
 
 // GetStats 客户统计：总数 / 潜在 / 活跃 / 非活跃 / 黄金及以上等级数 / 本月新增
@@ -104,5 +109,33 @@ func (r *CustomerRepo) GetStats(ctx context.Context, companyID int64) (*Customer
 		return nil, err
 	}
 
+	// 复购口径：order_count >= 2 视为复购客户。复购率的分母取「有过下单的客户」
+	// 而非全部客户——否则新客越多复购率越被稀释，指标失去参考意义。
+	if err := q().Model(&model.Customer{}).Where("order_count >= ?", 2).Count(&st.RepurchaseCount).Error; err != nil {
+		return nil, err
+	}
+	var orderedCustomers int64
+	if err := q().Model(&model.Customer{}).Where("order_count >= ?", 1).Count(&orderedCustomers).Error; err != nil {
+		return nil, err
+	}
+	if orderedCustomers > 0 {
+		st.RepurchaseRate = math.Round(float64(st.RepurchaseCount)/float64(orderedCustomers)*1000) / 10
+	}
+
 	return &st, nil
+}
+
+// AvgRating 客户满意度：该客户全部订单评价的评分均值，保留一位小数。
+// 无评价记录时返回 0（前端据此显示「暂无评价」而不是伪造一个分数）。
+func (r *CustomerRepo) AvgRating(ctx context.Context, companyID, customerID int64) (float64, error) {
+	var avg sql.NullFloat64
+	if err := r.tenant(companyID).WithContext(ctx).Model(&model.OrderReview{}).
+		Where("customer_id = ?", customerID).
+		Select("AVG(rating)").Scan(&avg).Error; err != nil {
+		return 0, err
+	}
+	if !avg.Valid {
+		return 0, nil
+	}
+	return math.Round(avg.Float64*10) / 10, nil
 }

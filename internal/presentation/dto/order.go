@@ -1,5 +1,7 @@
 package dto
 
+import "photography-server/internal/model"
+
 // ======================== 请求 ========================
 
 // OrderCreateReq 创建订单
@@ -52,15 +54,14 @@ type RescheduleApplyReq struct {
 	Reason      string `json:"reason"`                      // 改期原因说明
 }
 
-// ======================== 响应 ========================
-
-// OrderDetail 订单详情
+// OrderDetail 订单详情。各子项为具体类型而非 interface{}：
+// 字段改名/缺失会在编译期暴露，不再出现「前后端字段静默漂移」。
 type OrderDetail struct {
-	Order    interface{} `json:"order"`    // 订单信息
-	Payments interface{} `json:"payments"` // 收款记录
-	Refunds  interface{} `json:"refunds"`  // 退款记录
-	Logs     interface{} `json:"logs"`     // 操作日志
-	Delivery interface{} `json:"delivery"` // 交付信息
+	Order    *model.Order         `json:"order"`    // 订单信息
+	Payments []model.OrderPayment `json:"payments"` // 收款记录
+	Refunds  []model.OrderRefund  `json:"refunds"`  // 退款记录
+	Logs     []model.OrderLog     `json:"logs"`     // 操作日志
+	Delivery *model.Delivery      `json:"delivery"` // 交付信息（未创建交付单时为 null）
 	// AllowedTransitions 当前状态允许流转到的目标状态（领域状态机输出）。
 	// 前端据此渲染「阶段推进」按钮，避免在客户端重复实现状态机导致规则漂移。
 	AllowedTransitions []int `json:"allowed_transitions"`
@@ -81,5 +82,3 @@ type RefundCreateReq struct {
 	Reason string  `json:"reason"` // 退款原因
 	Amount float64 `json:"amount"` // 退款金额，为空时按规则自动计算
 }
-
-// ======================== 响应 ========================

@@ -9,10 +9,8 @@ import (
 
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
-	"photography-server/internal/repository"
+	"photography-server/internal/presentation/dto"
 )
-
-type FinanceSummary = repository.Summary
 
 // monthRange 返回左闭右开区间 [月初, 下月初)。
 // 旧实现用 month+"-31 23:59:59" 拼字符串，对 2 月等不足 31 天的月份会产生
@@ -28,9 +26,28 @@ func monthRange(month string) (string, string) {
 	return start.Format("2006-01-02 15:04:05"), end.Format("2006-01-02 15:04:05")
 }
 
-func (s *Service) FinanceSummary(ctx context.Context, op Operator, month string) (*repository.Summary, error) {
+// FinanceSummary 财务汇总。repository 取数 → 本层映射为对外契约（dto），
+// 避免仓储结构体直接充当 API 响应。
+func (s *Service) FinanceSummary(ctx context.Context, op Operator, month string) (*dto.FinanceSummaryResp, error) {
 	start, end := monthRange(month)
-	return s.FinanceRepo.GetSummary(ctx, op.CompanyID, start, end)
+	sum, err := s.FinanceRepo.GetSummary(ctx, op.CompanyID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.FinanceSummaryResp{
+		MonthReceivable:     sum.MonthReceivable,
+		MonthReceived:       sum.MonthReceived,
+		MonthRemaining:      sum.MonthRemaining,
+		PendingVerifyCount:  sum.PendingVerifyCount,
+		PendingVerifyAmount: sum.PendingVerifyAmount,
+		RefundingCount:      sum.RefundingCount,
+		RefundingAmount:     sum.RefundingAmount,
+		TotalIncome:         sum.TotalIncome,
+		DepositTotal:        sum.DepositTotal,
+		FinalTotal:          sum.FinalTotal,
+		RefundTotal:         sum.RefundTotal,
+		PendingCount:        sum.PendingCount,
+	}, nil
 }
 
 func (s *Service) ListFinancePayments(ctx context.Context, op Operator, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {

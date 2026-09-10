@@ -5,24 +5,32 @@ import "photography-server/internal/enum"
 // Customer 客户
 type Customer struct {
 	TenantBase
-	Code        string              `gorm:"column:code;size:20;not null;uniqueIndex:uk_customer_code,priority:1;comment:客户编号 CU-xxx" json:"code"`
-	StoreID     int64               `gorm:"column:store_id;index;comment:所属门店ID" json:"store_id"`
-	Name        string              `gorm:"column:name;size:50;not null;comment:客户姓名" json:"name"`
-	Mobile      string              `gorm:"column:mobile;size:20;comment:手机号" json:"mobile"`
-	Wechat      string              `gorm:"column:wechat;size:50;comment:微信号" json:"wechat"`
-	Gender      string              `gorm:"column:gender;size:10;comment:性别 male-男 female-女 unknown-未知" json:"gender"`
-	Birthday    *string             `gorm:"column:birthday;comment:生日" json:"birthday"`
-	Level       enum.CustomerLevel  `gorm:"column:level;type:tinyint;default:1;comment:客户等级 1-普通 2-黄金 3-铂金 4-钻石" json:"level"`
-	Source      string              `gorm:"column:source;size:50;comment:客户来源" json:"source"`
-	Tags        string              `gorm:"column:tags;size:200;comment:标签(逗号分隔)" json:"tags"`
-	Status      enum.CustomerStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-潜在 2-活跃 3-流失" json:"status"`
-	Remark      string              `gorm:"column:remark;size:500;comment:备注" json:"remark"`
-	Avatar      string              `gorm:"column:avatar;size:500;comment:头像地址" json:"avatar"`
-	OpenID      string              `gorm:"column:openid;size:64;index;comment:微信小程序openid" json:"openid"`
-	UnionID     string              `gorm:"column:unionid;size:64;comment:微信unionid" json:"unionid"`
-	IsVerified  int                 `gorm:"column:is_verified;type:tinyint;default:0;comment:手机号是否已验证 0-否 1-是" json:"is_verified"`
-	OrderCount  int64               `gorm:"column:order_count;default:0;comment:订单数(冗余)" json:"order_count"`
-	TotalAmount float64             `gorm:"column:total_amount;type:decimal(12,2);default:0;comment:累计消费(冗余)" json:"total_amount"`
+	Code     string              `gorm:"column:code;size:20;not null;uniqueIndex:uk_customer_code,priority:1;comment:客户编号 CU-xxx" json:"code"`
+	StoreID  int64               `gorm:"column:store_id;index;comment:所属门店ID" json:"store_id"`
+	Name     string              `gorm:"column:name;size:50;not null;comment:客户姓名" json:"name"`
+	Mobile   string              `gorm:"column:mobile;size:20;comment:手机号" json:"mobile"`
+	Wechat   string              `gorm:"column:wechat;size:50;comment:微信号" json:"wechat"`
+	Gender   string              `gorm:"column:gender;size:10;comment:性别 male-男 female-女 unknown-未知" json:"gender"`
+	Birthday *string             `gorm:"column:birthday;comment:生日" json:"birthday"`
+	Level    enum.CustomerLevel  `gorm:"column:level;type:tinyint;default:1;comment:客户等级 1-普通 2-黄金 3-铂金 4-钻石" json:"level"`
+	Source   string              `gorm:"column:source;size:50;comment:客户来源" json:"source"`
+	Tags     string              `gorm:"column:tags;size:200;comment:标签(逗号分隔)" json:"tags"`
+	Status   enum.CustomerStatus `gorm:"column:status;type:tinyint;default:1;comment:状态 1-潜在 2-活跃 3-流失" json:"status"`
+	Remark   string              `gorm:"column:remark;size:500;comment:备注" json:"remark"`
+	Avatar   string              `gorm:"column:avatar;size:500;comment:头像地址" json:"avatar"`
+	// —— 客户偏好与通知许可（原型「客户档案 · 客户偏好」区块）——
+	AllowNotifications *int    `gorm:"column:allow_notifications;type:tinyint;default:1;comment:通知许可 0-不允许 1-允许" json:"allow_notifications"`
+	PreferStyle        string  `gorm:"column:prefer_style;size:100;comment:偏好风格(如 自然·生活感)" json:"prefer_style"`
+	PreferScene        string  `gorm:"column:prefer_scene;size:100;comment:常用场景(如 户外公园)" json:"prefer_scene"`
+	OpenID             string  `gorm:"column:openid;size:64;index;comment:微信小程序openid" json:"openid"`
+	UnionID            string  `gorm:"column:unionid;size:64;comment:微信unionid" json:"unionid"`
+	IsVerified         int     `gorm:"column:is_verified;type:tinyint;default:0;comment:手机号是否已验证 0-否 1-是" json:"is_verified"`
+	OrderCount         int64   `gorm:"column:order_count;default:0;comment:订单数(冗余)" json:"order_count"`
+	TotalAmount        float64 `gorm:"column:total_amount;type:decimal(12,2);default:0;comment:累计消费(冗余)" json:"total_amount"`
+
+	// Satisfaction 客户满意度：该客户订单评价的评分均分（保留一位小数，0=暂无评价）。
+	// 非持久化列（gorm:"-"），仅在客户详情查询时计算填充，避免与真实评价两套数据打架。
+	Satisfaction float64 `gorm:"-" json:"satisfaction"`
 }
 
 func (Customer) TableName() string { return "crm_customer" }

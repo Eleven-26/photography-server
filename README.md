@@ -213,6 +213,24 @@ docker compose build backend   # SW_AGENT_ENABLE=true 时产物自动织入 agen
 
 代码侧：SkyWalking-go 由 agent 自动埋点 gin HTTP 入口与 gorm SQL，无需业务埋点；通道②（Jaeger）复用 OTel 手动埋点（gin otelgin / gorm OTel 插件 / xxl-job 根 span / NATS traceparent 透传），由 `APP_JAEGER_ENABLE` 控制。响应 `trace_id` 双通道通用：Jaeger 版取 OTel entry span，native 版取 agent native trace id（自动切换取值源，无感知）。xxl-job / NATS 的手动埋点暂仅 OTel（Jaeger）通道生效（SkyWalking-go native 版为 P1 待办，当前 HTTP+SQL 主链路已覆盖）。
 
+### 前端 `/api` 前缀（部署硬约束）
+
+前端所有请求都带 `/api` 前缀（`photography-frontend/src/api/common/apiPath.ts` 的 `API_PREFIX`），**后端自身没有 `/api` 路由** —— 该前缀仅在开发环境由 vite devServer 的 proxy `rewrite` 剥离（`vite.config.ts`）。
+
+> **生产环境（nginx / 网关）必须做同样的重写**，否则前端全站 404。
+
+nginx 示例（`proxy_pass` 结尾的 `/` 负责剥离 `/api`，不能省略）：
+
+```nginx
+location /api/ {
+    proxy_pass http://backend:8080/;   # 结尾斜杠必须保留，否则 /api 会原样透传
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+备选方案是给后端路由统一加 `/api` 前缀（见代码审查 #41，本轮未采用）。如需改动该约定，必须同步 `API_PREFIX`、vite proxy、nginx 三处，缺一处即全站不可用。
+
 ### Nacos 配置中心 + 服务注册（唯一配置源，硬依赖）
 
 无开关：本地只保留 bootstrap（`config.yaml`，仅 `nacos.*` 连接段），业务配置 100% 托管 Nacos。
