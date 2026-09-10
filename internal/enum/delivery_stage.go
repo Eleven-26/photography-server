@@ -25,3 +25,10 @@ func DeliveryStageName(stage DeliveryStage) string {
 	}
 	return "未知"
 }
+
+// DeliveryFeedbackStatus 客户修图反馈处理状态（biz_delivery_item.feedback_status）
+const (
+	FeedbackNone    = 0 // 无反馈
+	FeedbackPending = 1 // 待处理
+	FeedbackHandled = 2 // 已处理
+)

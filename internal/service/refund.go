@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -108,7 +109,7 @@ func (s *Service) AuditRefund(ctx context.Context, op Operator, id int64, approv
 		status = enum.RefundStatusApproved
 	}
 
-	return repository.Tx(func(tx *gorm.DB) error {
+	err = repository.Tx(func(tx *gorm.DB) error {
 		// 1. 更新退款单状态（CAS：仅当仍为"申请中"时生效，防并发重复审核）
 		ok, err := s.OrderRepo.WithTx(tx).AuditRefundApplying(ctx, op.CompanyID, id, map[string]interface{}{
 			"status":       status,
@@ -159,6 +160,18 @@ func (s *Service) AuditRefund(ctx context.Context, op Operator, id int64, approv
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// 事务提交后再通知客户审核结果：通知失败不能回滚已生效的审核
+	if approved {
+		s.NotifyClient(ctx, op, rf.CustomerID, "finance", "退款申请已通过",
+			fmt.Sprintf("退款单 %s（%.2f 元）已通过审核，请留意到账", rf.Code, rf.Amount), "refund", rf.ID)
+	} else {
+		s.NotifyClient(ctx, op, rf.CustomerID, "finance", "退款申请未通过",
+			"退款单 "+rf.Code+" 未通过审核："+remark, "refund", rf.ID)
+	}
+	return nil
 }
 
 func (s *Service) ListRefunds(ctx context.Context, op Operator, orderID int64) ([]model.OrderRefund, error) {

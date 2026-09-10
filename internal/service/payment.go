@@ -75,7 +75,7 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 		return errs.BadRequest(errs.ErrPaymentConfirmed)
 	}
 
-	return repository.Tx(func(tx *gorm.DB) error {
+	err = repository.Tx(func(tx *gorm.DB) error {
 		now := time.Now().Format("2006-01-02 15:04:05")
 
 		// 1. 事务内锁定读取订单（基于锁定前快照做金额与状态判断，防并发重复确认/超额收款）
@@ -83,8 +83,12 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 		if err != nil {
 			return errs.NotFound(errs.ErrOrderNotFound)
 		}
+		// 调度费（type=reschedule，客户改期产生的费用）独立于订单套餐应收：
+		// 不占订单额度、不计入订单已收，否则「已收」会超过「订单总额」，套餐应收/剩余应收口径被污染。
+		isRescheduleFee := p.Type == rescheduleFeePaymentType
+
 		// 1.1 收款确认时按最新订单快照二次校验：已收 + 本次不得超额（录入后订单可能被退款/改价）
-		if o.PaidAmt+p.Amount > o.TotalAmt+domain.FenEps() {
+		if !isRescheduleFee && o.PaidAmt+p.Amount > o.TotalAmt+domain.FenEps() {
 			return errs.BadRequest("确认后收款将超过订单剩余应收，请核对金额")
 		}
 
@@ -102,16 +106,19 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 		}
 
 		// 3. 累加订单已收金额（带租户过滤，同一事务连接）
+		// 调度费不计入订单已收、也不改 payment_status —— 它不在订单套餐应收范围内。
 		newPaid := o.PaidAmt + p.Amount
-		updates := map[string]interface{}{
-			"paid_amt": gorm.Expr("paid_amt + ?", p.Amount),
-		}
-		// 3.1 payment_status 由金额推导：全额收齐才标"已确认"，部分收款保持原状态
-		if st, ok := domain.DerivePaymentStatus(newPaid, o.RefundAmt, o.TotalAmt); ok {
-			updates["payment_status"] = st
-		}
-		if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, p.OrderID, updates); err != nil {
-			return err
+		if !isRescheduleFee {
+			updates := map[string]interface{}{
+				"paid_amt": gorm.Expr("paid_amt + ?", p.Amount),
+			}
+			// 3.1 payment_status 由金额推导：全额收齐才标"已确认"，部分收款保持原状态
+			if st, ok := domain.DerivePaymentStatus(newPaid, o.RefundAmt, o.TotalAmt); ok {
+				updates["payment_status"] = st
+			}
+			if err := s.OrderRepo.WithTx(tx).Update(ctx, op.CompanyID, p.OrderID, updates); err != nil {
+				return err
+			}
 		}
 
 		// 4. 状态流转：定金支付后进入待拍摄；尾款结清后订单完成
@@ -136,6 +143,18 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// 5. 事务提交后再通知客户：到账确认是客户最关心的资金节点（通知失败不回滚已生效的核验）
+	if p.Type == rescheduleFeePaymentType {
+		s.NotifyClient(ctx, op, p.CustomerID, "finance", "改期调度费已确认",
+			fmt.Sprintf("调度费 %.2f 元已核验到账", p.Amount), "payment", p.ID)
+	} else {
+		s.NotifyClient(ctx, op, p.CustomerID, "finance", "收款已确认到账",
+			fmt.Sprintf("已确认到账 %.2f 元", p.Amount), "payment", p.ID)
+	}
+	return nil
 }
 
 func (s *Service) ListPayments(ctx context.Context, op Operator, orderID int64) ([]model.OrderPayment, error) {

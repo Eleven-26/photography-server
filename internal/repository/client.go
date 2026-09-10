@@ -386,7 +386,8 @@ func (r *DeviceRepo) Delete(ctx context.Context, companyID, id int64) error {
 	return r.tenant(companyID).WithContext(ctx).Delete(&model.UserDevice{}, id).Error
 }
 
-// GetByMobile 按手机号查客户（客户端验证码登录：存在即登录，不存在可自动注册）
+// GetByMobile 按手机号查客户。两个用途：客户端验证码登录（存在即登录，不存在可自动注册）、
+// 员工端换绑手机号前的占用校验。软删客户由 soft_delete 插件自动排除，其手机号可被重新使用。
 func (r *CustomerRepo) GetByMobile(ctx context.Context, companyID int64, mobile string) (*model.Customer, error) {
 	var c model.Customer
 	err := r.tenant(companyID).WithContext(ctx).

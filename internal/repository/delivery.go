@@ -123,3 +123,41 @@ func (r *DeliveryRepo) ListItems(ctx context.Context, companyID, deliveryID int6
 	err := r.tenant(companyID).WithContext(ctx).Where("delivery_id = ?", deliveryID).Order("id ASC").Find(&list).Error
 	return list, err
 }
+
+// FeedbackListItem 客户修图反馈条目 + 交付单/订单编号（员工端「反馈整理」列表用）
+type FeedbackListItem struct {
+	model.DeliveryItem
+	DeliveryCode string `json:"delivery_code" gorm:"column:delivery_code"`
+	OrderCode    string `json:"order_code" gorm:"column:order_code"`
+}
+
+// ListFeedbackItems 客户反馈列表（报告 H11）。status<=0 表示全部；
+// 只返回有反馈的明细（feedback_status > 0），待处理排在已处理之前。
+// 注：与 List 同理，JOIN 下手写租户/软删条件，避免裸 company_id 列名歧义。
+func (r *DeliveryRepo) ListFeedbackItems(ctx context.Context, companyID int64, status, page, pageSize int) ([]FeedbackListItem, int64, error) {
+	base := func() *gorm.DB {
+		db := r.conn().WithContext(ctx).
+			Table("biz_delivery_item AS i").
+			Joins("LEFT JOIN biz_delivery AS d ON d.id = i.delivery_id AND d.company_id = i.company_id").
+			Joins("LEFT JOIN biz_order AS o ON o.id = i.order_id AND o.company_id = i.company_id").
+			Where("i.company_id = ? AND i.deleted = 0 AND i.feedback_status > 0", companyID)
+		if status > 0 {
+			db = db.Where("i.feedback_status = ?", status)
+		}
+		return db
+	}
+
+	var total int64
+	if err := base().Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	page, pageSize = normalizePage(page, pageSize)
+	var list []FeedbackListItem
+	if err := base().
+		Select("i.*, COALESCE(d.code,'') AS delivery_code, COALESCE(o.code,'') AS order_code").
+		Order("i.feedback_status ASC, i.id DESC").Offset((page - 1) * pageSize).Limit(pageSize).
+		Scan(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
+}

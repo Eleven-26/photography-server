@@ -76,6 +76,22 @@ func (h *Controller) RegisterStaffAuthed(g *gin.RouterGroup) {
 	// 个人中心（设备管理）
 	g.POST("/device/list", h.DeviceList)
 	g.POST("/device/remove/:id", h.DeviceRemove)
+	// 客户档案（报告 H7）：列表 / 档案 / 今日待跟进
+	g.POST("/customer/list", h.CustomerList)
+	g.POST("/customer/detail/:id", h.CustomerDetail)
+	g.POST("/customer/today-follow", h.TodayFollow)
+	// 客户手机号换绑（报告 H8）
+	g.POST("/customer/mobile", h.CustomerMobileUpdate)
+	// 收款核验到账（报告 H9）
+	g.POST("/payment/confirm/:id", h.PaymentConfirm)
+	// 订单加项（报告 H10，复用 PC 端同一 service，金额同事务重算）
+	g.POST("/order/addon/list/:order_id", h.OrderAddonList)
+	g.POST("/order/addon/create/:order_id", h.OrderAddonCreate)
+	g.POST("/order/addon/update/:id", h.OrderAddonUpdate)
+	g.POST("/order/addon/delete/:id", h.OrderAddonDelete)
+	// 反馈整理（报告 H11）
+	g.POST("/delivery/feedback/list", h.FeedbackList)
+	g.POST("/delivery/feedback/handle/:item_id", h.FeedbackHandle)
 }
 
 func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
@@ -758,6 +774,192 @@ func (h *Controller) DeviceRemove(c *gin.Context) {
 		return
 	}
 	if err := h.Svc.RemoveDevice(c.Request.Context(), op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 客户档案 / 手机号换绑（报告 H7、H8）
+// ---------------------------------------------------------------------
+
+// CustomerList 客户列表（body: keyword/page 等）
+func (h *Controller) CustomerList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ListCustomers(c.Request.Context(), op, page, pageSize, params.Str(c, "keyword"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// CustomerDetail 客户档案
+func (h *Controller) CustomerDetail(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	cu, err := h.Svc.GetCustomer(c.Request.Context(), op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, cu)
+}
+
+// TodayFollow 今日待跟进（到期/逾期且未成交未流失的线索）
+func (h *Controller) TodayFollow(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	list, err := h.Svc.StaffTodayFollowUp(c.Request.Context(), op, params.Int(c, "limit"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// CustomerMobileUpdate 修改客户手机号（换绑，含格式与占用校验）
+func (h *Controller) CustomerMobileUpdate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	var req dto.StaffCustomerMobileReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.UpdateCustomerMobile(c.Request.Context(), op, req.CustomerID, req.Mobile); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 收款核验 / 订单加项（报告 H9、H10）
+// ---------------------------------------------------------------------
+
+// PaymentConfirm 收款确认到账（核验客户提交的收款/调度费凭证）
+func (h *Controller) PaymentConfirm(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ConfirmPayment(c.Request.Context(), op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// OrderAddonList 订单加项列表
+func (h *Controller) OrderAddonList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	orderID, err := pathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ListOrderAddons(c.Request.Context(), op, orderID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// OrderAddonCreate 新增加项（同事务重算订单金额）
+func (h *Controller) OrderAddonCreate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	orderID, err := pathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.OrderAddonReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	a, err := h.Svc.CreateOrderAddon(c.Request.Context(), op, orderID, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, a)
+}
+
+// OrderAddonUpdate 修改加项（同事务重算订单金额）
+func (h *Controller) OrderAddonUpdate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.OrderAddonReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	a, err := h.Svc.UpdateOrderAddon(c.Request.Context(), op, id, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, a)
+}
+
+// OrderAddonDelete 删除加项（同事务重算订单金额）
+func (h *Controller) OrderAddonDelete(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.DeleteOrderAddon(c.Request.Context(), op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 反馈整理（报告 H11）
+// ---------------------------------------------------------------------
+
+// FeedbackList 客户修图反馈列表（body: status 1-待处理 2-已处理，0-全部）
+func (h *Controller) FeedbackList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ListFeedbackItems(c.Request.Context(), op, params.Int(c, "status"), page, pageSize)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// FeedbackHandle 标记反馈已处理并记录处理备注
+func (h *Controller) FeedbackHandle(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	itemID, err := pathID(c, "item_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.StaffFeedbackHandleReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.HandleFeedbackItem(c.Request.Context(), op, itemID, req.Remark); err != nil {
 		response.Fail(c, err)
 		return
 	}

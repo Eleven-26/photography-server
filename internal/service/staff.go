@@ -107,7 +107,12 @@ func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, resched
 	}
 
 	if !approved {
-		return s.writeOrderLog(ctx, rs.OrderID, "reschedule_rejected", o.Status, o.Status, "改期申请被拒绝: "+remark, op)
+		if err := s.writeOrderLog(ctx, rs.OrderID, "reschedule_rejected", o.Status, o.Status, "改期申请被拒绝: "+remark, op); err != nil {
+			return err
+		}
+		s.NotifyClient(ctx, op, rs.CustomerID, "order", "改期申请未通过",
+			"改期申请未通过："+remark, "reschedule", rs.ID)
+		return nil
 	}
 
 	// 同意：更新订单拍摄日期时间 + 取消旧档期锁 + 建新档期锁
@@ -132,8 +137,13 @@ func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, resched
 	if err := s.CalendarRepo.Create(ctx, &block); err != nil {
 		return err
 	}
-	return s.writeOrderLog(ctx, rs.OrderID, "reschedule_approved", o.Status, o.Status,
-		"改期已同意: "+rs.OriginalDate+" → "+rs.NewDate+" "+rs.NewTime, op)
+	if err := s.writeOrderLog(ctx, rs.OrderID, "reschedule_approved", o.Status, o.Status,
+		"改期已同意: "+rs.OriginalDate+" → "+rs.NewDate+" "+rs.NewTime, op); err != nil {
+		return err
+	}
+	s.NotifyClient(ctx, op, rs.CustomerID, "order", "改期申请已通过",
+		"拍摄时间已调整为 "+rs.NewDate+" "+rs.NewTime, "reschedule", rs.ID)
+	return nil
 }
 
 // ---------------------------------------------------------------------
@@ -445,4 +455,14 @@ func b2i(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// StaffTodayFollowUp 今日待跟进线索（报告 H7：员工端 CU01 客户/线索页的「今日待跟进」）。
+// 口径：下次跟进时间已到（含逾期）且尚未成交/流失，按到期时间升序——越早到期越优先。
+func (s *Service) StaffTodayFollowUp(ctx context.Context, op Operator, limit int) ([]model.Lead, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	until := time.Now().Format("2006-01-02") + " 23:59:59"
+	return s.LeadRepo.ListFollowUpDue(ctx, op.CompanyID, until, limit)
 }

@@ -89,6 +89,56 @@ type ClientSmsLoginReq struct {
 	Code   string `json:"code" binding:"required"`   // 验证码
 }
 
+// ClientQuoteModifyReq 客户对报价提出修改意见（写入线索沟通记录并通知工作室，不改报价状态）
+type ClientQuoteModifyReq struct {
+	Content string `json:"content" binding:"required"` // 修改意见
+}
+
+// ClientOrderRequirementReq 客户修改订单拍摄需求。
+// 仅含「需求类」字段：日期/时段属于改期（必须走改期单链路以同步档期锁），不在白名单内，避免绕过档期一致性。
+type ClientOrderRequirementReq struct {
+	ShootAddress string `json:"shoot_address"` // 拍摄地点
+	PeopleCount  string `json:"people_count"`  // 拍摄人数（如 2大1小）
+	ShootStyle   string `json:"shoot_style"`   // 拍摄风格
+	Remark       string `json:"remark"`        // 备注
+}
+
+// ClientExtraQuoteReq 加片费试算请求。select_count 不传（0）时按当前已选张数试算。
+type ClientExtraQuoteReq struct {
+	SelectCount int `json:"select_count"` // 预计选片张数
+}
+
+// ClientExtraQuoteResp 加片费试算结果（纯计算、不落库，供选片页实时提示）
+type ClientExtraQuoteResp struct {
+	IncludedCount  int     `json:"included_count"`  // 套餐包含精修张数
+	SelectedCount  int     `json:"selected_count"`  // 本次试算的选片张数
+	ExtraCount     int     `json:"extra_count"`     // 超出套餐张数
+	UnitPrice      float64 `json:"unit_price"`      // 加片单价
+	ExtraFee       float64 `json:"extra_fee"`       // 加片费合计
+	ExtraConfirmed int     `json:"extra_confirmed"` // 客户是否已确认加片 0-否 1-是（已确认即锁定选片）
+}
+
+// ClientReschedulePayReq 客户支付改期调度费（上传凭证 → 工作室核验，与收款流程同一套链路）
+type ClientReschedulePayReq struct {
+	MethodID int64  `json:"method_id"` // 收款方式ID（选填）
+	Voucher  string `json:"voucher"`   // 支付凭证图片
+}
+
+// 改期调度费支付状态（客户端展示用，由该改期单的收款单推导，不落库）
+const (
+	RescheduleFeeNoNeed  = 0 // 无需支付（免费改期）
+	RescheduleFeeUnpaid  = 1 // 待支付
+	RescheduleFeePending = 2 // 待核验（客户已提交凭证）
+	RescheduleFeePaid    = 3 // 已核验到账
+)
+
+// ClientRescheduleDetailResp 改期单详情 + 调度费支付情况
+type ClientRescheduleDetailResp struct {
+	Reschedule model.OrderReschedule `json:"reschedule"` // 改期单
+	PayStatus  int                   `json:"pay_status"` // 见 RescheduleFee* 常量
+	Payments   []model.OrderPayment  `json:"payments"`   // 该改期单的调度费收款记录
+}
+
 // ======================== 小程序员工端 ========================
 
 // StaffOverview 员工端工作台待办统计
@@ -197,4 +247,15 @@ type StaffReviewReplyReq struct {
 // StaffCustomRequestRespondReq 定制需求响应
 type StaffCustomRequestRespondReq struct {
 	Response string `json:"response"` // 响应说明
+}
+
+// StaffCustomerMobileReq 员工端修改客户手机号（换绑）
+type StaffCustomerMobileReq struct {
+	CustomerID int64  `json:"customer_id" binding:"required"` // 客户ID
+	Mobile     string `json:"mobile" binding:"required"`      // 新手机号
+}
+
+// StaffFeedbackHandleReq 客户修图反馈处理
+type StaffFeedbackHandleReq struct {
+	Remark string `json:"remark"` // 处理备注（如「已按要求重修」）
 }

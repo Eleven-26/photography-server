@@ -35,6 +35,9 @@ func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
 	g.POST("/studio/info", h.StudioInfo)
 	g.POST("/slot/list", h.SlotList)
 	g.POST("/custom-request/submit", h.CustomRequestSubmit)
+	// 作品集（报告 H5）：预约主页展示，只出「已发布 + 公开」作品
+	g.POST("/asset/list", h.AssetList)
+	g.POST("/asset/detail/:id", h.AssetDetail)
 }
 
 // RegisterAuthed 注册需登录路由（CustomerAuth 注入 ClientUser）
@@ -60,6 +63,22 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/delivery/feedback/:item_id", h.FeedbackSubmit)
 	// 定制需求
 	g.POST("/custom-request/list", h.CustomRequestList)
+	// 报价（报告 H1）：查看 / 接受 / 提出修改
+	g.POST("/quote/list", h.QuoteList)
+	g.POST("/quote/accept/:id", h.QuoteAccept)
+	g.POST("/quote/modify/:id", h.QuoteModify)
+	// 改期调度费（报告 H2）：详情含支付状态，支付走「上传凭证 → 工作室核验」
+	g.POST("/reschedule/detail/:id", h.RescheduleDetail)
+	g.POST("/reschedule/pay/:id", h.ReschedulePay)
+	// 加片费试算（报告 H3）
+	g.POST("/delivery/extra-quote/:id", h.ExtraQuote)
+	// 拍摄需求修改（报告 H4）
+	g.POST("/order/requirement/update/:id", h.OrderRequirementUpdate)
+	// 站内通知（报告 H6）
+	g.POST("/notification/list", h.NotificationList)
+	g.POST("/notification/unread-count", h.NotificationUnreadCount)
+	g.POST("/notification/read/:id", h.NotificationRead)
+	g.POST("/notification/read-all", h.NotificationReadAll)
 }
 
 // slugFrom 提取客户端公开接口的预约主页短链标识：query slug 与 X-Slug 头二选一（头优先）。
@@ -535,4 +554,226 @@ func (h *Controller) CustomRequestList(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// ---------------------------------------------------------------------
+// 作品集（报告 H5，公开接口）
+// ---------------------------------------------------------------------
+
+// AssetList 公开作品列表（预约主页作品集）
+func (h *Controller) AssetList(c *gin.Context) {
+	companyID, err := h.requireCompany(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ClientAssets(c.Request.Context(), companyID, page, pageSize,
+		params.Str(c, "category"), params.Str(c, "featured") == "1")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// AssetDetail 公开作品详情（浏览数 +1）
+func (h *Controller) AssetDetail(c *gin.Context) {
+	companyID, err := h.requireCompany(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	a, err := h.Svc.ClientAssetDetail(c.Request.Context(), companyID, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, a)
+}
+
+// ---------------------------------------------------------------------
+// 报价（报告 H1）
+// ---------------------------------------------------------------------
+
+// QuoteList 我的报价单列表（含明细字段，前端按 id 取单条即可）
+func (h *Controller) QuoteList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	list, err := h.Svc.ClientQuotes(c.Request.Context(), cu)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// QuoteAccept 接受报价
+func (h *Controller) QuoteAccept(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientQuoteAccept(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// QuoteModify 对报价提出修改意见
+func (h *Controller) QuoteModify(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientQuoteModifyReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientQuoteModify(c.Request.Context(), cu, id, req.Content); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 调度费 / 加片费试算 / 需求修改（报告 H2~H4）
+// ---------------------------------------------------------------------
+
+// RescheduleDetail 改期单详情 + 调度费支付状态
+func (h *Controller) RescheduleDetail(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	d, err := h.Svc.ClientRescheduleDetail(c.Request.Context(), cu, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, d)
+}
+
+// ReschedulePay 提交改期调度费支付凭证
+func (h *Controller) ReschedulePay(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientReschedulePayReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	p, err := h.Svc.ClientPayRescheduleFee(c.Request.Context(), cu, id, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, p)
+}
+
+// ExtraQuote 加片费试算（body 可为空：按当前已选张数试算）
+func (h *Controller) ExtraQuote(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientExtraQuoteReq
+	_ = c.ShouldBindJSON(&req)
+	q, err := h.Svc.ClientExtraQuote(c.Request.Context(), cu, id, req.SelectCount)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, q)
+}
+
+// OrderRequirementUpdate 客户修改拍摄需求（仅待定金/待拍摄，白名单字段）
+func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.ClientOrderRequirementReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientUpdateOrderRequirement(c.Request.Context(), cu, id, req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 站内通知（报告 H6）
+// ---------------------------------------------------------------------
+
+// NotificationList 我的通知列表（body: unread=1 只看未读）
+func (h *Controller) NotificationList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ListClientNotifications(c.Request.Context(), cu, page, pageSize, params.Str(c, "unread") == "1")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total})
+}
+
+// NotificationUnreadCount 未读通知数（铃铛红点）
+func (h *Controller) NotificationUnreadCount(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	count, err := h.Svc.UnreadClientNotificationCount(c.Request.Context(), cu)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, gin.H{"count": count})
+}
+
+// NotificationRead 标记单条已读
+func (h *Controller) NotificationRead(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := pathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.MarkClientNotificationRead(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// NotificationReadAll 全部标记已读
+func (h *Controller) NotificationReadAll(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	if err := h.Svc.MarkAllClientNotificationsRead(c.Request.Context(), cu); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
 }

@@ -114,10 +114,16 @@ func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int
 		}
 	}
 
-	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
+	if err := s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":        enum.DeliveryStageSelecting,
 		"sample_count": len(items),
-	})
+	}); err != nil {
+		return err
+	}
+	// 选片是有截止时间的客户待办，样片就绪必须通知到客户本人
+	s.NotifyClient(ctx, op, d.CustomerID, "order", "样片已上传，可开始选片",
+		"交付单 "+d.Code+" 的样片已上传，请在选片截止前完成选片", "delivery", d.ID)
+	return nil
 }
 
 func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int64, req dto.DeliverySelectReq) error {
@@ -182,8 +188,43 @@ func (s *Service) ConfirmDelivered(ctx context.Context, op Operator, deliveryID 
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
+	if err := s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":        enum.DeliveryStageDelivered,
 		"delivered_at": now,
+	}); err != nil {
+		return err
+	}
+	s.NotifyClient(ctx, op, d.CustomerID, "order", "成片已交付",
+		"交付单 "+d.Code+" 的成片已交付，请及时下载保存", "delivery", d.ID)
+	return nil
+}
+
+// ---------------------------------------------------------------------
+// 报告 H11：员工端「反馈整理」——客户在精修阶段提交的修改意见
+// ---------------------------------------------------------------------
+
+// ListFeedbackItems 客户反馈列表（status 见 enum.Feedback*，0 为全部）
+func (s *Service) ListFeedbackItems(ctx context.Context, op Operator, status, page, pageSize int) ([]repository.FeedbackListItem, int64, error) {
+	return s.DeliveryRepo.ListFeedbackItems(ctx, op.CompanyID, status, page, pageSize)
+}
+
+// HandleFeedbackItem 标记反馈已处理并记录处理备注（如「已按要求重修」）。
+// 无反馈的文件不可操作；重复提交按幂等返回成功（避免双击报错）。
+func (s *Service) HandleFeedbackItem(ctx context.Context, op Operator, itemID int64, remark string) error {
+	var item model.DeliveryItem
+	if err := s.DeliveryRepo.FirstItem(ctx, op.CompanyID, itemID, &item); err != nil {
+		return errs.NotFound("交付文件不存在")
+	}
+	if item.FeedbackStatus == enum.FeedbackNone {
+		return errs.BadRequest("该文件没有客户反馈")
+	}
+	if item.FeedbackStatus == enum.FeedbackHandled {
+		return nil
+	}
+	return s.DeliveryRepo.UpdateItem(ctx, op.CompanyID, itemID, map[string]interface{}{
+		"feedback_status": enum.FeedbackHandled,
+		"handled_at":      time.Now().Format("2006-01-02 15:04:05"),
+		"handle_remark":   remark,
+		"updated_by":      op.UserID,
 	})
 }

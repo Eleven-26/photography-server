@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
@@ -127,4 +128,30 @@ func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*dto.Custo
 		RepurchaseCount: st.RepurchaseCount,
 		RepurchaseRate:  st.RepurchaseRate,
 	}, nil
+}
+
+// UpdateCustomerMobile 员工端修改客户手机号（报告 H8：D12「修改手机号」）。
+// 手机号是客户登录凭据（验证码登录按手机号匹配客户），因此换绑前必须：
+//  1. 校验格式，并确认租户内无其他客户占用该号（重复占用会让两人抢同一登录身份）；
+//  2. 不改动历史订单上的 customer_mobile 快照 —— 快照是下单当时的事实，
+//     回溯修改会让已发生的对账与凭证追溯失真。
+func (s *Service) UpdateCustomerMobile(ctx context.Context, op Operator, customerID int64, mobile string) error {
+	mobile = strings.TrimSpace(mobile)
+	if !domain.IsMobile(mobile) {
+		return errs.BadRequest("手机号格式不正确")
+	}
+	cur, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, customerID)
+	if err != nil {
+		return errs.NotFound(errs.ErrCustomerNotFound)
+	}
+	if cur.Mobile == mobile {
+		return nil // 未变更：幂等
+	}
+	if other, err := s.CustomerRepo.GetByMobile(ctx, op.CompanyID, mobile); err == nil && other != nil {
+		return errs.Conflict(errs.ErrCustomerDuplicate + "：该手机号已被其他客户使用")
+	}
+	return s.CustomerRepo.Update(ctx, op.CompanyID, customerID, map[string]interface{}{
+		"mobile":     mobile,
+		"updated_by": op.UserID,
+	})
 }

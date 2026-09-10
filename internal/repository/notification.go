@@ -21,8 +21,11 @@ func (r *NotificationRepo) WithTx(tx *gorm.DB) *NotificationRepo {
 
 func NewNotificationRepo() *NotificationRepo { return &NotificationRepo{} }
 
-func (r *NotificationRepo) List(ctx context.Context, companyID, receiverID int64, page, pageSize int, onlyUnread bool) ([]model.SysNotification, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx).Where("receiver_id = ?", receiverID)
+// List 列出接收人的通知。receiverType 区分员工/客户（见 enum.NotificationReceiver）：
+// 两者 ID 空间独立，只用 receiver_id 过滤会让「客户 5」看到「员工 5」的通知。
+func (r *NotificationRepo) List(ctx context.Context, companyID int64, receiverType int, receiverID int64, page, pageSize int, onlyUnread bool) ([]model.SysNotification, int64, error) {
+	q := r.tenant(companyID).WithContext(ctx).
+		Where("receiver_type = ? AND receiver_id = ?", receiverType, receiverID)
 	if onlyUnread {
 		q = q.Where("is_read = ?", int(enum.NotificationUnread))
 	}
@@ -38,22 +41,25 @@ func (r *NotificationRepo) List(ctx context.Context, companyID, receiverID int64
 	return list, total, nil
 }
 
-func (r *NotificationRepo) UnreadCount(ctx context.Context, companyID, receiverID int64) (int64, error) {
+func (r *NotificationRepo) UnreadCount(ctx context.Context, companyID int64, receiverType int, receiverID int64) (int64, error) {
 	var count int64
 	err := r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).
-		Where("receiver_id = ? AND is_read = ?", receiverID, int(enum.NotificationUnread)).
+		Where("receiver_type = ? AND receiver_id = ? AND is_read = ?", receiverType, receiverID, int(enum.NotificationUnread)).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *NotificationRepo) MarkRead(ctx context.Context, companyID, notificationID int64) error {
-	return r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).Where("id = ?", notificationID).
+// MarkRead 标记单条已读。必须同时校验接收人归属：仅凭 company_id + id 时，
+// 同公司内任意员工/客户都能把别人的通知标记为已读。
+func (r *NotificationRepo) MarkRead(ctx context.Context, companyID int64, receiverType int, receiverID, notificationID int64) error {
+	return r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).
+		Where("id = ? AND receiver_type = ? AND receiver_id = ?", notificationID, receiverType, receiverID).
 		Update("is_read", int(enum.NotificationRead)).Error
 }
 
-func (r *NotificationRepo) MarkAllRead(ctx context.Context, companyID, receiverID int64) error {
+func (r *NotificationRepo) MarkAllRead(ctx context.Context, companyID int64, receiverType int, receiverID int64) error {
 	return r.tenant(companyID).WithContext(ctx).Model(&model.SysNotification{}).
-		Where("receiver_id = ? AND is_read = ?", receiverID, int(enum.NotificationUnread)).
+		Where("receiver_type = ? AND receiver_id = ? AND is_read = ?", receiverType, receiverID, int(enum.NotificationUnread)).
 		Update("is_read", int(enum.NotificationRead)).Error
 }
 

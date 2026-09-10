@@ -202,13 +202,19 @@ func (s *Service) UpdateOrder(ctx context.Context, op Operator, id int64, req dt
 // 任一步失败整体回滚——避免"订单已取消但档期仍锁定"、"已完成但 finished_at 为空"；
 // 事务内加行锁重读订单并二次校验状态机，消除校验与更新间的 TOCTOU。
 func (s *Service) ChangeOrderStatus(ctx context.Context, op Operator, id int64, to enum.OrderStatus, content string) error {
-	return repository.Tx(func(tx *gorm.DB) error {
+	var (
+		fromStatus enum.OrderStatus
+		customerID int64
+		orderCode  string
+	)
+	err := repository.Tx(func(tx *gorm.DB) error {
 		// 1. 事务内行锁读取：基于锁后快照做状态机校验，防并发绕过
 		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(ctx, op.CompanyID, id)
 		if err != nil {
 			return errs.NotFound(errs.ErrOrderNotFound)
 		}
 		from := o.Status
+		fromStatus, customerID, orderCode = from, o.CustomerID, o.Code
 		if !domain.OrderCanTransit(from, to) {
 			return errs.BadRequest(errs.ErrOrderStatusInvalid)
 		}
@@ -231,6 +237,16 @@ func (s *Service) ChangeOrderStatus(ctx context.Context, op Operator, id int64, 
 		// 3. 操作日志
 		return s.writeOrderLogTx(ctx, tx, id, "change_status", from, to, content, op)
 	})
+	if err != nil {
+		return err
+	}
+	// 4. 事务提交后再通知客户：通知失败不能影响已生效的状态流转。
+	// 「待确认 → 待拍摄」= 工作室确认了客户的预约，是客户最关心的一个节点。
+	if fromStatus == enum.OrderStatusPendingConfirm && to == enum.OrderStatusPendingShoot {
+		s.NotifyClient(ctx, op, customerID, "order", "预约已确认",
+			"订单 "+orderCode+" 已确认，请按约定时间到店拍摄", "order", id)
+	}
+	return nil
 }
 
 func (s *Service) CancelOrder(ctx context.Context, op Operator, id int64, reason string) error {

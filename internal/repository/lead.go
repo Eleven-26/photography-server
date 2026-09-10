@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"gorm.io/gorm"
+
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 )
 
@@ -79,6 +81,27 @@ func (r *LeadRepo) GetByMobile(ctx context.Context, companyID int64, mobile stri
 	return &l, nil
 }
 
+// ListFollowUpDue 今日待跟进线索：下次跟进时间已到（含逾期）且尚未成交/流失的线索。
+// until 传「今日 23:59:59」，让当天到期的线索也进入待办；按到期时间升序——越早到期越优先。
+// 注：next_follow_at 为 datetime 列，NULL 不参与比较（SQL 三值逻辑），
+// 因此只需 IS NOT NULL，不能写 `!= ''`——严格模式下空串转 datetime 会直接报错。
+func (r *LeadRepo) ListFollowUpDue(ctx context.Context, companyID int64, until string, limit int) ([]model.Lead, error) {
+	q := r.tenant(companyID).WithContext(ctx).
+		Where("next_follow_at IS NOT NULL AND next_follow_at <= ?", until).
+		Where("status IN ?", []int{
+			int(enum.LeadStatusPending),
+			int(enum.LeadStatusQuoting),
+			int(enum.LeadStatusQuoted),
+		}).
+		Order("next_follow_at ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var list []model.Lead
+	err := q.Find(&list).Error
+	return list, err
+}
+
 // -------- 报价单 --------
 
 // GetQuoteByID 根据 ID 查询报价单
@@ -99,6 +122,19 @@ func (r *LeadRepo) CreateQuote(ctx context.Context, q *model.Quote) error {
 func (r *LeadRepo) ListQuotesByLead(ctx context.Context, companyID, leadID int64) ([]model.Quote, error) {
 	var list []model.Quote
 	err := r.tenant(companyID).WithContext(ctx).Where("lead_id = ?", leadID).Order("id DESC").Find(&list).Error
+	return list, err
+}
+
+// ListQuotesByCustomer 查询客户可见的报价单（H5「我的报价」）。
+// 两条来源：直接挂在客户名下的报价（quote.customer_id，报价创建时由 lead.customer_id 回填），
+// 以及挂在该客户线索上的报价——早期数据可能未回填 customer_id，只按前者查会漏，故用 lead_id 子查询兜底。
+func (r *LeadRepo) ListQuotesByCustomer(ctx context.Context, companyID, customerID int64) ([]model.Quote, error) {
+	leadIDs := r.conn().Model(&model.Lead{}).Select("id").
+		Where("company_id = ? AND customer_id = ?", companyID, customerID)
+	var list []model.Quote
+	err := r.tenant(companyID).WithContext(ctx).
+		Where("customer_id = ? OR lead_id IN (?)", customerID, leadIDs).
+		Order("id DESC").Find(&list).Error
 	return list, err
 }
 

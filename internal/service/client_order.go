@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -426,4 +427,210 @@ func (s *Service) ClientFeedbackSubmit(ctx context.Context, cu *ClientUser, item
 		"feedback_priority": orDefault(req.Priority, "normal"),
 		"feedback_status":   1,
 	})
+}
+
+// ---------------------------------------------------------------------
+// 报告 H2~H4：客户侧调度费支付 / 加片费试算 / 拍摄需求修改
+// ---------------------------------------------------------------------
+
+// clientOwnedDelivery 取交付单并校验其订单归属当前客户（选片相关接口的公共前置）
+func (s *Service) clientOwnedDelivery(ctx context.Context, cu *ClientUser, deliveryID int64) (*model.Delivery, *model.Order, error) {
+	d, err := s.DeliveryRepo.GetByID(ctx, cu.CompanyID, deliveryID)
+	if err != nil {
+		return nil, nil, errs.NotFound(errs.ErrDeliveryNotFound)
+	}
+	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, d.OrderID)
+	if err != nil {
+		return nil, nil, errs.NotFound(errs.ErrOrderNotFound)
+	}
+	if err := clientOrderOwned(o, cu); err != nil {
+		return nil, nil, err
+	}
+	return d, o, nil
+}
+
+// ClientExtraQuote 加片费试算（H3：原型 C13「24/20 张 +¥240」）。
+// 纯计算、不落库：客户勾选过程中实时看到超出张数与加片费，确认前金额透明。
+// selectCount 传 0 时按当前已选张数试算；正式计价仍在 ClientSelectPhotos（提交选片时落库）。
+func (s *Service) ClientExtraQuote(ctx context.Context, cu *ClientUser, deliveryID int64, selectCount int) (*dto.ClientExtraQuoteResp, error) {
+	d, o, err := s.clientOwnedDelivery(ctx, cu, deliveryID)
+	if err != nil {
+		return nil, err
+	}
+	count := selectCount
+	if count <= 0 {
+		count = d.SelectedCount
+	}
+	included, unitPrice := 0, 0.0
+	if pkg, err := s.PackageRepo.GetByID(ctx, cu.CompanyID, o.PackageID); err == nil && pkg != nil {
+		included = pkg.PhotosIncluded
+		unitPrice = pkg.AddonUnitPrice
+	}
+	extraCount, extraFee := domain.ExtraRetouchFee(count, included, unitPrice)
+	return &dto.ClientExtraQuoteResp{
+		IncludedCount:  included,
+		SelectedCount:  count,
+		ExtraCount:     extraCount,
+		UnitPrice:      unitPrice,
+		ExtraFee:       extraFee,
+		ExtraConfirmed: d.ExtraConfirmed,
+	}, nil
+}
+
+// rescheduleFeePaymentType 调度费收款单类型。
+// 复用 biz_order_payment 承载调度费（无独立收费表）：核验链路与定金/尾款完全一致
+// （客户上传凭证 → 工作室核验）。但调度费不属于订单套餐应收，故在 payment.go 的确认
+// 核验分支中豁免「额度校验 / 已收累加」，否则订单已收会超过总额并污染应收口径。
+const rescheduleFeePaymentType = "reschedule"
+
+// listRescheduleFeePayments 取某改期单的调度费收款记录。
+// OrderPayment 无 reschedule_id 列，以 remark 精确写入改期单号（RS-xxx）建立 1:1 关联。
+func (s *Service) listRescheduleFeePayments(ctx context.Context, companyID int64, rs *model.OrderReschedule) ([]model.OrderPayment, error) {
+	list, err := s.OrderRepo.ListPayments(ctx, companyID, rs.OrderID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.OrderPayment, 0, 1)
+	for _, p := range list {
+		if p.Type == rescheduleFeePaymentType && p.Remark == rs.Code {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+// getOwnedReschedule 取改期单并校验归属当前客户（改期单未回填客户 ID 时按订单归属兜底）
+func (s *Service) getOwnedReschedule(ctx context.Context, cu *ClientUser, rescheduleID int64) (*model.OrderReschedule, error) {
+	rs, err := s.RescheduleRepo.GetByID(ctx, cu.CompanyID, rescheduleID)
+	if err != nil {
+		return nil, errs.NotFound("改期单不存在")
+	}
+	if rs.CustomerID > 0 && rs.CustomerID == cu.CustomerID {
+		return rs, nil
+	}
+	if o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, rs.OrderID); err == nil && o.CustomerID == cu.CustomerID {
+		return rs, nil
+	}
+	return nil, errs.NotFound("改期单不存在")
+}
+
+// ClientRescheduleDetail 改期单详情 + 调度费支付状态（H2：原型 B2 改期调度费支付）
+func (s *Service) ClientRescheduleDetail(ctx context.Context, cu *ClientUser, rescheduleID int64) (*dto.ClientRescheduleDetailResp, error) {
+	rs, err := s.getOwnedReschedule(ctx, cu, rescheduleID)
+	if err != nil {
+		return nil, err
+	}
+	payments, err := s.listRescheduleFeePayments(ctx, cu.CompanyID, rs)
+	if err != nil {
+		return nil, err
+	}
+	status := dto.RescheduleFeeNoNeed
+	if rs.FeeType == enum.RescheduleFeeCharged && rs.FeeAmount > 0 {
+		status = dto.RescheduleFeeUnpaid
+		for _, p := range payments {
+			if p.Status == enum.PaymentStatusConfirmed {
+				status = dto.RescheduleFeePaid
+				break
+			}
+			if p.Status == enum.PaymentStatusPending {
+				status = dto.RescheduleFeePending
+			}
+		}
+	}
+	return &dto.ClientRescheduleDetailResp{
+		Reschedule: *rs,
+		PayStatus:  status,
+		Payments:   payments,
+	}, nil
+}
+
+// ClientPayRescheduleFee 客户提交调度费支付凭证（H2），进入工作室核验队列。
+// 前置：改期单已同意且确需收费；幂等：已有待核验/已核验记录时直接拒绝，避免重复上传。
+func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, rescheduleID int64, req dto.ClientReschedulePayReq) (*model.OrderPayment, error) {
+	rs, err := s.getOwnedReschedule(ctx, cu, rescheduleID)
+	if err != nil {
+		return nil, err
+	}
+	if rs.Status != enum.RescheduleStatusApproved {
+		return nil, errs.BadRequest("改期申请尚未通过，暂无需支付调度费")
+	}
+	if rs.FeeType != enum.RescheduleFeeCharged || rs.FeeAmount <= 0 {
+		return nil, errs.BadRequest("本次改期无需支付调度费")
+	}
+	existing, err := s.listRescheduleFeePayments(ctx, cu.CompanyID, rs)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range existing {
+		switch p.Status {
+		case enum.PaymentStatusPending:
+			return nil, errs.BadRequest("调度费凭证已提交，请等待工作室核验")
+		case enum.PaymentStatusConfirmed:
+			return nil, errs.BadRequest("调度费已核验到账，无需重复支付")
+		}
+	}
+	p := model.OrderPayment{
+		TenantBase: model.TenantBase{
+			Base:      model.Base{CreatedBy: cu.CustomerID, UpdatedBy: cu.CustomerID},
+			CompanyID: cu.CompanyID,
+		},
+		OrderID:    rs.OrderID,
+		Code:       domain.GenCode("PM"),
+		CustomerID: cu.CustomerID,
+		Type:       rescheduleFeePaymentType,
+		Amount:     rs.FeeAmount,
+		MethodID:   req.MethodID,
+		Voucher:    req.Voucher,
+		Remark:     rs.Code, // 与改期单 1:1 关联（表无 reschedule_id 列）
+		Status:     enum.PaymentStatusPending,
+	}
+	if err := s.OrderRepo.CreatePayment(ctx, &p); err != nil {
+		return nil, err
+	}
+	s.NotifyStaff(ctx, clientOperator(cu), 0, "finance", "改期调度费待核验",
+		fmt.Sprintf("客户已提交改期单 %s 的调度费凭证（%.2f 元），请核验", rs.Code, rs.FeeAmount),
+		"payment", p.ID)
+	return &p, nil
+}
+
+// ClientUpdateOrderRequirement 客户修改拍摄需求（H4：原型 C10「修改需求」）。
+// 白名单字段仅「地点 / 人数 / 风格 / 备注」：金额与套餐不在其列，拍摄日期与时段也不在——
+// 日期时段变更必须走改期单（需重排档期锁），否则会出现「订单已改、档期仍锁在旧日期」。
+// 仅「待定金 / 待拍摄」可改；空值表示「不修改」，避免误清空既有需求。
+func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientOrderRequirementReq) error {
+	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		return errs.NotFound(errs.ErrOrderNotFound)
+	}
+	if err := clientOrderOwned(o, cu); err != nil {
+		return err
+	}
+	if o.Status != enum.OrderStatusPendingDeposit && o.Status != enum.OrderStatusPendingShoot {
+		return errs.BadRequest("订单已进入拍摄流程，需求变更请联系工作室")
+	}
+	updates := map[string]interface{}{"updated_by": cu.CustomerID}
+	if v := strings.TrimSpace(req.ShootAddress); v != "" {
+		updates["shoot_address"] = v
+	}
+	if v := strings.TrimSpace(req.PeopleCount); v != "" {
+		updates["people_count"] = v
+	}
+	if v := strings.TrimSpace(req.ShootStyle); v != "" {
+		updates["shoot_style"] = v
+	}
+	if v := strings.TrimSpace(req.Remark); v != "" {
+		updates["remark"] = v
+	}
+	if len(updates) == 1 {
+		return errs.BadRequest("请至少填写一项需要修改的需求")
+	}
+	if err := s.OrderRepo.Update(ctx, cu.CompanyID, orderID, updates); err != nil {
+		return err
+	}
+	// 需求直接影响拍前准备，必须留订单日志并提醒负责人
+	op := clientOperator(cu)
+	_ = s.writeOrderLog(ctx, orderID, "update_requirement", o.Status, o.Status, "客户修改拍摄需求", op)
+	s.NotifyStaff(ctx, op, o.OwnerID, "order", "客户修改了拍摄需求",
+		"订单 "+o.Code+" 的拍摄需求已由客户更新，请核对拍前准备", "order", o.ID)
+	return nil
 }

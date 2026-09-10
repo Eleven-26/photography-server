@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"photography-server/internal/domain"
@@ -153,6 +154,9 @@ func (s *Service) CreateQuote(ctx context.Context, op Operator, leadID int64, re
 	}
 
 	s.LeadRepo.Update(ctx, op.CompanyID, leadID, map[string]interface{}{"status": enum.LeadStatusQuoted})
+	// 报价已发出即通知客户（客户 ID 为 0 时内部跳过，不写孤儿通知）
+	s.NotifyClient(ctx, op, q.CustomerID, "order", "收到新的报价单",
+		fmt.Sprintf("报价单 %s 已生成（%.2f 元），请在「我的报价」中查看", q.Code, q.TotalPrice), "quote", q.ID)
 	return &q, nil
 }
 
