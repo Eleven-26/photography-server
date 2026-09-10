@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
@@ -84,7 +85,7 @@ func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int6
 		s.DeliveryRepo.UpdateItemKind(ctx, op.CompanyID, itemID, "selected")
 	}
 
-	now := "2006-01-02 15:04:05"
+	now := time.Now().Format("2006-01-02 15:04:05")
 	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":          enum.DeliveryStageRetouching,
 		"selected_count": len(req.ItemIDs),
@@ -132,7 +133,7 @@ func (s *Service) ConfirmDelivered(ctx context.Context, op Operator, deliveryID 
 		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
 	}
 
-	now := "2006-01-02 15:04:05"
+	now := time.Now().Format("2006-01-02 15:04:05")
 	return s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
 		"stage":        enum.DeliveryStageDelivered,
 		"delivered_at": now,

@@ -26,6 +26,7 @@ func Init(cfg *config.Config) {
 }
 
 // Get 获取中间件单例
+// 注意：未调用 Init() 时返回 nil，调用方需做 nil 检查
 func Get() *Middlewares {
 	return mwInstance
 }
