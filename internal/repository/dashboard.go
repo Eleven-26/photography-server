@@ -160,8 +160,11 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 		Where("status IN ?", openLeadStatus).Count(&ov.NewLeads).Error; err != nil {
 		return nil, err
 	}
+	// 逾期未跟进：next_follow_at 为 datetime 列，严格模式下与 '' 比较会直接报
+	// ERROR 1525 Incorrect DATETIME value: ''（空串需先转 datetime 才能比较）。
+	// NULL 本身不参与比较，故只需 IS NOT NULL，不能写 next_follow_at <> ''。
 	if err := q().Model(&model.Lead{}).
-		Where("status IN ? AND next_follow_at IS NOT NULL AND next_follow_at <> '' AND next_follow_at < ?", openLeadStatus, nowStr).
+		Where("status IN ? AND next_follow_at IS NOT NULL AND next_follow_at < ?", openLeadStatus, nowStr).
 		Count(&ov.OverdueLeads).Error; err != nil {
 		return nil, err
 	}
