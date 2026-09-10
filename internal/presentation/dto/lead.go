@@ -38,6 +38,11 @@ type LeadFollowReq struct {
 	Remark string `json:"remark"` // 跟进备注
 }
 
+// QuoteStatusReq 变更报价单状态
+type QuoteStatusReq struct {
+	Status enum.QuoteStatus `json:"status" binding:"required"` // 1-草稿 2-已发送 3-已接受 4-已拒绝 5-已成交
+}
+
 // QuoteCreateReq 创建报价单
 type QuoteCreateReq struct {
 	PackageID  int64   `json:"package_id" binding:"required"` // 套餐ID

@@ -19,3 +19,15 @@ func AssetStatusName(status AssetStatus) string {
 	}
 	return "未知"
 }
+
+// AssetVisibility 作品可见性
+const (
+	AssetVisibilityPublic  = 1 // 公开（客户 H5 可见）
+	AssetVisibilityPrivate = 2 // 未公开（仅工作室内部可见）
+)
+
+// AssetAuthorization 客户授权状态
+const (
+	AssetAuthPending = 1 // 待授权
+	AssetAuthGranted = 2 // 已授权
+)

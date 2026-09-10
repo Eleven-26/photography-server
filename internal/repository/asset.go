@@ -21,8 +21,8 @@ func NewAssetRepo() *AssetRepo {
 	return &AssetRepo{}
 }
 
-// List 作品列表（分页 + 关键字 + 类别 + 状态筛选）
-func (r *AssetRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, category, status string) ([]model.Asset, int64, error) {
+// List 作品列表（分页 + 关键字 + 类别 + 状态 + 精选筛选）
+func (r *AssetRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, category, status, featured string) ([]model.Asset, int64, error) {
 	q := r.tenant(companyID).WithContext(ctx)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
@@ -33,6 +33,9 @@ func (r *AssetRepo) List(ctx context.Context, companyID int64, page, pageSize in
 	}
 	if status != "" {
 		q = q.Where("status = ?", status)
+	}
+	if featured != "" {
+		q = q.Where("featured = ?", featured)
 	}
 	var total int64
 	if err := q.Model(&model.Asset{}).Count(&total).Error; err != nil {

@@ -92,7 +92,8 @@ func (h *Controller) PaymentMethodDelete(c *gin.Context) {
 func (h *Controller) OperationLogList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOperationLogs(c.Request.Context(), op, page, pageSize)
+	list, total, err := h.Svc.ListOperationLogs(c.Request.Context(), op, page, pageSize,
+		queryStr(c, "keyword"), queryStr(c, "module"), queryStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return

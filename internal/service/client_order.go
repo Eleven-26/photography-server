@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -86,6 +87,10 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 		"客户申请改期至 "+req.NewDate+" "+req.NewTime, clientOperator(cu)); err != nil {
 		logger.Warnf("ClientRescheduleApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
 	}
+	// 站内通知：改期申请待审批（失败不阻断申请）
+	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, "order", "改期申请待审批",
+		fmt.Sprintf("%s 申请将订单 %s 改期至 %s %s，请尽快处理", cu.Name, o.Code, req.NewDate, req.NewTime),
+		"order", orderID)
 	return &rs, nil
 }
 
@@ -166,6 +171,10 @@ func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID
 	if err := s.writeOrderLog(ctx, orderID, "client_refund", o.Status, o.Status, "客户申请退款", clientOperator(cu)); err != nil {
 		logger.Warnf("ClientRefundApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
 	}
+	// 站内通知：退款申请待审批（失败不阻断申请）
+	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, "finance", "退款申请待审批",
+		fmt.Sprintf("%s 申请退款 ¥%.2f（订单 %s），请尽快处理", cu.Name, rf.Amount, o.Code),
+		"refund", orderID)
 	return &rf, nil
 }
 

@@ -132,9 +132,106 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 }
 
 func (h *Controller) QuoteList(c *gin.Context) {
-	response.OK(c, []interface{}{})
+	op := middleware.GetOperator(c)
+	leadID, err := pathParam(c, "lead_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ListQuotes(c.Request.Context(), op, leadID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
 }
 
 func (h *Controller) QuoteStatus(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.QuoteStatusReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.UpdateQuoteStatus(c.Request.Context(), op, id, req.Status); err != nil {
+		response.Fail(c, err)
+		return
+	}
 	response.OKNil(c)
+}
+
+// -------- 沟通记录 / 需求摘要（复用员工端已实现的线索扩展能力） --------
+
+// LeadMessages 线索沟通记录（客户来讯 + 工作室发出）
+func (h *Controller) LeadMessages(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.StaffLeadMessages(c.Request.Context(), op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// LeadMessageSend 发送沟通消息（追问/报价通知/作品分享）
+func (h *Controller) LeadMessageSend(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.StaffLeadMessageReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	m, err := h.Svc.StaffSendLeadMessage(c.Request.Context(), op, id, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, m)
+}
+
+// LeadBriefList 需求摘要项列表（已确认 + 待追问）
+func (h *Controller) LeadBriefList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	leadID, err := pathParam(c, "lead_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	items, err := h.Svc.StaffBriefList(c.Request.Context(), op, leadID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, items)
+}
+
+// LeadBriefGenerate 依据线索信息重建需求摘要（已确认项 + 待追问项，覆盖旧数据）
+func (h *Controller) LeadBriefGenerate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	leadID, err := pathParam(c, "lead_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	items, err := h.Svc.StaffBriefGenerate(c.Request.Context(), op, leadID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, items)
 }

@@ -147,6 +147,10 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	ld.POST("/delete/:id", ctl.LeadDelete)
 	ld.POST("/follow/:id", ctl.LeadFollow)
 	ld.POST("/convert/:id", ctl.LeadConvert)
+	ld.POST("/messages/:id", ctl.LeadMessages)
+	ld.POST("/message/send/:id", ctl.LeadMessageSend)
+	ld.POST("/brief/list/:lead_id", ctl.LeadBriefList)
+	ld.POST("/brief/generate/:lead_id", ctl.LeadBriefGenerate)
 
 	// 报价单
 	qt := g.Group("/quote")
@@ -212,6 +216,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	wk.POST("/detail/:id", ctl.AssetDetail)
 	wk.POST("/create", ctl.AssetCreate)
 	wk.POST("/update/:id", ctl.AssetUpdate)
+	wk.POST("/status/:id", ctl.AssetStatus)
 	wk.POST("/delete/:id", ctl.AssetDelete)
 
 	// 档期

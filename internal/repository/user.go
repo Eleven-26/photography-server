@@ -40,6 +40,14 @@ func (r *UserRepo) List(ctx context.Context, companyID int64, page, pageSize int
 	return list, total, nil
 }
 
+// ListActiveIDs 公司内启用状态员工ID（站内通知广播用）
+func (r *UserRepo) ListActiveIDs(ctx context.Context, companyID int64) ([]int64, error) {
+	var ids []int64
+	err := r.tenant(companyID).WithContext(ctx).Model(&model.SysUser{}).
+		Where("status = ?", 1).Order("id ASC").Pluck("id", &ids).Error
+	return ids, err
+}
+
 func (r *UserRepo) GetByID(ctx context.Context, companyID, userID int64) (*model.SysUser, error) {
 	var u model.SysUser
 	if err := r.tenant(companyID).WithContext(ctx).First(&u, userID).Error; err != nil {

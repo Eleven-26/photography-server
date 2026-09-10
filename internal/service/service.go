@@ -102,6 +102,23 @@ func orDefaultInt64(v, def int64) int64 {
 	return v
 }
 
+// orDefaultInt int 版零值回退（创建取默认值、更新保持库中原值）。
+// 注意：当 0 是合法业务取值时不可使用本函数，应改用指针参数区分"未传"。
+func orDefaultInt(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
+// orDefaultFloat float64 版零值回退（更新场景保持库中原值）
+func orDefaultFloat(v, def float64) float64 {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
 // orDefaultEnum 枚举零值回退：v==0 时取 def。
 // 创建场景 def 传默认状态，更新场景 def 传库中当前值（实现"未传则保持原值"）。
 func orDefaultEnum[T ~int](v, def T) T {

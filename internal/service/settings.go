@@ -89,6 +89,6 @@ func (s *Service) DeletePaymentMethod(ctx context.Context, op Operator, id int64
 
 // -------- 操作日志 --------
 
-func (s *Service) ListOperationLogs(ctx context.Context, op Operator, page, pageSize int) ([]model.SysOperationLog, int64, error) {
-	return s.SettingsRepo.ListOperationLogs(ctx, op.CompanyID, page, pageSize)
+func (s *Service) ListOperationLogs(ctx context.Context, op Operator, page, pageSize int, keyword, module, status string) ([]model.SysOperationLog, int64, error) {
+	return s.SettingsRepo.ListOperationLogs(ctx, op.CompanyID, page, pageSize, keyword, module, status)
 }

@@ -80,9 +80,19 @@ func (r *SettingsRepo) DeletePaymentMethod(ctx context.Context, companyID, id in
 	return r.tenant(companyID).WithContext(ctx).Delete(&model.PaymentMethod{}, id).Error
 }
 
-// ListOperationLogs 操作日志列表（分页）
-func (r *SettingsRepo) ListOperationLogs(ctx context.Context, companyID int64, page, pageSize int) ([]model.SysOperationLog, int64, error) {
+// ListOperationLogs 操作日志列表（分页 + 关键字/模块/结果筛选）
+func (r *SettingsRepo) ListOperationLogs(ctx context.Context, companyID int64, page, pageSize int, keyword, module, status string) ([]model.SysOperationLog, int64, error) {
 	q := r.tenant(companyID).WithContext(ctx)
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		q = q.Where("username LIKE ? OR action LIKE ? OR path LIKE ?", kw, kw, kw)
+	}
+	if module != "" {
+		q = q.Where("module = ?", module)
+	}
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
 	var total int64
 	if err := q.Model(&model.SysOperationLog{}).Count(&total).Error; err != nil {
 		return nil, 0, err
