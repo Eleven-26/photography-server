@@ -81,8 +81,10 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 	if err := s.RescheduleRepo.Create(ctx, &rs); err != nil {
 		return nil, err
 	}
-	_ = s.writeOrderLog(ctx, orderID, "client_reschedule", o.Status, o.Status,
-		"客户申请改期至 "+req.NewDate+" "+req.NewTime, clientOperator(cu))
+	if err := s.writeOrderLog(ctx, orderID, "client_reschedule", o.Status, o.Status,
+		"客户申请改期至 "+req.NewDate+" "+req.NewTime, clientOperator(cu)); err != nil {
+		logger.Warnf("ClientRescheduleApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
+	}
 	return &rs, nil
 }
 
@@ -160,7 +162,9 @@ func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID
 	if err := s.OrderRepo.CreateRefund(ctx, &rf); err != nil {
 		return nil, err
 	}
-	_ = s.writeOrderLog(ctx, orderID, "client_refund", o.Status, o.Status, "客户申请退款", clientOperator(cu))
+	if err := s.writeOrderLog(ctx, orderID, "client_refund", o.Status, o.Status, "客户申请退款", clientOperator(cu)); err != nil {
+		logger.Warnf("ClientRefundApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
+	}
 	return &rf, nil
 }
 

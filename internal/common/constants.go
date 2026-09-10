@@ -15,6 +15,7 @@ const (
 	DefaultPage     = 1
 	DefaultPageSize = 20
 	MaxPageSize     = 200
+	MaxPage         = 10000 // 防止深分页导致 MySQL 性能问题
 )
 
 // 文件上传

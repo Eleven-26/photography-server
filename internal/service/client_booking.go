@@ -209,13 +209,34 @@ func (s *Service) ClientOrderDetail(ctx context.Context, cu *ClientUser, orderID
 	if err := clientOrderOwned(o, cu); err != nil {
 		return nil, err
 	}
-	payments, _ := s.OrderRepo.ListPayments(ctx, cu.CompanyID, orderID)
-	refunds, _ := s.OrderRepo.ListRefunds(ctx, cu.CompanyID, orderID)
-	logs, _ := s.OrderRepo.ListLogs(ctx, cu.CompanyID, orderID)
-	delivery, _ := s.DeliveryRepo.GetByOrderID(ctx, cu.CompanyID, orderID)
-	reschedules, _ := s.RescheduleRepo.ListByOrder(ctx, cu.CompanyID, orderID)
-	addons, _ := s.AddonRepo.ListByOrder(ctx, cu.CompanyID, orderID)
-	review, _ := s.ReviewRepo.GetByOrderID(ctx, cu.CompanyID, orderID)
+	payments, err := s.OrderRepo.ListPayments(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: ListPayments failed, orderID=%d, err=%v", orderID, err)
+	}
+	refunds, err := s.OrderRepo.ListRefunds(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: ListRefunds failed, orderID=%d, err=%v", orderID, err)
+	}
+	logs, err := s.OrderRepo.ListLogs(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: ListLogs failed, orderID=%d, err=%v", orderID, err)
+	}
+	delivery, err := s.DeliveryRepo.GetByOrderID(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: GetByOrderID failed, orderID=%d, err=%v", orderID, err)
+	}
+	reschedules, err := s.RescheduleRepo.ListByOrder(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: ListByOrder failed, orderID=%d, err=%v", orderID, err)
+	}
+	addons, err := s.AddonRepo.ListByOrder(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: ListByOrder failed, orderID=%d, err=%v", orderID, err)
+	}
+	review, err := s.ReviewRepo.GetByOrderID(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		logger.Warnf("ClientOrderDetail: GetByOrderID failed, orderID=%d, err=%v", orderID, err)
+	}
 
 	return &dto.ClientOrderDetail{
 		Order:       o,

@@ -1,6 +1,7 @@
 package response
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +41,8 @@ func PageOK(c *gin.Context, list interface{}, total int64, page, pageSize int) {
 // 非业务错误（内部异常）不回显内部细节，仅返回通用文案，完整错误记入服务端日志。
 // 错误响应同样带 trace_id，前端可用该 ID 反馈问题到后端精确检索链路。
 func Fail(c *gin.Context, err error) {
-	be, ok := err.(*errs.BizError)
-	if !ok {
+	var be *errs.BizError
+	if !errors.As(err, &be) {
 		logger.Errorf("[response] internal error: path=%s err=%v", c.Request.URL.Path, err)
 		be = errs.Internal("") // 默认文案：系统繁忙，请稍后再试
 	}

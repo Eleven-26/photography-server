@@ -64,6 +64,8 @@ func HTTPStatus(e error) int {
 			return http.StatusForbidden
 		case be.Code >= 40400 && be.Code < 40500:
 			return http.StatusNotFound
+		case be.Code >= 40900 && be.Code < 41000:
+			return http.StatusConflict
 		case be.Code >= 40000 && be.Code < 40100:
 			return http.StatusBadRequest
 		case be.Code >= 50000:

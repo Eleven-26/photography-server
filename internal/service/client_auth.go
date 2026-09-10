@@ -16,6 +16,7 @@ import (
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
+	"photography-server/internal/pkg/logger"
 )
 
 // ClientUser 客户端（H5/小程序）登录上下文，由 CustomerAuth 中间件注入
@@ -169,7 +170,9 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 		if openid != "" && c.OpenID == "" {
 			updates["openid"] = openid
 		}
-		_ = s.CustomerRepo.Update(ctx, companyID, c.ID, updates)
+		if err := s.CustomerRepo.Update(ctx, companyID, c.ID, updates); err != nil {
+			logger.Warnf("CustomerSmsLogin: update customer failed, customerID=%d, err=%v", c.ID, err)
+		}
 		// 登录成功把状态置回活跃：失效认证缓存，避免"流失中"的旧画像在 TTL 内继续拦截
 		invalidateCustomerCache(ctx, companyID, c.ID)
 	}
@@ -196,7 +199,9 @@ func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, p
 	if err != nil {
 		return nil, "", errs.Internal("")
 	}
-	_ = s.AuthRepo.TouchLogin(ctx, u.ID, ip)
+	if err := s.AuthRepo.TouchLogin(ctx, u.ID, ip); err != nil {
+		logger.Warnf("StaffSmsLogin: TouchLogin failed, userID=%d, err=%v", u.ID, err)
+	}
 	if deviceName != "" {
 		now := time.Now()
 		nowStr := now.Format("2006-01-02 15:04:05")
@@ -211,7 +216,9 @@ func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, p
 			LastIP:       ip,
 			LastActiveAt: &nowStr,
 		}
-		_ = s.DeviceRepo.Create(ctx, d)
+		if err := s.DeviceRepo.Create(ctx, d); err != nil {
+			logger.Warnf("StaffSmsLogin: create device failed, userID=%d, err=%v", u.ID, err)
+		}
 	}
 	return u, token, nil
 }

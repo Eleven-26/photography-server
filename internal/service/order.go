@@ -24,10 +24,22 @@ func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*d
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
-	payments, _ := s.OrderRepo.ListPayments(ctx, op.CompanyID, id)
-	refunds, _ := s.OrderRepo.ListRefunds(ctx, op.CompanyID, id)
-	logs, _ := s.OrderRepo.ListLogs(ctx, op.CompanyID, id)
-	delivery, _ := s.DeliveryRepo.GetByOrderID(ctx, op.CompanyID, id)
+	payments, err := s.OrderRepo.ListPayments(ctx, op.CompanyID, id)
+	if err != nil {
+		logger.Warnf("GetOrderDetail: ListPayments failed, orderID=%d, err=%v", id, err)
+	}
+	refunds, err := s.OrderRepo.ListRefunds(ctx, op.CompanyID, id)
+	if err != nil {
+		logger.Warnf("GetOrderDetail: ListRefunds failed, orderID=%d, err=%v", id, err)
+	}
+	logs, err := s.OrderRepo.ListLogs(ctx, op.CompanyID, id)
+	if err != nil {
+		logger.Warnf("GetOrderDetail: ListLogs failed, orderID=%d, err=%v", id, err)
+	}
+	delivery, err := s.DeliveryRepo.GetByOrderID(ctx, op.CompanyID, id)
+	if err != nil {
+		logger.Warnf("GetOrderDetail: GetByOrderID failed, orderID=%d, err=%v", id, err)
+	}
 
 	return &dto.OrderDetail{
 		Order:    o,

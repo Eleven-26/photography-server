@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -144,8 +145,10 @@ type DB struct {
 }
 
 func (d DB) DSN() string {
+	// 对密码进行 URL 编码，防止特殊字符（@、/、?、# 等）导致 DSN 解析错误
+	encodedPassword := url.QueryEscape(d.Password)
 	return strings.Join([]string{
-		d.User + ":" + d.Password,
+		d.User + ":" + encodedPassword,
 		"@tcp(" + d.Host + ":" + strconv.Itoa(d.Port) + ")/" + d.Name,
 		"?charset=" + d.Charset + "&parseTime=True&loc=Local",
 	}, "")
