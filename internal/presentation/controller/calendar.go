@@ -1,18 +1,17 @@
 package controller
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 )
 
 func (h *Controller) CalendarList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
+	photographerID := params.Int64(c, "photographer_id")
 	list, err := h.Svc.ListCalendar(c.Request.Context(), op, queryStr(c, "start_date"), queryStr(c, "end_date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)

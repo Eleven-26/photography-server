@@ -8,6 +8,7 @@ import (
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 	"photography-server/internal/service"
@@ -68,6 +69,10 @@ func slugFrom(c *gin.Context) string {
 	if v := c.GetHeader("X-Slug"); v != "" {
 		return v
 	}
+	// POST 参数统一走 body；query 仅作预约主页短链的兜底
+	if v := params.Str(c, "slug"); v != "" {
+		return v
+	}
 	return c.Query("slug")
 }
 
@@ -96,8 +101,8 @@ func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 }
 
 func pager(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	page := params.Int(c, "page")
+	pageSize := params.Int(c, "page_size")
 	if page <= 0 {
 		page = 1
 	}
@@ -184,7 +189,7 @@ func (h *Controller) PackageList(c *gin.Context) {
 		return
 	}
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ClientPackages(c.Request.Context(), companyID, page, pageSize, c.Query("category"))
+	list, total, err := h.Svc.ClientPackages(c.Request.Context(), companyID, page, pageSize, params.Str(c, "category"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -227,15 +232,15 @@ func (h *Controller) StudioInfo(c *gin.Context) {
 	response.OK(c, info)
 }
 
-// SlotList 指定日期可约时段（query: date、photographer_id 可选）
+// SlotList 指定日期可约时段（body: date、photographer_id 可选）
 func (h *Controller) SlotList(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
-	slots, err := h.Svc.ClientSlots(c.Request.Context(), companyID, c.Query("date"), photographerID)
+	photographerID := params.Int64(c, "photographer_id")
+	slots, err := h.Svc.ClientSlots(c.Request.Context(), companyID, params.Str(c, "date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -330,7 +335,7 @@ func (h *Controller) BookingCancel(c *gin.Context) {
 func (h *Controller) OrderList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ClientOrders(c.Request.Context(), cu, page, pageSize, c.Query("status"))
+	list, total, err := h.Svc.ClientOrders(c.Request.Context(), cu, page, pageSize, params.Str(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return

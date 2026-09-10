@@ -1,11 +1,10 @@
 package controller
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 )
@@ -13,7 +12,7 @@ import (
 func (h *Controller) LeadList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	ownerID, _ := strconv.ParseInt(c.Query("owner_id"), 10, 64)
+	ownerID := params.Int64(c, "owner_id")
 	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "keyword"), queryStr(c, "status"), ownerID)
 	if err != nil {

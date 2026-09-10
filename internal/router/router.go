@@ -5,6 +5,7 @@ import (
 
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/controller"
 	"photography-server/internal/presentation/h5"
 	"photography-server/internal/presentation/wechat"
@@ -22,6 +23,9 @@ func New(cfg *config.Config, svc *service.Service) *gin.Engine {
 
 	engine := gin.New()
 	engine.Use(middleware.CORS(cfg.App.CORSOrigins), middleware.Recovery(), middleware.RequestLog())
+	// 请求参数统一从 JSON body 取（含分页 page/page_size、keyword、status 等）：
+	// 预解析 body 存入 context 并回填，供 params.Str/Int/Int64 读取；非 JSON 请求原样放行
+	engine.Use(params.Middleware())
 	// Jaeger 链路通道（OTel → Jaeger，复用 OTel 埋点）：未启用时返回 nil，请求路径零影响
 	if tm := middleware.JaegerTrace(cfg.Jaeger.Service); tm != nil {
 		engine.Use(tm)

@@ -1,12 +1,11 @@
 package controller
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 )
@@ -29,7 +28,7 @@ func (h *Controller) OrderCreate(c *gin.Context) {
 func (h *Controller) OrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	customerID, _ := strconv.ParseInt(c.Query("customer_id"), 10, 64)
+	customerID := params.Int64(c, "customer_id")
 	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize,
 		queryStr(c, "status"), customerID)
 	if err != nil {

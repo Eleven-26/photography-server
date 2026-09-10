@@ -1,11 +1,10 @@
 package controller
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 )
@@ -13,7 +12,7 @@ import (
 func (h *Controller) UserList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	storeID, _ := strconv.ParseInt(c.Query("store_id"), 10, 64)
+	storeID := params.Int64(c, "store_id")
 	list, total, err := h.Svc.ListUsers(c.Request.Context(), op, page, pageSize, queryStr(c, "keyword"), storeID)
 	if err != nil {
 		response.Fail(c, err)

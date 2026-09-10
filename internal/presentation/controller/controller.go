@@ -8,6 +8,7 @@ import (
 	"photography-server/internal/common"
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/service"
 )
 
@@ -38,17 +39,9 @@ func bearerToken(c *gin.Context) string {
 	return ""
 }
 
-// bindQuery 绑定查询参数
-func (h *Controller) bindQuery(c *gin.Context, obj interface{}) error {
-	if err := c.ShouldBindQuery(obj); err != nil {
-		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
-	}
-	return nil
-}
-
 func pager(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(common.DefaultPage)))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", strconv.Itoa(common.DefaultPageSize)))
+	page := params.Int(c, "page")
+	pageSize := params.Int(c, "page_size")
 	if page <= 0 {
 		page = common.DefaultPage
 	}
@@ -61,8 +54,9 @@ func pager(c *gin.Context) (int, int) {
 	return page, pageSize
 }
 
+// queryStr 取字符串参数：统一从 POST body 取（见 pkg/params），不再读 query
 func queryStr(c *gin.Context, key string) string {
-	return c.Query(key)
+	return params.Str(c, key)
 }
 
 func pathID(c *gin.Context) (int64, error) {

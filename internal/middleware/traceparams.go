@@ -41,7 +41,8 @@ func TraceParams() gin.HandlerFunc {
 	}
 }
 
-// captureBody 读取 JSON 请求 body 并立即复原（后续处理器不受影响），超限截断
+// captureBody 读取 JSON 请求 body 并**完整复原**（后续处理器不受影响），仅对返回值按上限截断。
+// 注意：回填必须是完整 body —— 若按记录上限截断回填，大 body 的 ShouldBindJSON 会解析失败。
 func captureBody(c *gin.Context) string {
 	if c.Request.Body == nil {
 		return ""
@@ -50,7 +51,7 @@ func captureBody(c *gin.Context) string {
 	if !strings.Contains(ct, "application/json") && !strings.Contains(ct, "text/json") {
 		return ""
 	}
-	data, err := io.ReadAll(io.LimitReader(c.Request.Body, traceBodyMaxBytes+1))
+	data, err := io.ReadAll(c.Request.Body)
 	_ = c.Request.Body.Close()
 	if err != nil {
 		return ""

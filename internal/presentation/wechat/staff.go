@@ -8,6 +8,7 @@ import (
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/response"
 )
@@ -85,8 +86,8 @@ func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
 }
 
 func pager(c *gin.Context) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	page := params.Int(c, "page")
+	pageSize := params.Int(c, "page_size")
 	if page <= 0 {
 		page = 1
 	}
@@ -170,11 +171,11 @@ func (h *Controller) Overview(c *gin.Context) {
 	response.OK(c, ov)
 }
 
-// OrderList 订单列表（query: status）
+// OrderList 订单列表（body: status）
 func (h *Controller) StaffOrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, c.Query("status"), 0)
+	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, params.Str(c, "status"), 0)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -371,7 +372,7 @@ func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 func (h *Controller) RescheduleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	status, _ := strconv.Atoi(c.Query("status"))
+	status := params.Int(c, "status")
 	list, total, err := h.Svc.StaffRescheduleList(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
@@ -443,11 +444,11 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 // 日程 / 线索 / 简报
 // ---------------------------------------------------------------------
 
-// ScheduleList 日程列表（query: start_date/end_date/photographer_id）
+// ScheduleList 日程列表（body: start_date/end_date/photographer_id）
 func (h *Controller) ScheduleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
-	list, err := h.Svc.ListCalendar(c.Request.Context(), op, c.Query("start_date"), c.Query("end_date"), photographerID)
+	photographerID := params.Int64(c, "photographer_id")
+	list, err := h.Svc.ListCalendar(c.Request.Context(), op, params.Str(c, "start_date"), params.Str(c, "end_date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -459,8 +460,8 @@ func (h *Controller) ScheduleList(c *gin.Context) {
 func (h *Controller) LeadList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	ownerID, _ := strconv.ParseInt(c.Query("owner_id"), 10, 64)
-	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize, c.Query("keyword"), c.Query("status"), ownerID)
+	ownerID := params.Int64(c, "owner_id")
+	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize, params.Str(c, "keyword"), params.Str(c, "status"), ownerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -596,7 +597,7 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 func (h *Controller) StaffCustomRequestList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	status, _ := strconv.Atoi(c.Query("status"))
+	status := params.Int(c, "status")
 	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
@@ -628,7 +629,7 @@ func (h *Controller) CustomRequestRespond(c *gin.Context) {
 // SlotTemplateList 档期时段模板列表
 func (h *Controller) SlotTemplateList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	photographerID, _ := strconv.ParseInt(c.Query("photographer_id"), 10, 64)
+	photographerID := params.Int64(c, "photographer_id")
 	list, err := h.Svc.StaffSlotTemplates(c.Request.Context(), op, photographerID)
 	if err != nil {
 		response.Fail(c, err)
@@ -681,7 +682,7 @@ func (h *Controller) SlotTemplateDelete(c *gin.Context) {
 func (h *Controller) ReviewList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	minRating, _ := strconv.Atoi(c.Query("min_rating"))
+	minRating := params.Int(c, "min_rating")
 	list, total, err := h.Svc.StaffReviewList(c.Request.Context(), op, page, pageSize, minRating)
 	if err != nil {
 		response.Fail(c, err)
