@@ -10,6 +10,7 @@ import (
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/logger"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )

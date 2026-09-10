@@ -18,9 +18,9 @@ import (
 const ClientUserKey ctxKey = "photography.client_user"
 
 // GetClientUser 从 gin 上下文获取当前登录客户（CustomerAuth 注入）
-func GetClientUser(c *gin.Context) *service.ClientUser {
+func GetClientUser(c *gin.Context) *domain.ClientUser {
 	v, _ := c.Get(string(ClientUserKey))
-	cu, _ := v.(*service.ClientUser)
+	cu, _ := v.(*domain.ClientUser)
 	return cu
 }
 

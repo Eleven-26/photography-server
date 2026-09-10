@@ -35,10 +35,10 @@ func (s *Service) CreateCustomer(ctx context.Context, op Operator, req dto.Custo
 		Wechat:   req.Wechat,
 		Gender:   req.Gender,
 		Birthday: strPtr(req.Birthday),
-		Level:    enum.CustomerLevelNormal,
+		Level:    orDefaultEnum(req.Level, enum.CustomerLevelNormal),
 		Source:   req.Source,
 		Tags:     req.Tags,
-		Status:   enum.CustomerStatusPotential,
+		Status:   orDefaultEnum(req.Status, enum.CustomerStatusPotential),
 		Remark:   req.Remark,
 		Avatar:   req.Avatar,
 	}
@@ -49,7 +49,7 @@ func (s *Service) CreateCustomer(ctx context.Context, op Operator, req dto.Custo
 }
 
 func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req dto.CustomerUpdateReq) error {
-	_, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, id)
+	cur, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrCustomerNotFound)
 	}
@@ -60,10 +60,10 @@ func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req
 		"wechat":     req.Wechat,
 		"gender":     req.Gender,
 		"birthday":   req.Birthday,
-		"level":      req.Level,
+		"level":      orDefaultEnum(req.Level, cur.Level),
 		"source":     req.Source,
 		"tags":       req.Tags,
-		"status":     req.Status,
+		"status":     orDefaultEnum(req.Status, cur.Status),
 		"remark":     req.Remark,
 		"avatar":     req.Avatar,
 		"updated_by": op.UserID,
@@ -90,8 +90,11 @@ func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*dto.Custo
 	}
 	// repository 返回自持结构，service 负责映射为对外 dto
 	return &dto.CustomerStatsResp{
-		Total:  st.Total,
-		Active: st.Active,
-		GoldUp: st.GoldUp,
+		Total:        st.Total,
+		Potential:    st.Potential,
+		Active:       st.Active,
+		Inactive:     st.Inactive,
+		GoldUp:       st.GoldUp,
+		NewThisMonth: st.NewThisMonth,
 	}, nil
 }

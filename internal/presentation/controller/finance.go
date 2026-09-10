@@ -31,7 +31,7 @@ func (h *Controller) FinancePayments(c *gin.Context) {
 func (h *Controller) FinanceRefunds(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListFinanceRefunds(c.Request.Context(), op, page, pageSize)
+	list, total, err := h.Svc.ListFinanceRefunds(c.Request.Context(), op, page, pageSize, queryStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return

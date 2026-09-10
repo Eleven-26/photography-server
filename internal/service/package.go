@@ -68,7 +68,7 @@ func (s *Service) UpdatePackage(ctx context.Context, op Operator, id int64, req 
 		"shoot_hours":      req.ShootHours,
 		"content_desc":     req.ContentDesc,
 		"addon_unit_price": req.AddonUnitPrice,
-		"status":           req.Status,
+		"status":           orDefaultEnum(req.Status, p.Status),
 		"updated_by":       op.UserID,
 	})
 }

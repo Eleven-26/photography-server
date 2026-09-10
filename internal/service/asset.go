@@ -62,7 +62,7 @@ func (s *Service) UpdateAsset(ctx context.Context, op Operator, id int64, req dt
 		"photographer": req.Photographer,
 		"model":        req.Model,
 		"location":     req.Location,
-		"status":       req.Status,
+		"status":       orDefaultEnum(req.Status, a.Status),
 		"updated_by":   op.UserID,
 	})
 }

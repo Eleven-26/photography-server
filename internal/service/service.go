@@ -102,6 +102,15 @@ func orDefaultInt64(v, def int64) int64 {
 	return v
 }
 
+// orDefaultEnum 枚举零值回退：v==0 时取 def。
+// 创建场景 def 传默认状态，更新场景 def 传库中当前值（实现"未传则保持原值"）。
+func orDefaultEnum[T ~int](v, def T) T {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
 // orderLog 构造订单操作日志实体。
 // 必须带上 TenantBase：OrderLog 内嵌 TenantBase，写入走 conn().Create（不注入租户），
 // 而读取走 tenant(companyID) 过滤。漏填 CompanyID 会导致日志以 company_id=0 入库，

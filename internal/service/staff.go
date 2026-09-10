@@ -57,8 +57,9 @@ func (s *Service) StaffOverview(ctx context.Context, op Operator) (*dto.StaffOve
 		}
 	}
 
-	// 待审批退款
-	_, refundTotal, err := s.FinanceRepo.ListRefunds(ctx, op.CompanyID, 1, 1)
+	// 待审批退款：只统计"申请中"的单据
+	// （旧实现调用 ListRefunds 未带状态，当时仓储硬编码 status=已退款，统计口径错误）
+	_, refundTotal, err := s.FinanceRepo.ListRefunds(ctx, op.CompanyID, 1, 1, fmt.Sprintf("%d", int(enum.RefundStatusApplying)))
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -61,25 +62,45 @@ func (r *CustomerRepo) Delete(ctx context.Context, companyID, customerID int64) 
 
 // CustomerStats 客户统计（仓储自持的领域结构，避免反向依赖 presentation/dto）
 type CustomerStats struct {
-	Total  int64
-	Active int64
-	GoldUp int64
+	Total        int64
+	Potential    int64
+	Active       int64
+	Inactive     int64
+	GoldUp       int64
+	NewThisMonth int64
 }
 
-// GetStats 客户统计：总数 / 活跃数 / 黄金及以上等级数
+// GetStats 客户统计：总数 / 潜在 / 活跃 / 非活跃 / 黄金及以上等级数 / 本月新增
 func (r *CustomerRepo) GetStats(ctx context.Context, companyID int64) (*CustomerStats, error) {
 	var st CustomerStats
-	q := r.tenant(companyID).WithContext(ctx)
+	// 每条统计都从基础查询重新派生，避免链式条件在同一 Statement 上累积
+	// （GORM 在 clone=0 时 Where 会追加到共享 Statement，导致后一条统计被前一条的条件污染）
+	q := func() *gorm.DB { return r.tenant(companyID).WithContext(ctx) }
 
-	if err := q.Model(&model.Customer{}).Count(&st.Total).Error; err != nil {
+	if err := q().Model(&model.Customer{}).Count(&st.Total).Error; err != nil {
 		return nil, err
 	}
 
-	if err := q.Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusActive).Count(&st.Active).Error; err != nil {
+	if err := q().Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusPotential).Count(&st.Potential).Error; err != nil {
 		return nil, err
 	}
 
-	if err := q.Model(&model.Customer{}).Where("level IN ?", []enum.CustomerLevel{enum.CustomerLevelGold, enum.CustomerLevelPlatinum, enum.CustomerLevelDiamond}).Count(&st.GoldUp).Error; err != nil {
+	if err := q().Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusActive).Count(&st.Active).Error; err != nil {
+		return nil, err
+	}
+
+	if err := q().Model(&model.Customer{}).Where("status = ?", enum.CustomerStatusInactive).Count(&st.Inactive).Error; err != nil {
+		return nil, err
+	}
+
+	if err := q().Model(&model.Customer{}).Where("level IN ?", []enum.CustomerLevel{enum.CustomerLevelGold, enum.CustomerLevelPlatinum, enum.CustomerLevelDiamond}).Count(&st.GoldUp).Error; err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+	monthEnd := monthStart.AddDate(0, 1, 0)
+	if err := q().Model(&model.Customer{}).Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&st.NewThisMonth).Error; err != nil {
 		return nil, err
 	}
 

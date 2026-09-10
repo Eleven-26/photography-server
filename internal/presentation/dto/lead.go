@@ -1,5 +1,7 @@
 package dto
 
+import "photography-server/internal/enum"
+
 // ======================== 请求 ========================
 
 // LeadCreateReq 创建线索
@@ -18,17 +20,17 @@ type LeadCreateReq struct {
 
 // LeadUpdateReq 更新线索
 type LeadUpdateReq struct {
-	StoreID     int64   `json:"store_id"`     // 门店ID
-	Name        string  `json:"name"`         // 客户姓名
-	Mobile      string  `json:"mobile"`       // 手机号
-	Source      string  `json:"source"`       // 来源
-	ProjectType string  `json:"project_type"` // 项目类型
-	BudgetMin   float64 `json:"budget_min"`   // 预算下限
-	BudgetMax   float64 `json:"budget_max"`   // 预算上限
-	Status      string  `json:"status"`       // 状态
-	ShootDate   string  `json:"shoot_date"`   // 期望拍摄日期
-	Remark      string  `json:"remark"`       // 备注
-	OwnerID     int64   `json:"owner_id"`     // 负责人ID
+	StoreID     int64           `json:"store_id"`     // 门店ID
+	Name        string          `json:"name"`         // 客户姓名
+	Mobile      string          `json:"mobile"`       // 手机号
+	Source      string          `json:"source"`       // 来源
+	ProjectType string          `json:"project_type"` // 项目类型
+	BudgetMin   float64         `json:"budget_min"`   // 预算下限
+	BudgetMax   float64         `json:"budget_max"`   // 预算上限
+	Status      enum.LeadStatus `json:"status"`       // 状态 1-待回复 2-待报价 3-已报价 4-已成交 5-已流失（0=保持原值）
+	ShootDate   string          `json:"shoot_date"`   // 期望拍摄日期
+	Remark      string          `json:"remark"`       // 备注
+	OwnerID     int64           `json:"owner_id"`     // 负责人ID
 }
 
 // LeadFollowReq 跟进线索

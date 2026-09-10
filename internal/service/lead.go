@@ -49,7 +49,7 @@ func (s *Service) CreateLead(ctx context.Context, op Operator, req dto.LeadCreat
 }
 
 func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto.LeadUpdateReq) error {
-	_, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
+	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
 	}
@@ -60,7 +60,7 @@ func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto
 		"project_type": req.ProjectType,
 		"budget_min":   req.BudgetMin,
 		"budget_max":   req.BudgetMax,
-		"status":       req.Status,
+		"status":       orDefaultEnum(req.Status, l.Status),
 		"shoot_date":   req.ShootDate,
 		"remark":       req.Remark,
 		"owner_id":     req.OwnerID,
