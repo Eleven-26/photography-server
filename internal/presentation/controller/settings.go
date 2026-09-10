@@ -100,3 +100,33 @@ func (h *Controller) OperationLogList(c *gin.Context) {
 	}
 	response.PageOK(c, list, total, page, pageSize)
 }
+
+// ---------------------------------------------------------------------
+// 工作室设置（预约主页 / 接单规则 / 改期政策）—— 与员工端共用 service
+// ---------------------------------------------------------------------
+
+// StudioGet 工作室设置读取（不存在时自动建默认行）
+func (h *Controller) StudioGet(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	st, err := h.Svc.StudioSetting(c.Request.Context(), op)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, st)
+}
+
+// StudioUpdate 工作室设置更新（仅更新传入字段，数值支持改为 0）
+func (h *Controller) StudioUpdate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	var req dto.StaffStudioSettingReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.UpdateStudioSetting(c.Request.Context(), op, req.ToUpdates()); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}

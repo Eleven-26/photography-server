@@ -2,7 +2,9 @@ package response
 
 import (
 	"errors"
+	"mime"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/trace"
@@ -47,6 +49,14 @@ func Fail(c *gin.Context, err error) {
 		be = errs.Internal("") // 默认文案：系统繁忙，请稍后再试
 	}
 	c.JSON(errs.HTTPStatus(err), Body{Code: be.Code, Msg: be.Msg, Data: nil, TraceID: traceIDOf(c)})
+}
+
+// File 二进制/文本文件下载。filename 含中文时按 RFC 5987 生成 filename*，
+// 前端从 Content-Disposition 取文件名即可（见前端 download() 助手）。
+func File(c *gin.Context, filename, contentType string, content []byte) {
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+	c.Header("Content-Length", strconv.Itoa(len(content)))
+	c.Data(http.StatusOK, contentType, content)
 }
 
 // traceIDOf 取当前请求的 trace_id：优先请求上下文里的 entry span，

@@ -35,6 +35,49 @@ func (r *DeliveryRepo) GetByOrderID(ctx context.Context, companyID, orderID int6
 	return &d, nil
 }
 
+// DeliveryListItem 交付单 + 订单快照（交付工作台看板用）。
+// 订单编号/套餐名/拍摄日期取自订单表，避免前端为看板再查一次订单列表。
+type DeliveryListItem struct {
+	model.Delivery
+	OrderCode   string `json:"order_code" gorm:"column:order_code"`
+	PackageName string `json:"package_name" gorm:"column:package_name"`
+	ShootDate   string `json:"shoot_date" gorm:"column:shoot_date"`
+}
+
+// List 交付单列表。stage<=0 不筛选阶段；keyword 命中客户姓名或订单编号。
+// 注：这里用 Table + 别名手写租户/软删条件 —— Repo.tenant() 生成的裸
+// `company_id = ?` 在 JOIN 下会因列名歧义报错。
+func (r *DeliveryRepo) List(ctx context.Context, companyID int64, stage int, keyword string, page, pageSize int) ([]DeliveryListItem, int64, error) {
+	base := func() *gorm.DB {
+		db := r.conn().WithContext(ctx).
+			Table("biz_delivery AS d").
+			Joins("LEFT JOIN biz_order AS o ON o.id = d.order_id AND o.company_id = d.company_id").
+			Where("d.company_id = ? AND d.deleted = 0", companyID)
+		if stage > 0 {
+			db = db.Where("d.stage = ?", stage)
+		}
+		if keyword != "" {
+			like := "%" + keyword + "%"
+			db = db.Where("(d.customer_name LIKE ? OR o.code LIKE ?)", like, like)
+		}
+		return db
+	}
+
+	var total int64
+	if err := base().Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	page, pageSize = normalizePage(page, pageSize)
+	var list []DeliveryListItem
+	if err := base().
+		Select("d.*, COALESCE(o.code,'') AS order_code, COALESCE(o.package_name,'') AS package_name, COALESCE(o.shoot_date,'') AS shoot_date").
+		Order("d.id DESC").Offset((page - 1) * pageSize).Limit(pageSize).
+		Scan(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	return list, total, nil
+}
+
 func (r *DeliveryRepo) Create(ctx context.Context, d *model.Delivery) error {
 	return r.conn().WithContext(ctx).Create(d).Error
 }

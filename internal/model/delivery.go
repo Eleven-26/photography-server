@@ -10,6 +10,8 @@ type Delivery struct {
 	CustomerID          int64              `gorm:"column:customer_id;index;comment:客户ID" json:"customer_id"`
 	CustomerName        string             `gorm:"column:customer_name;size:50;comment:客户姓名(快照)" json:"customer_name"`
 	Stage               enum.DeliveryStage `gorm:"column:stage;type:tinyint;default:1;comment:阶段 1-待上传样片 2-客户选片中 3-精修进行中 4-待确认交付 5-已交付" json:"stage"`
+	RawCount            int                `gorm:"column:raw_count;default:0;comment:原片数量(计划)" json:"raw_count"`
+	RetouchTarget       int                `gorm:"column:retouch_target;default:0;comment:计划精修张数" json:"retouch_target"`
 	SampleCount         int                `gorm:"column:sample_count;default:0;comment:样片数量" json:"sample_count"`
 	SelectedCount       int                `gorm:"column:selected_count;default:0;comment:客户已选张数" json:"selected_count"`
 	SelectDeadline      *string            `gorm:"column:select_deadline;comment:选片截止时间(逾期默认全选)" json:"select_deadline"`

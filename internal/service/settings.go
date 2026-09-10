@@ -45,6 +45,7 @@ func (s *Service) Workspace(ctx context.Context, op Operator) (*Workspace, error
 func (s *Service) UpdateCompany(ctx context.Context, op Operator, req dto.CompanyUpdateReq) error {
 	return s.SettingsRepo.UpdateCompany(ctx, op.CompanyID, map[string]interface{}{
 		"name": req.Name, "logo": req.Logo,
+		"city": req.City, "intro": req.Intro,
 		"contact_name": req.ContactName, "contact_phone": req.ContactPhone,
 		"address": req.Address, "updated_by": op.UserID,
 	})

@@ -38,3 +38,14 @@ func (h *Controller) FinanceRefunds(c *gin.Context) {
 	}
 	response.PageOK(c, list, total, page, pageSize)
 }
+
+// FinanceExport 导出对账 CSV（按月份，缺省当月）。浏览器直接下载，不走统一 JSON 包装。
+func (h *Controller) FinanceExport(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	filename, content, err := h.Svc.FinanceExport(c.Request.Context(), op, queryStr(c, "month"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.File(c, filename, "text/csv; charset=utf-8", content)
+}

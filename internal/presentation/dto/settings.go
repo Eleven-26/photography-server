@@ -6,6 +6,8 @@ package dto
 type CompanyUpdateReq struct {
 	Name         string `json:"name"`          // 公司名称
 	Logo         string `json:"logo"`          // 公司Logo URL
+	City         string `json:"city"`          // 所在城市
+	Intro        string `json:"intro"`         // 工作室简介
 	ContactName  string `json:"contact_name"`  // 联系人姓名
 	ContactPhone string `json:"contact_phone"` // 联系人电话
 	Address      string `json:"address"`       // 公司地址

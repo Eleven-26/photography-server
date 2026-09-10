@@ -203,6 +203,9 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 
 	// 交付
 	dv := g.Group("/delivery")
+	dv.POST("/list", ctl.DeliveryList)
+	dv.POST("/create/:order_id", ctl.DeliveryCreate)
+	dv.POST("/remind/:id", ctl.DeliveryRemind)
 	dv.POST("/detail/:id", ctl.DeliveryDetail)
 	dv.POST("/items/:id", ctl.DeliveryItems)
 	dv.POST("/upload-samples/:id", ctl.DeliveryUploadSamples)
@@ -224,12 +227,18 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	cal.POST("/list", ctl.CalendarList)
 	cal.POST("/lock", ctl.CalendarLock)
 	cal.POST("/cancel/:id", ctl.CalendarCancel)
+	// 档期规则（排班时段模板）
+	cal.POST("/slot-template/list", ctl.SlotTemplateList)
+	cal.POST("/slot-template/save", ctl.SlotTemplateSave)
+	cal.POST("/slot-template/save/:id", ctl.SlotTemplateSave)
+	cal.POST("/slot-template/delete/:id", ctl.SlotTemplateDelete)
 
 	// 财务
 	fn := g.Group("/finance")
 	fn.POST("/summary", ctl.FinanceSummary)
 	fn.POST("/payments", ctl.FinancePayments)
 	fn.POST("/refunds", ctl.FinanceRefunds)
+	fn.POST("/export", ctl.FinanceExport)
 
 	// 工作台
 	dash := g.Group("/dashboard")
@@ -251,6 +260,8 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	st.POST("/payment-method/update/:id", ctl.PaymentMethodUpdate)
 	st.POST("/payment-method/delete/:id", ctl.PaymentMethodDelete)
 	st.POST("/operation-log/list", ctl.OperationLogList)
+	st.POST("/studio/get", ctl.StudioGet)
+	st.POST("/studio/update", ctl.StudioUpdate)
 
 	// 上传
 	up := g.Group("/upload")

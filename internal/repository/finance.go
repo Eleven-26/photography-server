@@ -155,6 +155,26 @@ func (r *FinanceRepo) ListRefunds(ctx context.Context, companyID int64, page, pa
 	return list, total, nil
 }
 
+// ExportPayments 区间内收款流水（对账导出，不分页）。按 paid_at 过滤，
+// 未付款（paid_at 为空）的单据不计入流水，但仍在待核验汇总口径内。
+func (r *FinanceRepo) ExportPayments(ctx context.Context, companyID int64, start, end string) ([]model.OrderPayment, error) {
+	var list []model.OrderPayment
+	err := r.tenant(companyID).WithContext(ctx).
+		Where("paid_at >= ? AND paid_at < ?", start, end).
+		Order("paid_at ASC, id ASC").Find(&list).Error
+	return list, err
+}
+
+// ExportRefunds 区间内退款单据（对账导出，不分页）。按申请时间过滤，含未通过的单据，
+// 由 Status 列区分，避免导出文件与「退款审批」列表口径不一致。
+func (r *FinanceRepo) ExportRefunds(ctx context.Context, companyID int64, start, end string) ([]model.OrderRefund, error) {
+	var list []model.OrderRefund
+	err := r.tenant(companyID).WithContext(ctx).
+		Where("created_at >= ? AND created_at < ?", start, end).
+		Order("id ASC").Find(&list).Error
+	return list, err
+}
+
 func (r *FinanceRepo) GetMonthlyStats(ctx context.Context, companyID int64, year int) ([]MonthlyStat, error) {
 	type row struct {
 		Month  int     `json:"month"`

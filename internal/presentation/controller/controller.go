@@ -59,6 +59,11 @@ func queryStr(c *gin.Context, key string) string {
 	return params.Str(c, key)
 }
 
+// queryInt 取整型参数：同样统一从 POST body 取
+func queryInt(c *gin.Context, key string) int {
+	return params.Int(c, key)
+}
+
 func pathID(c *gin.Context) (int64, error) {
 	return pathParam(c, "id")
 }

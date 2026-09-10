@@ -8,6 +8,56 @@ import (
 	"photography-server/internal/response"
 )
 
+// DeliveryCreate 新建交付任务 body: DeliveryCreateReq（路径 :order_id 优先于 body.order_id）
+func (h *Controller) DeliveryCreate(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	orderID, err := pathParam(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.DeliveryCreateReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	req.OrderID = orderID
+	d, err := h.Svc.CreateDeliveryTask(c.Request.Context(), op, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, d)
+}
+
+// DeliveryList 交付工作台看板列表（按阶段筛选）
+func (h *Controller) DeliveryList(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	page, pageSize := pager(c)
+	list, total, err := h.Svc.ListDeliveries(c.Request.Context(), op, queryInt(c, "stage"), page, pageSize, queryStr(c, "keyword"))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.PageOK(c, list, total, page, pageSize)
+}
+
+// DeliveryRemind 提醒交付负责人
+func (h *Controller) DeliveryRemind(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.RemindDeliveryOperator(c.Request.Context(), op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// DeliveryDetail 交付单详情（:id 为 order_id）
 func (h *Controller) DeliveryDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := pathID(c)

@@ -19,7 +19,8 @@ docs/sql/
 ├── 增量/                        # 【增量】升级脚本，按文件名排序依次执行
 │   ├── ddl-初版.sql              #   0. 初版基线结构（等价于上线时的 ddl.sql 快照）
 │   ├── dml-初版.sql              #   0. 初版基线数据
-│   └── upgrade_client_20260907.sql  # 1. 客户端三端能力（+9 表、9 处 ALTER）
+│   ├── upgrade_client_20260907.sql      # 1. 客户端三端能力（+9 表、9 处 ALTER）
+│   └── upgrade_p1_pc_modules_20260910.sql # 2. P1 交付工作台/工作室设置（sys_company +2 列、biz_delivery +2 列）
 └── README.md                   # 本文件
 ```
 
@@ -118,5 +119,5 @@ docker exec $DB mysql -u$U -p$P -e "DROP DATABASE IF EXISTS _v_full; DROP DATABA
 | 项 | 值 |
 |---|---|
 | 全量表数 | 29 |
-| 增量次数 | 1（`upgrade_client_20260907`） |
-| 最近校验 | 2026-09-10 ✅ 列 571 行 / 索引 175 行 / 表 29 行 / 数据 29 表，全部零差异 |
+| 增量次数 | 2（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`） |
+| 最近校验 | 2026-09-10 ✅ 列 575 行 / 索引 175 行 / 表 29 行，全部零差异 |

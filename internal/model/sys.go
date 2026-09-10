@@ -5,6 +5,8 @@ type SysCompany struct {
 	Base
 	Name         string `gorm:"column:name;size:100;not null;comment:公司/工作室名称" json:"name"`
 	Logo         string `gorm:"column:logo;size:500;comment:LOGO地址" json:"logo"`
+	City         string `gorm:"column:city;size:50;comment:所在城市" json:"city"`
+	Intro        string `gorm:"column:intro;size:1000;comment:工作室简介" json:"intro"`
 	ContactName  string `gorm:"column:contact_name;size:50;comment:联系人" json:"contact_name"`
 	ContactPhone string `gorm:"column:contact_phone;size:20;comment:联系电话" json:"contact_phone"`
 	Address      string `gorm:"column:address;size:200;comment:地址" json:"address"`

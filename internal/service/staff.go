@@ -301,16 +301,16 @@ func (s *Service) StaffBriefConfirm(ctx context.Context, op Operator, itemID int
 }
 
 // ---------------------------------------------------------------------
-// 档期时段模板
+// 档期时段模板（PC 端与员工端共用同一份实现，此处为 PC 命名入口）
 // ---------------------------------------------------------------------
 
-// StaffSlotTemplates 档期时段模板列表
-func (s *Service) StaffSlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
+// SlotTemplates 档期时段模板列表
+func (s *Service) SlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
 	return s.SlotTemplateRepo.List(ctx, op.CompanyID, photographerID)
 }
 
-// StaffSaveSlotTemplate 新建/更新档期时段模板
-func (s *Service) StaffSaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
+// SaveSlotTemplate 新建/更新档期时段模板
+func (s *Service) SaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
 	if req.Weekday < 0 || req.Weekday > 6 {
 		return nil, errs.BadRequest("星期参数错误（0-周日 ... 6-周六）")
 	}
@@ -350,12 +350,27 @@ func (s *Service) StaffSaveSlotTemplate(ctx context.Context, op Operator, id int
 	return &m, nil
 }
 
-// StaffDeleteSlotTemplate 删除档期时段模板
-func (s *Service) StaffDeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
+// DeleteSlotTemplate 删除档期时段模板
+func (s *Service) DeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
 	if _, err := s.SlotTemplateRepo.GetByID(ctx, op.CompanyID, id); err != nil {
 		return errs.NotFound("模板不存在")
 	}
 	return s.SlotTemplateRepo.Delete(ctx, op.CompanyID, id)
+}
+
+// StaffSlotTemplates 档期时段模板列表（员工端入口）
+func (s *Service) StaffSlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
+	return s.SlotTemplates(ctx, op, photographerID)
+}
+
+// StaffSaveSlotTemplate 新建/更新档期时段模板（员工端入口）
+func (s *Service) StaffSaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
+	return s.SaveSlotTemplate(ctx, op, id, req)
+}
+
+// StaffDeleteSlotTemplate 删除档期时段模板（员工端入口）
+func (s *Service) StaffDeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
+	return s.DeleteSlotTemplate(ctx, op, id)
 }
 
 // ---------------------------------------------------------------------
@@ -380,18 +395,28 @@ func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID in
 	return s.ReviewRepo.Update(ctx, op.CompanyID, reviewID, updates)
 }
 
-// StaffStudioSettingGet 工作室设置（员工端查看/编辑）
-func (s *Service) StaffStudioSettingGet(ctx context.Context, op Operator) (*model.StudioSetting, error) {
+// StudioSetting 工作室设置（PC / 员工端共用，不存在时自动建默认行）
+func (s *Service) StudioSetting(ctx context.Context, op Operator) (*model.StudioSetting, error) {
 	return s.StudioSettingRepo.GetOrCreate(ctx, op.CompanyID)
 }
 
-// StaffStudioSettingUpdate 工作室设置更新（仅更新传入的非零字段由 controller 组装）
-func (s *Service) StaffStudioSettingUpdate(ctx context.Context, op Operator, updates map[string]interface{}) error {
+// UpdateStudioSetting 工作室设置更新（updates 由 controller 按「指针非 nil 才更新」组装）
+func (s *Service) UpdateStudioSetting(ctx context.Context, op Operator, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return nil
 	}
 	updates["updated_by"] = op.UserID
 	return s.StudioSettingRepo.Update(ctx, op.CompanyID, updates)
+}
+
+// StaffStudioSettingGet 工作室设置（员工端查看/编辑）
+func (s *Service) StaffStudioSettingGet(ctx context.Context, op Operator) (*model.StudioSetting, error) {
+	return s.StudioSetting(ctx, op)
+}
+
+// StaffStudioSettingUpdate 工作室设置更新（员工端入口）
+func (s *Service) StaffStudioSettingUpdate(ctx context.Context, op Operator, updates map[string]interface{}) error {
+	return s.UpdateStudioSetting(ctx, op, updates)
 }
 
 // StaffCustomRequests 定制需求列表（待处理优先）
