@@ -22,7 +22,7 @@ INSERT INTO `sys_role` (`created_by`,`updated_by`,`company_id`,`name`,`code`,`re
 (1, 1, 1, '销售', 'sales', '线索与客户跟进', 1, 2);
 
 -- 角色权限（RBAC 默认绑定；权限点清单见 internal/domain/perm.go）
--- 各角色权限点数：admin 72 / manager 55 / photographer 23 / sales 31
+-- 各角色权限点数：admin 72 / manager 55 / photographer 27 / sales 32
 -- 用 JOIN code 生成 role_id，不写死 ID，保证与增量脚本结果一致
 INSERT INTO `sys_role_permission` (`company_id`, `role_id`, `permission`)
 SELECT r.company_id,
@@ -289,15 +289,21 @@ FROM `sys_role` r
     UNION ALL
     SELECT 'photographer' AS code, 'order:status' AS permission
     UNION ALL
+    SELECT 'photographer' AS code, 'order:update' AS permission
+    UNION ALL
     SELECT 'photographer' AS code, 'order:reschedule' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'customer:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'lead:view' AS permission
     UNION ALL
+    SELECT 'photographer' AS code, 'lead:update' AS permission
+    UNION ALL
     SELECT 'photographer' AS code, 'quote:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'package:view' AS permission
+    UNION ALL
+    SELECT 'photographer' AS code, 'payment:create' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'delivery:view' AS permission
     UNION ALL
@@ -316,6 +322,8 @@ FROM `sys_role` r
     SELECT 'photographer' AS code, 'calendar:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'calendar:update' AS permission
+    UNION ALL
+    SELECT 'photographer' AS code, 'settings:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'notification:view' AS permission
     UNION ALL

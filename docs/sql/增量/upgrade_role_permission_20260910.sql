@@ -344,15 +344,21 @@ FROM `sys_role` r
     UNION ALL
     SELECT 'photographer' AS code, 'order:status' AS permission
     UNION ALL
+    SELECT 'photographer' AS code, 'order:update' AS permission
+    UNION ALL
     SELECT 'photographer' AS code, 'order:reschedule' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'customer:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'lead:view' AS permission
     UNION ALL
+    SELECT 'photographer' AS code, 'lead:update' AS permission
+    UNION ALL
     SELECT 'photographer' AS code, 'quote:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'package:view' AS permission
+    UNION ALL
+    SELECT 'photographer' AS code, 'payment:create' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'delivery:view' AS permission
     UNION ALL
@@ -371,6 +377,8 @@ FROM `sys_role` r
     SELECT 'photographer' AS code, 'calendar:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'calendar:update' AS permission
+    UNION ALL
+    SELECT 'photographer' AS code, 'settings:view' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'notification:view' AS permission
     UNION ALL
@@ -451,7 +459,7 @@ WHERE r.deleted = 0;
 
 -- ---------------------------------------------------------------------
 -- 6. 校验（可选，人工确认用）：
---    各内置角色权限点数量应为 admin 72 / manager 55 / photographer 23 / sales 31
+--    各内置角色权限点数量应为 admin 72 / manager 55 / photographer 27 / sales 32
 -- ---------------------------------------------------------------------
 -- SELECT r.code, r.data_scope, COUNT(rp.id) AS perm_count
 -- FROM sys_role r LEFT JOIN sys_role_permission rp ON rp.role_id = r.id
