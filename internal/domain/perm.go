@@ -15,12 +15,13 @@ const (
 	PermDashboardView Perm = "dashboard:view"
 
 	// ---- 订单 ----
+	// （order:price 已移除：订单金额无独立修改接口，改价经加项走 order:update；
+	//   二期如落地改价接口再按 docs/rbac/运维手册.md 流程新增）
 	PermOrderView            Perm = "order:view"
 	PermOrderCreate          Perm = "order:create"
 	PermOrderUpdate          Perm = "order:update"
 	PermOrderStatus          Perm = "order:status"
 	PermOrderCancel          Perm = "order:cancel"
-	PermOrderPrice           Perm = "order:price"
 	PermOrderReschedule      Perm = "order:reschedule"
 	PermOrderRescheduleAudit Perm = "order:reschedule_audit"
 
@@ -39,10 +40,11 @@ const (
 	PermLeadDelete  Perm = "lead:delete"
 
 	// ---- 报价 ----
+	// （quote:audit 已移除：报价无审批接口，状态流转走 quote:update；
+	//   二期如落地报价审批再新增）
 	PermQuoteView   Perm = "quote:view"
 	PermQuoteCreate Perm = "quote:create"
 	PermQuoteUpdate Perm = "quote:update"
-	PermQuoteAudit  Perm = "quote:audit"
 
 	// ---- 套餐 ----
 	PermPackageView    Perm = "package:view"
@@ -159,7 +161,6 @@ var permGroups = []PermGroup{
 		{PermOrderUpdate, "编辑订单"},
 		{PermOrderStatus, "变更订单状态"},
 		{PermOrderCancel, "取消订单"},
-		{PermOrderPrice, "修改订单金额"},
 		{PermOrderReschedule, "申请改期"},
 		{PermOrderRescheduleAudit, "审批改期"},
 	}},
@@ -181,7 +182,6 @@ var permGroups = []PermGroup{
 		{PermQuoteView, "查看报价"},
 		{PermQuoteCreate, "创建报价"},
 		{PermQuoteUpdate, "编辑报价"},
-		{PermQuoteAudit, "报价审批"},
 	}},
 	{Module: "套餐", Perms: []PermDesc{
 		{PermPackageView, "查看套餐"},

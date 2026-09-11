@@ -129,6 +129,25 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 		Images:       req.Images,
 		Status:       enum.CustomRequestPending,
 	}
+	// 门店归属（独立接单）：提交时指定目标门店则直接落店；非法值报错，
+	// 不静默改写为 0——静默降级会让"客户以为提交给了某店、门店却看不到"。
+	if req.StoreID > 0 {
+		stores, err := s.UserRepo.ListStores(ctx, companyID)
+		if err != nil {
+			return nil, err
+		}
+		valid := false
+		for _, st := range stores {
+			if st.ID == req.StoreID {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, errs.BadRequest("门店不存在或不属于当前机构")
+		}
+		m.StoreID = req.StoreID
+	}
 	if cu != nil {
 		m.CustomerID = cu.CustomerID
 		m.Name = orDefault(req.Name, cu.Name)

@@ -67,6 +67,7 @@ type ClientFeedbackReq struct {
 type ClientCustomRequestReq struct {
 	Name         string  `json:"name"`          // 称呼（游客提交时必填）
 	Mobile       string  `json:"mobile"`        // 联系电话（游客提交时必填）
+	StoreID      int64   `json:"store_id"`      // 目标门店（可选；0=公共池。H5 提交页按门店参数化后传入）
 	ProjectType  string  `json:"project_type"`  // 拍摄类型
 	ExpectedDate string  `json:"expected_date"` // 期望拍摄日期
 	Location     string  `json:"location"`      // 期望拍摄地点

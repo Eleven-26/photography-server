@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -24,6 +25,10 @@ type ScopeCols struct {
 	// （本人也看得见本店资源），而非按 Owner 列过滤。
 	// 不置此位时，ScopeSelf 会因本表无 Owner 列而落进 `1 = 0`，把共享资源全部锁死。
 	Shared bool
+	// Public 标记该表存在「公共池」：Store 列为 0 的行属无主数据（如 H5 游客提交的
+	// 定制需求，提交时尚无门店归属），对任何员工可见，由员工响应认领。
+	// 生效于 ScopeStore 与 ScopeSelf：过滤条件会附加 `OR <Store> = 0`。
+	Public bool
 }
 
 // 各业务表的过滤列声明，集中定义避免列名字符串散落在各仓储方法内。
@@ -35,6 +40,10 @@ var (
 	scopeAsset    = ScopeCols{Store: "store_id", Owner: []string{"created_by"}}
 	// 套餐是门店级共享资源：摄影师（仅本人）也必须看得到本店套餐，否则无法开单。
 	scopePackage = ScopeCols{Store: "store_id", Shared: true}
+
+	// 定制需求：独立接单 + 公共池。H5 客户提交时尚无门店归属（store_id=0），
+	// 本店需能看到无主需求去认领，故 Public；已响应的记录归响应人（response_by）。
+	scopeCustomRequest = ScopeCols{Store: "store_id", Owner: []string{"response_by"}, Public: true}
 
 	// 已 JOIN biz_order AS o 的场景（交片单及其明细）直接按订单归属过滤
 	scopeOrderJoined = ScopeCols{Store: "o.store_id", Owner: []string{"o.photographer_id", "o.owner_id"}}
@@ -80,44 +89,53 @@ func (r *Repo) scopedFromOrder(q *gorm.DB, ctx context.Context, companyID int64)
 //   - ScopeAll（含 DataScope 零值）→ 不加任何条件。零值放行是有意为之：
 //     权限体系未启用 / 存量角色未配置数据范围 / 未经员工认证的链路时，
 //     行为与改造前完全一致。
-//   - ScopeStore → `<Store> = op.StoreID`
+//   - ScopeStore → `<Store> = op.StoreID`（Public 表附加 `OR <Store> = 0` 公共池）
 //   - ScopeSelf  → `<Owner[0]> = op.UserID OR <Owner[1]> = op.UserID ...`
-//     （Shared 表降级为按 Store 过滤，见 ScopeCols.Shared）
+//     （Shared 表降级为按 Store 过滤，见 ScopeCols.Shared；
+//     Public 表附加 `OR <Store> = 0` 公共池，保证无主数据可被认领）
 //
 // 降级规则（安全优先，绝不因"维度缺失"而放行全部数据）：
 //   - op.StoreID == 0（未分配门店）而需要门店过滤 → 降级为 ScopeSelf，
 //     否则 `store_id = 0` 会查到全部「未分配门店」的数据，属越权；
 //   - 表未声明 Owner 列却需要 Self 过滤 → 返回 `1 = 0`（查不到数据）。
-//     确需放行的共享资源应由调用方在 ScopeCols 上标记 Shared 或**不调用**本函数。
+//     确需放行的共享资源应由调用方在 ScopeCols 上标记 Shared / Public 或**不调用**本函数。
 func applyScope(q *gorm.DB, op domain.Operator, c ScopeCols) *gorm.DB {
 	switch op.DataScope {
 	case domain.ScopeStore:
 		if c.Store != "" && op.StoreID != 0 {
-			return q.Where(c.Store+" = ?", op.StoreID)
+			return q.Where(storeCond(c), op.StoreID)
 		}
 		return applySelf(q, op, c)
 	case domain.ScopeSelf:
 		if c.Shared && c.Store != "" && op.StoreID != 0 {
-			return q.Where(c.Store+" = ?", op.StoreID)
+			return q.Where(storeCond(c), op.StoreID)
 		}
 		return applySelf(q, op, c)
 	}
 	return q
 }
 
+// storeCond 生成门店维度过滤条件；Public 表的 store_id=0 视为公共池对本店可见
+func storeCond(c ScopeCols) string {
+	if c.Public {
+		return "(" + c.Store + " = ? OR " + c.Store + " = 0)"
+	}
+	return c.Store + " = ?"
+}
+
 // applySelf 追加「归属人为本人」的过滤（多列 OR）
 func applySelf(q *gorm.DB, op domain.Operator, c ScopeCols) *gorm.DB {
-	if len(c.Owner) == 0 {
-		return q.Where("1 = 0")
-	}
-	cond := ""
-	args := make([]interface{}, 0, len(c.Owner))
-	for i, col := range c.Owner {
-		if i > 0 {
-			cond += " OR "
-		}
-		cond += col + " = ?"
+	conds := make([]string, 0, len(c.Owner)+1)
+	args := make([]interface{}, 0, len(c.Owner)+1)
+	for _, col := range c.Owner {
+		conds = append(conds, col+" = ?")
 		args = append(args, op.UserID)
 	}
-	return q.Where(cond, args...)
+	if c.Public && c.Store != "" {
+		conds = append(conds, c.Store+" = 0")
+	}
+	if len(conds) == 0 {
+		return q.Where("1 = 0")
+	}
+	return q.Where(strings.Join(conds, " OR "), args...)
 }

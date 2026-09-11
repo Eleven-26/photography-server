@@ -173,7 +173,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middlewa
 	ld.POST("/brief/generate/:lead_id", mw.Perm(domain.PermLeadUpdate), ctl.LeadBriefGenerate)
 
 	// 报价单（status 为接受/拒绝/成交/撤回的状态流转，归 quote:update；
-	// quote:audit 当前无对应路由——报价审批由客户侧接受/拒绝承载，该点暂为预留）
+	// 报价无独立审批接口，quote:audit 已随 2026-09-11 权限点清理移除）
 	qt := g.Group("/quote")
 	qt.POST("/create/:lead_id", mw.Perm(domain.PermQuoteCreate), ctl.QuoteCreate)
 	qt.POST("/list/:lead_id", mw.Perm(domain.PermQuoteView), ctl.QuoteList)
@@ -188,7 +188,7 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middlewa
 	pk.POST("/status/:id", mw.Perm(domain.PermPackagePublish), ctl.PackageStatus)
 	pk.POST("/delete/:id", mw.Perm(domain.PermPackageDelete), ctl.PackageDelete)
 
-	// 订单（update 接口内若变更金额，需另有 order:price——路由级无法区分字段，由 service 层追加校验）
+	// 订单（金额无独立修改接口——改价经加项同事务重算，走 order:update）
 	od := g.Group("/order")
 	od.POST("/create", mw.Perm(domain.PermOrderCreate), ctl.OrderCreate)
 	od.POST("/list", mw.Perm(domain.PermOrderView), ctl.OrderList)

@@ -16,13 +16,15 @@
 docs/sql/
 ├── ddl.sql                     # 【全量】建表结构（30 张表，最新结构）
 ├── dml.sql                     # 【全量】初始化数据（公司/门店/角色/角色权限/管理员/收款方式/示例业务数据）
-├── 增量/                        # 【增量】升级脚本，按文件名排序依次执行
+├── 增量/                        # 【增量】升级脚本，按文件名中的日期排序依次执行
 │   ├── ddl-初版.sql              #   0. 初版基线结构（等价于上线时的 ddl.sql 快照）
 │   ├── dml-初版.sql              #   0. 初版基线数据
 │   ├── upgrade_client_20260907.sql      # 1. 客户端三端能力（+9 表、9 处 ALTER）
 │   ├── upgrade_p1_pc_modules_20260910.sql # 2. P1 交付工作台/工作室设置（sys_company +2 列、biz_delivery +2 列）
 │   ├── upgrade_p2_customer_pref_20260910.sql # 3. P2 客户偏好与通知许可（crm_customer +3 列、level 默认值修正）
-│   └── upgrade_role_permission_20260910.sql # 4. RBAC（+1 表 sys_role_permission、sys_role.data_scope、biz_asset.store_id + 回填 + 内置角色默认权限）
+│   ├── upgrade_role_permission_20260910.sql # 4. RBAC（+1 表 sys_role_permission、sys_role.data_scope、biz_asset.store_id + 回填 + 内置角色默认权限）
+│   ├── upgrade_custom_request_store_20260911.sql # 5. 定制需求接入数据权限（biz_custom_request +store_id、经 crm_lead 回填）
+│   └── upgrade_perm_prune_20260911.sql # 6. 权限点清理（删 order:price / quote:audit 残留行）
 └── README.md                   # 本文件
 ```
 
@@ -42,8 +44,10 @@ mysql -uroot -p < docs/sql/dml.sql   # 初始化数据（必须在 ddl 之后）
 ### 2. 老环境升级（增量）
 
 ```bash
-# 按文件名排序依次执行，顺序：初版 → 各次 upgrade
-for f in docs/sql/增量/*.sql; do
+# 按文件名中的日期(yyyymmdd)升序执行，同日期按文件名序：初版 → 各次 upgrade
+# ⚠️ 不要按 ls 字典序执行——文件名是「主题_日期」格式，字典序会把
+#    upgrade_perm_* 排到 upgrade_role_* 之前（日期倒挂），先跑依赖后建表的脚本会中断整条链。
+for f in $(ls docs/sql/增量/*.sql | awk '{n=$0; sub(/^.*\//,"",n); if (match(n,/[0-9]{8}\.sql$/)) d=substr(n,RSTART,8); else d="99999999"; print d"\t"$0}' | sort -k1,1 -k2,2 | cut -f2-); do
   echo ">>> $f"
   mysql -uroot -p photography < "$f"
 done
@@ -61,8 +65,8 @@ done
 
 ### 命名规范
 
-- 增量文件：`YYYYMMDD_变更描述.sql`（如 `20260915_order_addon_fields.sql`）
-- 描述用英文小写下划线，同一日期多次变更加后缀 `_2`
+- 增量文件：`upgrade_变更描述_YYYYMMDD.sql`（如 `upgrade_order_addon_fields_20260915.sql`）
+- 描述用英文小写下划线；**执行顺序按文件名中的日期排序，而非文件名字典序**（字典序会因主题首字母不同造成日期倒挂，见上方示例）
 
 ## 四、一致性验证方法（可复现）
 

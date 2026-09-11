@@ -140,6 +140,44 @@ func TestApplyScope(t *testing.T) {
 	}
 }
 
+// TestApplyScopePublic 锁定「公共池」语义（定制需求：store_id=0 对员工可见可认领）。
+func TestApplyScopePublic(t *testing.T) {
+	db := dryRunDB(t)
+
+	assertSQL := func(name, wantIn string, wantNotIn []string, wantVar interface{}) {
+		t.Helper()
+		var out []model.CustomRequest
+		op := domain.Operator{UserID: 9, StoreID: 7, DataScope: domain.ScopeStore}
+		if name == "仅本人_归属人OR公共池" {
+			op.DataScope = domain.ScopeSelf
+		}
+		if name == "全部数据_不加条件" {
+			op.DataScope = domain.ScopeAll
+		}
+		sql, vars := scopeSQL(t,
+			applyScope(db.Model(&model.CustomRequest{}).Where("company_id = ?", int64(100)), op, scopeCustomRequest),
+			&out)
+		if wantIn != "" && !strings.Contains(sql, wantIn) {
+			t.Errorf("[%s] SQL 应包含 %q，实际: %s", name, wantIn, sql)
+		}
+		for _, notWant := range wantNotIn {
+			if strings.Contains(sql, notWant) {
+				t.Errorf("[%s] SQL 不应包含 %q，实际: %s", name, notWant, sql)
+			}
+		}
+		if wantVar != nil && !hasVar(vars, wantVar) {
+			t.Errorf("[%s] 参数应包含 %v，实际: %v", name, wantVar, vars)
+		}
+	}
+
+	// 本门店：本店 + 公共池（store_id=0）
+	assertSQL("本门店_本店OR公共池", "(store_id = ? OR store_id = 0)", nil, int64(7))
+	// 仅本人：我响应过的 + 公共池
+	assertSQL("仅本人_归属人OR公共池", "(response_by = ? OR store_id = 0)", nil, int64(9))
+	// 全部数据：不加任何条件
+	assertSQL("全部数据_不加条件", "", []string{"store_id = ?"}, nil)
+}
+
 // TestScopedFromOrder 锁定「无 store_id 的从表」经可见订单传递过滤的行为。
 func TestScopedFromOrder(t *testing.T) {
 	db := dryRunDB(t)

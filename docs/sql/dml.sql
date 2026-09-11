@@ -22,7 +22,7 @@ INSERT INTO `sys_role` (`created_by`,`updated_by`,`company_id`,`name`,`code`,`re
 (1, 1, 1, '销售', 'sales', '线索与客户跟进', 1, 2);
 
 -- 角色权限（RBAC 默认绑定；权限点清单见 internal/domain/perm.go）
--- 各角色权限点数：admin 72 / manager 55 / photographer 27 / sales 32
+-- 各角色权限点数：admin 70 / manager 53 / photographer 27 / sales 32
 -- 用 JOIN code 生成 role_id，不写死 ID，保证与增量脚本结果一致
 INSERT INTO `sys_role_permission` (`company_id`, `role_id`, `permission`)
 SELECT r.company_id,
@@ -40,8 +40,6 @@ FROM `sys_role` r
     SELECT 'admin' AS code, 'order:status' AS permission
     UNION ALL
     SELECT 'admin' AS code, 'order:cancel' AS permission
-    UNION ALL
-    SELECT 'admin' AS code, 'order:price' AS permission
     UNION ALL
     SELECT 'admin' AS code, 'order:reschedule' AS permission
     UNION ALL
@@ -72,8 +70,6 @@ FROM `sys_role` r
     SELECT 'admin' AS code, 'quote:create' AS permission
     UNION ALL
     SELECT 'admin' AS code, 'quote:update' AS permission
-    UNION ALL
-    SELECT 'admin' AS code, 'quote:audit' AS permission
     UNION ALL
     SELECT 'admin' AS code, 'package:view' AS permission
     UNION ALL
@@ -185,8 +181,6 @@ FROM `sys_role` r
     UNION ALL
     SELECT 'manager' AS code, 'order:cancel' AS permission
     UNION ALL
-    SELECT 'manager' AS code, 'order:price' AS permission
-    UNION ALL
     SELECT 'manager' AS code, 'order:reschedule_audit' AS permission
     UNION ALL
     SELECT 'manager' AS code, 'customer:view' AS permission
@@ -214,8 +208,6 @@ FROM `sys_role` r
     SELECT 'manager' AS code, 'quote:create' AS permission
     UNION ALL
     SELECT 'manager' AS code, 'quote:update' AS permission
-    UNION ALL
-    SELECT 'manager' AS code, 'quote:audit' AS permission
     UNION ALL
     SELECT 'manager' AS code, 'package:view' AS permission
     UNION ALL

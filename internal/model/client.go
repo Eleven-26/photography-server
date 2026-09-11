@@ -47,6 +47,9 @@ func (OrderReview) TableName() string { return "biz_order_review" }
 // CustomRequest 定制需求（客户非套餐需求提交）
 type CustomRequest struct {
 	TenantBase
+	// StoreID 所属门店（0 = 公共池未归属）：独立接单模式下按店过滤；
+	// H5 提交页未参数化前新数据落公共池，由员工响应认领
+	StoreID      int64                    `gorm:"column:store_id;index;comment:所属门店ID(0=公共池未归属)" json:"store_id"`
 	CustomerID   int64                    `gorm:"column:customer_id;index;comment:客户ID(登录提交时有值)" json:"customer_id"`
 	Name         string                   `gorm:"column:name;size:50;comment:称呼" json:"name"`
 	Mobile       string                   `gorm:"column:mobile;size:20;comment:联系电话" json:"mobile"`

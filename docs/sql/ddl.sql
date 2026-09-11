@@ -309,6 +309,7 @@ CREATE TABLE `biz_custom_request`
     `updated_at`    datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `deleted`       bigint   NOT NULL DEFAULT '0' COMMENT '是否删除 0-否 1-是',
     `company_id`    bigint   NOT NULL DEFAULT '0' COMMENT '公司ID',
+    `store_id`      bigint   NOT NULL DEFAULT '0' COMMENT '所属门店ID(0=公共池未归属)',
     `customer_id`   bigint   NOT NULL DEFAULT '0' COMMENT '客户ID(登录提交时有值)',
     `name`          varchar(50)       DEFAULT NULL COMMENT '称呼',
     `mobile`        varchar(20)       DEFAULT NULL COMMENT '联系电话',
@@ -326,6 +327,7 @@ CREATE TABLE `biz_custom_request`
     `response_at`   datetime          DEFAULT NULL COMMENT '响应时间',
     PRIMARY KEY (`id`),
     KEY             `idx_custom_req_company` (`company_id`),
+    KEY             `idx_custom_req_store` (`store_id`),
     KEY             `idx_custom_req_customer` (`customer_id`),
     KEY             `idx_custom_req_status` (`status`),
     KEY             `idx_custom_req_deleted` (`deleted`)

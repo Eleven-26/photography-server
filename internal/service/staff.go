@@ -436,17 +436,24 @@ func (s *Service) StaffCustomRequests(ctx context.Context, op Operator, page, pa
 
 // StaffCustomRequestRespond 响应定制需求（转化线索由既有 ConvertLeadToCustomer 承接）
 func (s *Service) StaffCustomRequestRespond(ctx context.Context, op Operator, id int64, response string) error {
-	if _, err := s.CustomRequestRepo.GetByID(ctx, op.CompanyID, id); err != nil {
+	req, err := s.CustomRequestRepo.GetByID(ctx, op.CompanyID, id)
+	if err != nil {
 		return errs.NotFound("定制需求不存在")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return s.CustomRequestRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
+	updates := map[string]interface{}{
 		"status":      enum.CustomRequestResponded,
 		"response":    response,
 		"response_by": op.UserID,
 		"response_at": now,
 		"updated_by":  op.UserID,
-	})
+	}
+	// 认领落店：公共池（store_id=0）的需求被响应后归属响应人门店，
+	// 之后按常规门店口径过滤（仅本人可见自己响应的，本店可见同店的）
+	if req.StoreID == 0 && op.StoreID != 0 {
+		updates["store_id"] = op.StoreID
+	}
+	return s.CustomRequestRepo.Update(ctx, op.CompanyID, id, updates)
 }
 
 // b2i bool 转 0/1

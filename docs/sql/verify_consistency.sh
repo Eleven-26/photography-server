@@ -23,8 +23,15 @@ sed -e 's/`photography`/`_v_full`/g' dml.sql >> "$WORK/v_full.sql"
 sed -e 's/`photography`/`_v_incr`/g' 增量/ddl-初版.sql  > "$WORK/v_incr.sql"
 sed -e 's/`photography`/`_v_incr`/g' 增量/dml-初版.sql >> "$WORK/v_incr.sql"
 INCR_LIST=""
-for f in 增量/*.sql; do
-  case "$f" in *ddl-*|*dml-*) continue;; esac   # 跳过基线文件
+# 增量按「文件名中的日期(yyyymmdd)」升序执行，同日期按文件名序。
+# 不要按文件名字典序：perm_* 会排在 role_* 前面，导致 prune 的 DELETE
+# 先于 sys_role_permission 建表执行而中断整条链（2026-09-11 踩坑）。
+INCR_FILES=$(ls 增量/*.sql 2>/dev/null | grep -avE '(ddl|dml)-' | awk '{
+  n = $0; sub(/^.*\//, "", n);
+  if (match(n, /[0-9]{8}\.sql$/)) d = substr(n, RSTART, 8); else d = "99999999";
+  print d "\t" $0
+}' | sort -k1,1 -k2,2 | cut -f2-)
+for f in $INCR_FILES; do
   sed -e 's/`photography`/`_v_incr`/g' "$f" >> "$WORK/v_incr.sql"
   INCR_LIST="$INCR_LIST $f"
 done

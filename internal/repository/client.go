@@ -143,6 +143,9 @@ func (r *CustomRequestRepo) GetByID(ctx context.Context, companyID, id int64) (*
 
 func (r *CustomRequestRepo) List(ctx context.Context, companyID int64, page, pageSize int, status int, customerID int64) ([]model.CustomRequest, int64, error) {
 	q := r.tenant(companyID).WithContext(ctx)
+	// 数据权限：独立接单 + 公共池（store_id=0 对员工可见可认领）。
+	// H5 客户侧链路（customerID > 0）无操作人上下文，applyScope 零值放行，行为不变。
+	q = applyScope(q, opOf(ctx), scopeCustomRequest)
 	if status > 0 {
 		q = q.Where("status = ?", status)
 	}
