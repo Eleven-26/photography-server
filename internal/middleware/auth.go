@@ -199,7 +199,9 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 		Permissions: auth.Permissions,
 	}
 	c.Set(string(OperatorKey), op)
-	ctx := context.WithValue(c.Request.Context(), OperatorKey, op)
+	// 同时写入 request context：controller → service → repository 全程原样透传，
+	// 使行级数据权限过滤无需改动仓储方法签名（见 domain.WithOperator）。
+	ctx := domain.WithOperator(c.Request.Context(), op)
 	c.Request = c.Request.WithContext(ctx)
 	c.Next()
 }

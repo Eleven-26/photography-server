@@ -25,7 +25,8 @@ func NewAssetRepo() *AssetRepo {
 
 // List 作品列表（分页 + 关键字 + 类别 + 状态 + 精选筛选）
 func (r *AssetRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, category, status, featured string) ([]model.Asset, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：本门店 / 仅本人（created_by）
+	q := applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeAsset)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("title LIKE ? OR code LIKE ?", kw, kw)

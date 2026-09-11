@@ -96,24 +96,30 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	openLeadStatus := []int{int(enum.LeadStatusPending), int(enum.LeadStatusQuoting), int(enum.LeadStatusQuoted)}
 
 	q := func() *gorm.DB { return r.tenant(companyID).WithContext(ctx) }
+	// —— 行级数据权限（口径见 repository/scope.go）——
+	// 订单表直接按门店/归属人过滤；收款表无 store_id，经「可见订单」子查询传递；
+	// 线索表按 owner_id 过滤；未读通知按 receiver_id 天然收敛，无需过滤。
+	orders := func() *gorm.DB { return scopedOrder(q().Model(&model.Order{}), ctx) }
+	fromOrder := func() *gorm.DB { return r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID) }
+	leads := func() *gorm.DB { return applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeLead) }
 
 	// 今日 / 本月新增订单数
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&ov.TodayOrders).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&ov.MonthOrders).Error; err != nil {
 		return nil, err
 	}
 
 	// 今日 / 本月确认到账金额（仅统计已核验通过的收款单）
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), dayStartStr, dayEndStr).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.TodayAmount).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), monthStartStr, monthEndStr).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.MonthAmount).Error; err != nil {
 		return nil, err
@@ -121,34 +127,34 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	ov.TodayConfirmed = ov.TodayAmount
 
 	// 今日申报待核验金额
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND created_at >= ? AND created_at < ?", int(enum.PaymentStatusPending), dayStart, dayEnd).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.TodayPending).Error; err != nil {
 		return nil, err
 	}
 
 	// 待核验收款单数 / 待交付订单数
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ?", int(enum.PaymentStatusPending)).Count(&ov.PendingPayments).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("status = ?", int(enum.OrderStatusPendingDelivery)).Count(&ov.PendingDeliveries).Error; err != nil {
 		return nil, err
 	}
 
 	// 待定金 / 精修中订单数
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("status = ?", int(enum.OrderStatusPendingDeposit)).Count(&ov.PendingDeposit).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("status = ?", int(enum.OrderStatusRetouching)).Count(&ov.PendingRetouch).Error; err != nil {
 		return nil, err
 	}
 
 	// 未来待拍摄订单：已排期（待拍摄/拍摄中）且拍摄日期不早于今天
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Where("status IN ? AND shoot_date IS NOT NULL AND shoot_date >= ?",
 			[]int{int(enum.OrderStatusPendingShoot), int(enum.OrderStatusShooting)}, dayStart.Format("2006-01-02")).
 		Count(&ov.UpcomingShoots).Error; err != nil {
@@ -156,27 +162,27 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	}
 
 	// 线索：跟进中 / 逾期未跟进
-	if err := q().Model(&model.Lead{}).
+	if err := leads().
 		Where("status IN ?", openLeadStatus).Count(&ov.NewLeads).Error; err != nil {
 		return nil, err
 	}
 	// 逾期未跟进：next_follow_at 为 datetime 列，严格模式下与 '' 比较会直接报
 	// ERROR 1525 Incorrect DATETIME value: ''（空串需先转 datetime 才能比较）。
 	// NULL 本身不参与比较，故只需 IS NOT NULL，不能写 next_follow_at <> ''。
-	if err := q().Model(&model.Lead{}).
+	if err := leads().
 		Where("status IN ? AND next_follow_at IS NOT NULL AND next_follow_at < ?", openLeadStatus, nowStr).
 		Count(&ov.OverdueLeads).Error; err != nil {
 		return nil, err
 	}
 
-	// 当前登录人未读通知
+	// 当前登录人未读通知（receiver_id 已限定本人，无需数据权限过滤）
 	if err := q().Model(&model.SysNotification{}).
 		Where("receiver_id = ? AND is_read = ?", userID, int(enum.NotificationUnread)).Count(&ov.UnreadNotify).Error; err != nil {
 		return nil, err
 	}
 
 	// 本月新增线索：作为成交率分母（与「本月新增订单」取同一时间窗，口径可解释）
-	if err := q().Model(&model.Lead{}).
+	if err := leads().
 		Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&ov.MonthLeads).Error; err != nil {
 		return nil, err
 	}
@@ -185,7 +191,7 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	}
 
 	// 今日拍摄列表（待拍摄 / 拍摄中，按时间排序）
-	if err := q().Model(&model.Order{}).
+	if err := orders().
 		Select("id, code, customer_name, package_name, shoot_time, shoot_address, photographer, status").
 		Where("shoot_date = ? AND status IN ?", dayStart.Format("2006-01-02"),
 			[]int{int(enum.OrderStatusPendingShoot), int(enum.OrderStatusShooting)}).
@@ -193,7 +199,8 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 		return nil, err
 	}
 
-	// 未来 7 天剩余可约时段
+	// 未来 7 天剩余可约时段（**有意不做数据权限过滤**：这是全店档期容量口径，
+	// 若按摄影师过滤会漏算他人已锁档期，导致可约数虚高）
 	slots, err := r.availableSlots(ctx, companyID, dayStart, 7)
 	if err != nil {
 		return nil, err

@@ -53,26 +53,29 @@ type Summary struct {
 func (r *FinanceRepo) GetSummary(ctx context.Context, companyID int64, start, end string) (*Summary, error) {
 	var s Summary
 	q := func() *gorm.DB { return r.tenant(companyID).WithContext(ctx) }
+	// 收款 / 退款表无 store_id，数据权限经「可见订单」子查询传递；
+	// ScopeAll 或未经员工认证的链路下原样返回，行为与改造前一致。
+	fromOrder := func() *gorm.DB { return r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID) }
 
 	// 本月应收：本月创建的订单总额
-	if err := q().Model(&model.Order{}).
+	if err := scopedOrder(q().Model(&model.Order{}), ctx).
 		Where("created_at >= ? AND created_at < ?", start, end).
 		Select("COALESCE(SUM(total_amt),0)").Scan(&s.MonthReceivable).Error; err != nil {
 		return nil, err
 	}
 
 	// 本月已收 / 定金 / 尾款+加片
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), start, end).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.MonthReceived).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND type = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), "deposit", start, end).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.DepositTotal).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND type IN (?) AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), []string{"final", "addon"}, start, end).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.FinalTotal).Error; err != nil {
 		return nil, err
@@ -83,12 +86,12 @@ func (r *FinanceRepo) GetSummary(ctx context.Context, companyID int64, start, en
 	}
 
 	// 待核验申报：不受月份限制（属于待办口径，本月口径会漏掉历史欠核验单）
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ?", int(enum.PaymentStatusPending)).
 		Count(&s.PendingVerifyCount).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.OrderPayment{}).
+	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ?", int(enum.PaymentStatusPending)).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.PendingVerifyAmount).Error; err != nil {
 		return nil, err
@@ -96,19 +99,19 @@ func (r *FinanceRepo) GetSummary(ctx context.Context, companyID int64, start, en
 	s.PendingCount = s.PendingVerifyCount
 
 	// 退款中（申请中 + 已通过未打款）
-	if err := q().Model(&model.OrderRefund{}).
+	if err := fromOrder().Model(&model.OrderRefund{}).
 		Where("status IN ?", []int{int(enum.RefundStatusApplying), int(enum.RefundStatusApproved)}).
 		Count(&s.RefundingCount).Error; err != nil {
 		return nil, err
 	}
-	if err := q().Model(&model.OrderRefund{}).
+	if err := fromOrder().Model(&model.OrderRefund{}).
 		Where("status IN ?", []int{int(enum.RefundStatusApplying), int(enum.RefundStatusApproved)}).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.RefundingAmount).Error; err != nil {
 		return nil, err
 	}
 
 	// 已退款金额（区间内）
-	if err := q().Model(&model.OrderRefund{}).
+	if err := fromOrder().Model(&model.OrderRefund{}).
 		Where("status = ? AND refund_at >= ? AND refund_at < ?", int(enum.RefundStatusDone), start, end).
 		Select("COALESCE(SUM(amount),0)").Scan(&s.RefundTotal).Error; err != nil {
 		return nil, err
@@ -120,7 +123,7 @@ func (r *FinanceRepo) GetSummary(ctx context.Context, companyID int64, start, en
 // ListPayments 收款流水。status 为空表示不筛选（全部状态）。
 // 旧实现空值默认只查"待核验"，导致前端下拉的"全部状态"名不副实。
 func (r *FinanceRepo) ListPayments(ctx context.Context, companyID int64, page, pageSize int, status string) ([]model.OrderPayment, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -139,7 +142,7 @@ func (r *FinanceRepo) ListPayments(ctx context.Context, companyID int64, page, p
 // ListRefunds 退款流水。status 为空表示不筛选（全部状态）。
 // 旧实现硬编码 status=已退款，导致"退款审批"页看不到申请中/已通过的单据。
 func (r *FinanceRepo) ListRefunds(ctx context.Context, companyID int64, page, pageSize int, status string) ([]model.OrderRefund, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -159,7 +162,7 @@ func (r *FinanceRepo) ListRefunds(ctx context.Context, companyID int64, page, pa
 // 未付款（paid_at 为空）的单据不计入流水，但仍在待核验汇总口径内。
 func (r *FinanceRepo) ExportPayments(ctx context.Context, companyID int64, start, end string) ([]model.OrderPayment, error) {
 	var list []model.OrderPayment
-	err := r.tenant(companyID).WithContext(ctx).
+	err := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).
 		Where("paid_at >= ? AND paid_at < ?", start, end).
 		Order("paid_at ASC, id ASC").Find(&list).Error
 	return list, err
@@ -169,7 +172,7 @@ func (r *FinanceRepo) ExportPayments(ctx context.Context, companyID int64, start
 // 由 Status 列区分，避免导出文件与「退款审批」列表口径不一致。
 func (r *FinanceRepo) ExportRefunds(ctx context.Context, companyID int64, start, end string) ([]model.OrderRefund, error) {
 	var list []model.OrderRefund
-	err := r.tenant(companyID).WithContext(ctx).
+	err := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).
 		Where("created_at >= ? AND created_at < ?", start, end).
 		Order("id ASC").Find(&list).Error
 	return list, err
@@ -184,7 +187,7 @@ func (r *FinanceRepo) GetMonthlyStats(ctx context.Context, companyID int64, year
 	var rows []row
 	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local).Format("2006-01-02")
 	end := time.Date(year, 12, 31, 23, 59, 59, 0, time.Local).Format("2006-01-02 15:04:05")
-	r.tenant(companyID).WithContext(ctx).Model(&model.OrderPayment{}).
+	r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).Model(&model.OrderPayment{}).
 		Select("MONTH(paid_at) as month, COALESCE(SUM(amount),0) as income").
 		Where("status = ? AND paid_at BETWEEN ? AND ?", int(enum.PaymentStatusConfirmed), start, end).
 		Group("MONTH(paid_at)").Scan(&rows)

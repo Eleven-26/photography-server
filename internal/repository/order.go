@@ -24,7 +24,8 @@ func (r *OrderRepo) WithTx(tx *gorm.DB) *OrderRepo {
 func NewOrderRepo() *OrderRepo { return &OrderRepo{} }
 
 func (r *OrderRepo) List(ctx context.Context, companyID int64, page, pageSize int, status string, customerID int64) ([]model.Order, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：全部/本门店/仅本人（无操作人的链路自动放行，见 scope.go）
+	q := scopedOrder(r.tenant(companyID).WithContext(ctx), ctx)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -117,7 +118,9 @@ func (r *OrderRepo) ListPayments(ctx context.Context, companyID, orderID int64) 
 }
 
 func (r *OrderRepo) GetUnconfirmedPayments(ctx context.Context, companyID int64, page, pageSize int) ([]model.OrderPayment, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx).Where("status = ?", enum.PaymentStatusPending)
+	// 跨订单分页列表：数据权限经「可见订单」传递（本表无 store_id）
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).
+		Where("status = ?", enum.PaymentStatusPending)
 	var total int64
 	if err := q.Model(&model.OrderPayment{}).Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -133,12 +136,13 @@ func (r *OrderRepo) GetUnconfirmedPayments(ctx context.Context, companyID int64,
 func (r *OrderRepo) GetTodayStats(ctx context.Context, companyID int64) (confirmed float64, pending float64, err error) {
 	// 必须是 Format(layout) 的结果，写成 layout 字面量会被当作实际日期拼进 SQL，导致统计恒为 0
 	today := time.Now().Format("2006-01-02")
-	q := r.tenant(companyID).WithContext(ctx).
+	// 今日收款统计：数据权限经「可见订单」传递（本表无 store_id）
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).
 		Where("status = ? AND paid_at BETWEEN ? AND ?", enum.PaymentStatusConfirmed, today, today+" 23:59:59")
 	if err := q.Model(&model.OrderPayment{}).Select("COALESCE(SUM(amount),0)").Scan(&confirmed).Error; err != nil {
 		return 0, 0, err
 	}
-	q2 := r.tenant(companyID).WithContext(ctx).
+	q2 := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID).
 		Where("status = ? AND created_at BETWEEN ? AND ?", enum.PaymentStatusPending, today, today+" 23:59:59")
 	if err := q2.Model(&model.OrderPayment{}).Select("COALESCE(SUM(amount),0)").Scan(&pending).Error; err != nil {
 		return 0, 0, err

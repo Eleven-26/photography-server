@@ -41,7 +41,11 @@ func New(deps Deps) *Middlewares {
 
 type ctxKey string
 
-// OperatorKey 操作人上下文键，同时用于 gin.Context 与 request context
+// OperatorKey 操作人上下文键，用于 gin.Context（gin 侧取值见 GetOperator）。
+//
+// 注意：request context 侧的注入与读取已改用 domain.WithOperator / domain.OperatorFrom
+// ——repository 层要按操作人做行级数据过滤，而它不能 import middleware（层次倒置），
+// 故把 context 存取下沉到 domain。两处写入的是同一个 Operator 值，保持同步。
 const OperatorKey ctxKey = "photography.operator"
 
 // GetOperator 从 gin 上下文获取当前操作人

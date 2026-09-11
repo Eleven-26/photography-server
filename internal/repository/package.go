@@ -23,7 +23,8 @@ func NewPackageRepo() *PackageRepo {
 
 // List 套餐列表（分页 + 关键字 + 状态 + 类别筛选）
 func (r *PackageRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, status, category string) ([]model.Package, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：套餐为门店共享资源，本人范围降级为「本门店可见」（见 ScopeCols.Shared）
+	q := applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopePackage)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR code LIKE ?", kw, kw)

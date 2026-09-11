@@ -25,7 +25,8 @@ func NewLeadRepo() *LeadRepo {
 
 // List 线索列表（分页 + 关键字 + 状态 + 负责人筛选）
 func (r *LeadRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：本门店 / 仅本人（owner_id）
+	q := applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeLead)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)

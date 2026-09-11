@@ -53,7 +53,8 @@ func (r *OrderRescheduleRepo) ListByOrder(ctx context.Context, companyID, orderI
 }
 
 func (r *OrderRescheduleRepo) List(ctx context.Context, companyID int64, page, pageSize int, status int) ([]model.OrderReschedule, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 跨订单分页列表：数据权限经「可见订单」传递（本表无 store_id）
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID)
 	if status > 0 {
 		q = q.Where("status = ?", status)
 	}
@@ -97,7 +98,8 @@ func (r *ReviewRepo) GetByOrderID(ctx context.Context, companyID, orderID int64)
 }
 
 func (r *ReviewRepo) List(ctx context.Context, companyID int64, page, pageSize int, minRating int) ([]model.OrderReview, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 评价表无 store_id，数据权限经「可见订单」传递
+	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID)
 	if minRating > 0 {
 		q = q.Where("rating >= ?", minRating)
 	}

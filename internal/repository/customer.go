@@ -25,7 +25,8 @@ func (r *CustomerRepo) WithTx(tx *gorm.DB) *CustomerRepo {
 func NewCustomerRepo() *CustomerRepo { return &CustomerRepo{} }
 
 func (r *CustomerRepo) List(ctx context.Context, companyID int64, page, pageSize int, keyword string) ([]model.Customer, int64, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：本门店 / 仅本人（created_by）
+	q := applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeCustomer)
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		q = q.Where("name LIKE ? OR mobile LIKE ? OR code LIKE ?", kw, kw, kw)
@@ -80,7 +81,8 @@ func (r *CustomerRepo) GetStats(ctx context.Context, companyID int64) (*Customer
 	var st CustomerStats
 	// 每条统计都从基础查询重新派生，避免链式条件在同一 Statement 上累积
 	// （GORM 在 clone=0 时 Where 会追加到共享 Statement，导致后一条统计被前一条的条件污染）
-	q := func() *gorm.DB { return r.tenant(companyID).WithContext(ctx) }
+	// 行级数据权限：统计口径必须与列表口径一致，否则卡片数字与列表对不上
+	q := func() *gorm.DB { return applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeCustomer) }
 
 	if err := q().Model(&model.Customer{}).Count(&st.Total).Error; err != nil {
 		return nil, err

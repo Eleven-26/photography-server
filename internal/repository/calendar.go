@@ -20,7 +20,9 @@ func (r *CalendarRepo) WithTx(tx *gorm.DB) *CalendarRepo {
 func NewCalendarRepo() *CalendarRepo { return &CalendarRepo{} }
 
 func (r *CalendarRepo) List(ctx context.Context, companyID int64, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
-	q := r.tenant(companyID).WithContext(ctx)
+	// 行级数据权限：本门店 / 仅本人（photographer_id）。
+	// 客户端约拍链路（client_booking / client_catalog）无操作人，自动放行。
+	q := applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeCalendar)
 	if startDate != "" && endDate != "" {
 		q = q.Where("date BETWEEN ? AND ?", startDate, endDate)
 	}

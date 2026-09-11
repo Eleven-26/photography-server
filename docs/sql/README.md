@@ -122,4 +122,4 @@ docker exec $DB mysql -u$U -p$P -e "DROP DATABASE IF EXISTS _v_full; DROP DATABA
 |---|---|
 | 全量表数 | 30 |
 | 增量次数 | 4（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`、`upgrade_p2_customer_pref_20260910`、`upgrade_role_permission_20260910`） |
-| 最近校验 | ⏳ RBAC 增量（第 4 次）**待复验** —— 本机 Docker 引擎未运行，尚未实跑比对；上一次基线：列 578 / 索引 175 / 表 29 三视图零差异 |
+| 最近校验 | ✅ **2026-09-11 实跑通过**（RBAC 增量 · 第 4 次）：列 **585** / 索引 **181** / 表 **30**，三视图与全量脚本零差异；两套脚本导入均**零错误**。较上次基线（578 / 175 / 29）增加 7 列 / 6 索引 / 1 表，与 `upgrade_role_permission_20260910` 的变更量吻合。校验脚本：**`docs/sql/verify_consistency.sh`**（`bash docs/sql/verify_consistency.sh`，跑完自动清理临时库） |

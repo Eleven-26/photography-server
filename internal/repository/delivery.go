@@ -53,6 +53,8 @@ func (r *DeliveryRepo) List(ctx context.Context, companyID int64, stage int, key
 			Table("biz_delivery AS d").
 			Joins("LEFT JOIN biz_order AS o ON o.id = d.order_id AND o.company_id = d.company_id").
 			Where("d.company_id = ? AND d.deleted = 0", companyID)
+		// 数据权限经已 JOIN 的订单别名传递（本表无 store_id）
+		db = applyScope(db, opOf(ctx), scopeOrderJoined)
 		if stage > 0 {
 			db = db.Where("d.stage = ?", stage)
 		}
@@ -141,6 +143,8 @@ func (r *DeliveryRepo) ListFeedbackItems(ctx context.Context, companyID int64, s
 			Joins("LEFT JOIN biz_delivery AS d ON d.id = i.delivery_id AND d.company_id = i.company_id").
 			Joins("LEFT JOIN biz_order AS o ON o.id = i.order_id AND o.company_id = i.company_id").
 			Where("i.company_id = ? AND i.deleted = 0 AND i.feedback_status > 0", companyID)
+		// 数据权限经已 JOIN 的订单别名传递（本表无 store_id）
+		db = applyScope(db, opOf(ctx), scopeOrderJoined)
 		if status > 0 {
 			db = db.Where("i.feedback_status = ?", status)
 		}
