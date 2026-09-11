@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
@@ -24,74 +25,81 @@ func (h *Controller) RegisterStaffPublic(g *gin.RouterGroup) {
 	g.POST("/auth/login", h.StaffLogin)
 }
 
-// RegisterStaffAuthed 注册员工区需登录路由（StaffAuth 注入 Operator，挂 /wechat/staff）
-func (h *Controller) RegisterStaffAuthed(g *gin.RouterGroup) {
+// RegisterStaffAuthed 注册员工区需登录路由（StaffAuth 注入 Operator，挂 /wechat/staff）。
+//
+// 权限点与 PC 端**同源**（domain.Perm 常量、同一张 sys_role_permission），
+// 即"员工端与 PC 同权"：某角色能在 PC 做的事，在员工端也放行；反之亦然。
+// 若将来需要按端差异化（如禁止员工端导出财务），应另设端维度而非复制权限点。
+//
+// 【免挂权限点】/device/list、/device/remove —— 操作对象是登录者本人的登录设备，
+// 属账号自助能力而非角色能力边界，任何登录员工都必须能管自己的设备。
+func (h *Controller) RegisterStaffAuthed(g *gin.RouterGroup, mw *middleware.Middlewares) {
 	// 工作台
-	g.POST("/overview", h.Overview)
+	g.POST("/overview", mw.Perm(domain.PermDashboardView), h.Overview)
 	// 订单（复用 PC 端 service）
-	g.POST("/order/list", h.StaffOrderList)
-	g.POST("/order/detail/:id", h.StaffOrderDetail)
-	g.POST("/order/status/:id", h.OrderStatus)
-	g.POST("/order/logs/:id", h.OrderLogs)
-	g.POST("/order/create", h.OrderCreate)
+	g.POST("/order/list", mw.Perm(domain.PermOrderView), h.StaffOrderList)
+	g.POST("/order/detail/:id", mw.Perm(domain.PermOrderView), h.StaffOrderDetail)
+	g.POST("/order/status/:id", mw.Perm(domain.PermOrderStatus), h.OrderStatus)
+	g.POST("/order/logs/:id", mw.Perm(domain.PermOrderView), h.OrderLogs)
+	g.POST("/order/create", mw.Perm(domain.PermOrderCreate), h.OrderCreate)
 	// 收款（拍照上传凭证 → 工作室核验）
-	g.POST("/payment/create/:order_id", h.PaymentCreate)
-	g.POST("/payment/list/:order_id", h.PaymentList)
+	g.POST("/payment/create/:order_id", mw.Perm(domain.PermPaymentCreate), h.PaymentCreate)
+	g.POST("/payment/list/:order_id", mw.Perm(domain.PermPaymentView), h.PaymentList)
 	// 交付
-	g.POST("/delivery/detail/:id", h.StaffDeliveryDetail)
-	g.POST("/delivery/create/:order_id", h.DeliveryCreate)
-	g.POST("/delivery/upload-samples/:id", h.DeliveryUploadSamples)
-	g.POST("/delivery/upload-retouched/:id", h.DeliveryUploadRetouched)
-	// 改期审批
-	g.POST("/reschedule/list", h.RescheduleList)
-	g.POST("/reschedule/audit/:id", h.RescheduleAudit)
+	g.POST("/delivery/detail/:id", mw.Perm(domain.PermDeliveryView), h.StaffDeliveryDetail)
+	g.POST("/delivery/create/:order_id", mw.Perm(domain.PermDeliveryCreate), h.DeliveryCreate)
+	g.POST("/delivery/upload-samples/:id", mw.Perm(domain.PermDeliveryUpdate), h.DeliveryUploadSamples)
+	g.POST("/delivery/upload-retouched/:id", mw.Perm(domain.PermDeliveryUpdate), h.DeliveryUploadRetouched)
+	// 改期审批（列表归订单查看，审批独立成点）
+	g.POST("/reschedule/list", mw.Perm(domain.PermOrderView), h.RescheduleList)
+	g.POST("/reschedule/audit/:id", mw.Perm(domain.PermOrderRescheduleAudit), h.RescheduleAudit)
 	// 退款（查看/审核复用 PC 端）
-	g.POST("/refund/list/:order_id", h.RefundList)
-	g.POST("/refund/audit/:id", h.RefundAudit)
+	g.POST("/refund/list/:order_id", mw.Perm(domain.PermRefundView), h.RefundList)
+	g.POST("/refund/audit/:id", mw.Perm(domain.PermRefundAudit), h.RefundAudit)
 	// 日程
-	g.POST("/schedule/list", h.ScheduleList)
-	// 线索跟进 + AI 简报
-	g.POST("/lead/list", h.LeadList)
-	g.POST("/lead/detail/:id", h.LeadDetail)
-	g.POST("/lead/messages/:id", h.LeadMessages)
-	g.POST("/lead/message/send/:id", h.LeadMessageSend)
-	g.POST("/brief/generate/:lead_id", h.BriefGenerate)
-	g.POST("/brief/list/:lead_id", h.BriefList)
-	g.POST("/brief/send/:id", h.BriefSend)
-	g.POST("/brief/confirm/:id", h.BriefConfirm)
+	g.POST("/schedule/list", mw.Perm(domain.PermCalendarView), h.ScheduleList)
+	// 线索跟进 + AI 简报（读归 view，跟进/生成/发送归 update）
+	g.POST("/lead/list", mw.Perm(domain.PermLeadView), h.LeadList)
+	g.POST("/lead/detail/:id", mw.Perm(domain.PermLeadView), h.LeadDetail)
+	g.POST("/lead/messages/:id", mw.Perm(domain.PermLeadView), h.LeadMessages)
+	g.POST("/lead/message/send/:id", mw.Perm(domain.PermLeadUpdate), h.LeadMessageSend)
+	g.POST("/brief/generate/:lead_id", mw.Perm(domain.PermLeadUpdate), h.BriefGenerate)
+	g.POST("/brief/list/:lead_id", mw.Perm(domain.PermLeadView), h.BriefList)
+	g.POST("/brief/send/:id", mw.Perm(domain.PermLeadUpdate), h.BriefSend)
+	g.POST("/brief/confirm/:id", mw.Perm(domain.PermLeadUpdate), h.BriefConfirm)
 	// 定制需求
-	g.POST("/custom-request/list", h.StaffCustomRequestList)
-	g.POST("/custom-request/respond/:id", h.CustomRequestRespond)
+	g.POST("/custom-request/list", mw.Perm(domain.PermRequestView), h.StaffCustomRequestList)
+	g.POST("/custom-request/respond/:id", mw.Perm(domain.PermRequestHandle), h.CustomRequestRespond)
 	// 档期时段模板
-	g.POST("/slot-template/list", h.SlotTemplateList)
-	g.POST("/slot-template/save", h.SlotTemplateSave)
-	g.POST("/slot-template/save/:id", h.SlotTemplateSave)
-	g.POST("/slot-template/delete/:id", h.SlotTemplateDelete)
+	g.POST("/slot-template/list", mw.Perm(domain.PermCalendarView), h.SlotTemplateList)
+	g.POST("/slot-template/save", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateSave)
+	g.POST("/slot-template/save/:id", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateSave)
+	g.POST("/slot-template/delete/:id", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateDelete)
 	// 评价
-	g.POST("/review/list", h.ReviewList)
-	g.POST("/review/reply/:id", h.ReviewReply)
+	g.POST("/review/list", mw.Perm(domain.PermReviewView), h.ReviewList)
+	g.POST("/review/reply/:id", mw.Perm(domain.PermReviewReply), h.ReviewReply)
 	// 工作室设置
-	g.POST("/studio/get", h.StudioGet)
-	g.POST("/studio/update", h.StudioUpdate)
-	// 个人中心（设备管理）
+	g.POST("/studio/get", mw.Perm(domain.PermSettingsView), h.StudioGet)
+	g.POST("/studio/update", mw.Perm(domain.PermSettingsUpdate), h.StudioUpdate)
+	// 个人中心（设备管理）：操作对象是本人设备，属自助类 → 免挂权限点
 	g.POST("/device/list", h.DeviceList)
 	g.POST("/device/remove/:id", h.DeviceRemove)
-	// 客户档案（报告 H7）：列表 / 档案 / 今日待跟进
-	g.POST("/customer/list", h.CustomerList)
-	g.POST("/customer/detail/:id", h.CustomerDetail)
-	g.POST("/customer/today-follow", h.TodayFollow)
+	// 客户档案（报告 H7）：列表 / 档案 / 今日待跟进（跟进对象是线索）
+	g.POST("/customer/list", mw.Perm(domain.PermCustomerView), h.CustomerList)
+	g.POST("/customer/detail/:id", mw.Perm(domain.PermCustomerView), h.CustomerDetail)
+	g.POST("/customer/today-follow", mw.Perm(domain.PermLeadView), h.TodayFollow)
 	// 客户手机号换绑（报告 H8）
-	g.POST("/customer/mobile", h.CustomerMobileUpdate)
+	g.POST("/customer/mobile", mw.Perm(domain.PermCustomerUpdate), h.CustomerMobileUpdate)
 	// 收款核验到账（报告 H9）
-	g.POST("/payment/confirm/:id", h.PaymentConfirm)
+	g.POST("/payment/confirm/:id", mw.Perm(domain.PermPaymentConfirm), h.PaymentConfirm)
 	// 订单加项（报告 H10，复用 PC 端同一 service，金额同事务重算）
-	g.POST("/order/addon/list/:order_id", h.OrderAddonList)
-	g.POST("/order/addon/create/:order_id", h.OrderAddonCreate)
-	g.POST("/order/addon/update/:id", h.OrderAddonUpdate)
-	g.POST("/order/addon/delete/:id", h.OrderAddonDelete)
+	g.POST("/order/addon/list/:order_id", mw.Perm(domain.PermOrderView), h.OrderAddonList)
+	g.POST("/order/addon/create/:order_id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonCreate)
+	g.POST("/order/addon/update/:id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonUpdate)
+	g.POST("/order/addon/delete/:id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonDelete)
 	// 反馈整理（报告 H11）
-	g.POST("/delivery/feedback/list", h.FeedbackList)
-	g.POST("/delivery/feedback/handle/:item_id", h.FeedbackHandle)
+	g.POST("/delivery/feedback/list", mw.Perm(domain.PermDeliveryView), h.FeedbackList)
+	g.POST("/delivery/feedback/handle/:item_id", mw.Perm(domain.PermDeliveryUpdate), h.FeedbackHandle)
 }
 
 func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {

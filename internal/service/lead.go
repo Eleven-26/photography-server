@@ -56,6 +56,13 @@ func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
 	}
+	// 变更归属人 = 分配线索，属高敏动作（决定谁跟进这个客户）。路由级 lead/update
+	// 无法区分字段，故在此按"负责人是否真的变了"追加 lead:assign 校验；同人不变更放行。
+	if req.OwnerID != 0 && req.OwnerID != l.OwnerID {
+		if err := requirePerm(op, domain.PermLeadAssign); err != nil {
+			return err
+		}
+	}
 	shootDate := l.ShootDate
 	if req.ShootDate != "" {
 		shootDate = strPtr(req.ShootDate)

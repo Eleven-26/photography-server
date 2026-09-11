@@ -385,6 +385,8 @@ FROM `sys_role` r
     UNION ALL
     SELECT 'sales' AS code, 'request:view' AS permission
     UNION ALL
+    SELECT 'sales' AS code, 'request:handle' AS permission
+    UNION ALL
     SELECT 'sales' AS code, 'review:view' AS permission
     UNION ALL
     SELECT 'sales' AS code, 'review:reply' AS permission

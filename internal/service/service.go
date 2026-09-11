@@ -9,6 +9,7 @@ import (
 
 	"photography-server/internal/domain"
 	"photography-server/internal/model"
+	"photography-server/internal/pkg/errs"
 	"photography-server/internal/repository"
 )
 
@@ -133,6 +134,25 @@ func orDefaultEnum[T ~int](v, def T) T {
 		return def
 	}
 	return v
+}
+
+// requirePerm 校验操作者是否具备指定权限点。
+//
+// 用途：**路由级无法区分的字段级动作**——同一个接口既能做普通编辑、又能触发高敏动作时，
+// 由 service 层按字段差异追加校验。目前用于 lead/update 变更归属人（= 分配线索，需 lead:assign）
+// 与 lead/update 变更预算（需 lead:update，由路由级已覆盖）。
+//
+// 注意与路由级 mw.Perm 的分工：能靠路由区分的动作一律用路由级挂载（就近可见、无需读业务代码），
+// 只有当"同一接口内的不同字段对应不同权限点"时才用本函数。admin 角色短路放行，
+// 判定口径与 middleware.hasPerm 保持一致。
+func requirePerm(op Operator, want domain.Perm) error {
+	if op.RoleCode == domain.RoleCodeAdmin {
+		return nil
+	}
+	if !domain.HasPerm(op.Permissions, want) {
+		return errs.Forbidden(errs.ErrForbidden)
+	}
+	return nil
 }
 
 // orderLog 构造订单操作日志实体。

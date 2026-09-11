@@ -82,7 +82,7 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	wcStaffPub := api.Group("/wechat/staff")
 	wcCtl.RegisterStaffPublic(wcStaffPub)
 	wcStaffAuth := api.Group("/wechat/staff", mw.StaffAuth(), mw.OperationLog())
-	wcCtl.RegisterStaffAuthed(wcStaffAuth)
+	wcCtl.RegisterStaffAuthed(wcStaffAuth, mw)
 
 	// 调试路由（Redis/NATS/ES/Mongo 读写删除 + 配置密文生成，无业务鉴权）：
 	// 以 profile（服务端启动参数/APP_PROFILE，可信）白名单为准——只有 dev/test/docker.dev 注册；
@@ -104,28 +104,37 @@ func debugProfile(profile string) bool {
 	return false
 }
 
-// registerCommon 注册所有客户端共用的业务路由。
+// registerCommon 注册所有客户端共用的业务路由（PC 管理后台与小程序管理后台共用挂载点，权限点挂一次两端生效）。
 //
-// mw 仅用于在个别路由上追加权限点判定（mw.Perm(...)）；分组级认证由调用方的
+// mw 仅用于在路由上追加权限点判定（mw.Perm(...)）；分组级认证由调用方的
 // pc / miniapp 分组统一挂载，此处不重复认证。
-// 权限点按批次逐步挂载中，未声明权限点的路由行为与改造前完全一致。
+//
+// 【免挂权限点的路由（自助类 / 通用能力）】——这是**有意为之**，不是遗漏：
+//   - /user/profile、/user/change-password、/user/logout：操作对象是登录者本人账号，
+//     不属于角色能力边界，任何登录员工都必须可用（否则改密码都要管理员授权，属设计缺陷）。
+//   - /upload/file：通用文件上传能力，被收款凭证、作品、交付文件等多条链路共用；
+//     挂 asset:upload 会连带拦掉销售上传收款凭证（sales 无 asset:upload），属误伤。
+//     上传内容的安全性由各业务接口自身的归属校验与文件类型白名单保证。
+//
+// 除此之外的每条业务路由都必须挂权限点——权限点的**唯一权威来源**是 domain.Perm 常量，
+// 与 .doc/角色权限管理实施方案-2026-09-10.md §九 的角色矩阵对应。
 func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middleware.Middlewares) {
-	// 用户与权限
+	// 用户与权限（profile / change-password / logout 为自助类，豁免权限点）
 	u := g.Group("/user")
 	u.POST("/profile", ctl.Profile)
 	u.POST("/change-password", ctl.ChangePassword)
 	u.POST("/logout", ctl.Logout)
-	u.POST("/list", ctl.UserList)
-	u.POST("/create", ctl.UserCreate)
-	u.POST("/update/:id", ctl.UserUpdate)
-	u.POST("/delete/:id", ctl.UserDelete)
-	u.POST("/reset-password/:id", ctl.UserResetPassword)
+	u.POST("/list", mw.Perm(domain.PermUserView), ctl.UserList)
+	u.POST("/create", mw.Perm(domain.PermUserCreate), ctl.UserCreate)
+	u.POST("/update/:id", mw.Perm(domain.PermUserUpdate), ctl.UserUpdate)
+	u.POST("/delete/:id", mw.Perm(domain.PermUserDelete), ctl.UserDelete)
+	u.POST("/reset-password/:id", mw.Perm(domain.PermUserResetPwd), ctl.UserResetPassword)
 
 	r := g.Group("/role")
-	r.POST("/list", ctl.RoleList)
-	r.POST("/create", ctl.RoleCreate)
-	r.POST("/update/:id", ctl.RoleUpdate)
-	r.POST("/delete/:id", ctl.RoleDelete)
+	r.POST("/list", mw.Perm(domain.PermRoleView), ctl.RoleList)
+	r.POST("/create", mw.Perm(domain.PermRoleCreate), ctl.RoleCreate)
+	r.POST("/update/:id", mw.Perm(domain.PermRoleUpdate), ctl.RoleUpdate)
+	r.POST("/delete/:id", mw.Perm(domain.PermRoleDelete), ctl.RoleDelete)
 	// 角色权限（RBAC）：配置入口是权限体系的"钥匙"，随接口一同挂载权限点，
 	// 避免 B1-1 上线到 B1-2 挂载之间出现可被任意登录员工改权限的安全空窗。
 	r.POST("/catalog", mw.Perm(domain.PermRoleView), ctl.RoleCatalog)
@@ -133,147 +142,151 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middlewa
 	r.POST("/grant/:id", mw.Perm(domain.PermRoleGrant), ctl.RoleGrant)
 
 	s := g.Group("/store")
-	s.POST("/list", ctl.StoreList)
-	s.POST("/create", ctl.StoreCreate)
-	s.POST("/update/:id", ctl.StoreUpdate)
-	s.POST("/delete/:id", ctl.StoreDelete)
+	s.POST("/list", mw.Perm(domain.PermStoreView), ctl.StoreList)
+	s.POST("/create", mw.Perm(domain.PermStoreCreate), ctl.StoreCreate)
+	s.POST("/update/:id", mw.Perm(domain.PermStoreUpdate), ctl.StoreUpdate)
+	s.POST("/delete/:id", mw.Perm(domain.PermStoreDelete), ctl.StoreDelete)
 
-	// 客户
+	// 客户（stats / orders 为客户的只读派生视图，与 list/detail 同权限）
 	cu := g.Group("/customer")
-	cu.POST("/list", ctl.CustomerList)
-	cu.POST("/detail/:id", ctl.CustomerDetail)
-	cu.POST("/create", ctl.CustomerCreate)
-	cu.POST("/update/:id", ctl.CustomerUpdate)
-	cu.POST("/delete/:id", ctl.CustomerDelete)
-	cu.POST("/stats", ctl.CustomerStats)
-	cu.POST("/orders/:id", ctl.CustomerOrders)
+	cu.POST("/list", mw.Perm(domain.PermCustomerView), ctl.CustomerList)
+	cu.POST("/detail/:id", mw.Perm(domain.PermCustomerView), ctl.CustomerDetail)
+	cu.POST("/create", mw.Perm(domain.PermCustomerCreate), ctl.CustomerCreate)
+	cu.POST("/update/:id", mw.Perm(domain.PermCustomerUpdate), ctl.CustomerUpdate)
+	cu.POST("/delete/:id", mw.Perm(domain.PermCustomerDelete), ctl.CustomerDelete)
+	cu.POST("/stats", mw.Perm(domain.PermCustomerView), ctl.CustomerStats)
+	cu.POST("/orders/:id", mw.Perm(domain.PermCustomerView), ctl.CustomerOrders)
 
-	// 线索
+	// 线索（沟通记录与 AI 简报读接口归 lead:view，写入归 lead:update；
+	// 变更归属人属"分配"语义，路由级无法区分，由 service 层追加 lead:assign 校验）
 	ld := g.Group("/lead")
-	ld.POST("/list", ctl.LeadList)
-	ld.POST("/detail/:id", ctl.LeadDetail)
-	ld.POST("/create", ctl.LeadCreate)
-	ld.POST("/update/:id", ctl.LeadUpdate)
-	ld.POST("/delete/:id", ctl.LeadDelete)
-	ld.POST("/follow/:id", ctl.LeadFollow)
-	ld.POST("/convert/:id", ctl.LeadConvert)
-	ld.POST("/messages/:id", ctl.LeadMessages)
-	ld.POST("/message/send/:id", ctl.LeadMessageSend)
-	ld.POST("/brief/list/:lead_id", ctl.LeadBriefList)
-	ld.POST("/brief/generate/:lead_id", ctl.LeadBriefGenerate)
+	ld.POST("/list", mw.Perm(domain.PermLeadView), ctl.LeadList)
+	ld.POST("/detail/:id", mw.Perm(domain.PermLeadView), ctl.LeadDetail)
+	ld.POST("/create", mw.Perm(domain.PermLeadCreate), ctl.LeadCreate)
+	ld.POST("/update/:id", mw.Perm(domain.PermLeadUpdate), ctl.LeadUpdate)
+	ld.POST("/delete/:id", mw.Perm(domain.PermLeadDelete), ctl.LeadDelete)
+	ld.POST("/follow/:id", mw.Perm(domain.PermLeadUpdate), ctl.LeadFollow)
+	ld.POST("/convert/:id", mw.Perm(domain.PermLeadConvert), ctl.LeadConvert)
+	ld.POST("/messages/:id", mw.Perm(domain.PermLeadView), ctl.LeadMessages)
+	ld.POST("/message/send/:id", mw.Perm(domain.PermLeadUpdate), ctl.LeadMessageSend)
+	ld.POST("/brief/list/:lead_id", mw.Perm(domain.PermLeadView), ctl.LeadBriefList)
+	ld.POST("/brief/generate/:lead_id", mw.Perm(domain.PermLeadUpdate), ctl.LeadBriefGenerate)
 
-	// 报价单
+	// 报价单（status 为接受/拒绝/成交/撤回的状态流转，归 quote:update；
+	// quote:audit 当前无对应路由——报价审批由客户侧接受/拒绝承载，该点暂为预留）
 	qt := g.Group("/quote")
-	qt.POST("/create/:lead_id", ctl.QuoteCreate)
-	qt.POST("/list/:lead_id", ctl.QuoteList)
-	qt.POST("/status/:id", ctl.QuoteStatus)
+	qt.POST("/create/:lead_id", mw.Perm(domain.PermQuoteCreate), ctl.QuoteCreate)
+	qt.POST("/list/:lead_id", mw.Perm(domain.PermQuoteView), ctl.QuoteList)
+	qt.POST("/status/:id", mw.Perm(domain.PermQuoteUpdate), ctl.QuoteStatus)
 
-	// 套餐
+	// 套餐（status 即上下架）
 	pk := g.Group("/package")
-	pk.POST("/list", ctl.PackageList)
-	pk.POST("/detail/:id", ctl.PackageDetail)
-	pk.POST("/create", ctl.PackageCreate)
-	pk.POST("/update/:id", ctl.PackageUpdate)
-	pk.POST("/status/:id", ctl.PackageStatus)
-	pk.POST("/delete/:id", ctl.PackageDelete)
+	pk.POST("/list", mw.Perm(domain.PermPackageView), ctl.PackageList)
+	pk.POST("/detail/:id", mw.Perm(domain.PermPackageView), ctl.PackageDetail)
+	pk.POST("/create", mw.Perm(domain.PermPackageCreate), ctl.PackageCreate)
+	pk.POST("/update/:id", mw.Perm(domain.PermPackageUpdate), ctl.PackageUpdate)
+	pk.POST("/status/:id", mw.Perm(domain.PermPackagePublish), ctl.PackageStatus)
+	pk.POST("/delete/:id", mw.Perm(domain.PermPackageDelete), ctl.PackageDelete)
 
-	// 订单
+	// 订单（update 接口内若变更金额，需另有 order:price——路由级无法区分字段，由 service 层追加校验）
 	od := g.Group("/order")
-	od.POST("/create", ctl.OrderCreate)
-	od.POST("/list", ctl.OrderList)
-	od.POST("/detail/:id", ctl.OrderDetail)
-	od.POST("/update/:id", ctl.OrderUpdate)
-	od.POST("/status/:id", ctl.OrderStatus)
-	od.POST("/cancel/:id", ctl.OrderCancel)
-	od.POST("/logs/:id", ctl.OrderLogs)
+	od.POST("/create", mw.Perm(domain.PermOrderCreate), ctl.OrderCreate)
+	od.POST("/list", mw.Perm(domain.PermOrderView), ctl.OrderList)
+	od.POST("/detail/:id", mw.Perm(domain.PermOrderView), ctl.OrderDetail)
+	od.POST("/update/:id", mw.Perm(domain.PermOrderUpdate), ctl.OrderUpdate)
+	od.POST("/status/:id", mw.Perm(domain.PermOrderStatus), ctl.OrderStatus)
+	od.POST("/cancel/:id", mw.Perm(domain.PermOrderCancel), ctl.OrderCancel)
+	od.POST("/logs/:id", mw.Perm(domain.PermOrderView), ctl.OrderLogs)
 
-	// 订单加项（妆造/时效/服务/精修）：增删改同事务重算订单金额
-	od.POST("/addon/list/:order_id", ctl.OrderAddonList)
-	od.POST("/addon/create/:order_id", ctl.OrderAddonCreate)
-	od.POST("/addon/update/:id", ctl.OrderAddonUpdate)
-	od.POST("/addon/delete/:id", ctl.OrderAddonDelete)
+	// 订单加项（妆造/时效/服务/精修）：增删改同事务重算订单金额，归订单编辑权限
+	od.POST("/addon/list/:order_id", mw.Perm(domain.PermOrderView), ctl.OrderAddonList)
+	od.POST("/addon/create/:order_id", mw.Perm(domain.PermOrderUpdate), ctl.OrderAddonCreate)
+	od.POST("/addon/update/:id", mw.Perm(domain.PermOrderUpdate), ctl.OrderAddonUpdate)
+	od.POST("/addon/delete/:id", mw.Perm(domain.PermOrderUpdate), ctl.OrderAddonDelete)
 
 	// 改期：PC 不直接改订单拍摄日期（会漏掉档期锁重排），统一走改期单链路
-	od.POST("/reschedule/list/:order_id", ctl.OrderRescheduleList)
-	od.POST("/reschedule/apply/:order_id", ctl.OrderRescheduleApply)
-	od.POST("/reschedule/audit/:id", ctl.OrderRescheduleAudit)
+	// apply = 发起改期（销售/店长），audit = 审批改期（店长），二者权限点分离
+	od.POST("/reschedule/list/:order_id", mw.Perm(domain.PermOrderView), ctl.OrderRescheduleList)
+	od.POST("/reschedule/apply/:order_id", mw.Perm(domain.PermOrderReschedule), ctl.OrderRescheduleApply)
+	od.POST("/reschedule/audit/:id", mw.Perm(domain.PermOrderRescheduleAudit), ctl.OrderRescheduleAudit)
 
-	// 收款
+	// 收款（登记与核验到账分离：登记不改变资金确认状态，核验才是）
 	pm := g.Group("/payment")
-	pm.POST("/create/:order_id", ctl.PaymentCreate)
-	pm.POST("/list/:order_id", ctl.PaymentList)
-	pm.POST("/confirm/:id", ctl.PaymentConfirm)
-	pm.POST("/delete/:id", ctl.PaymentDelete)
+	pm.POST("/create/:order_id", mw.Perm(domain.PermPaymentCreate), ctl.PaymentCreate)
+	pm.POST("/list/:order_id", mw.Perm(domain.PermPaymentView), ctl.PaymentList)
+	pm.POST("/confirm/:id", mw.Perm(domain.PermPaymentConfirm), ctl.PaymentConfirm)
+	pm.POST("/delete/:id", mw.Perm(domain.PermPaymentDelete), ctl.PaymentDelete)
 
-	// 退款
+	// 退款（发起与审批分离：发起者不得自审）
 	rf := g.Group("/refund")
-	rf.POST("/apply/:order_id", ctl.RefundApply)
-	rf.POST("/list/:order_id", ctl.RefundList)
-	rf.POST("/audit/:id", ctl.RefundAudit)
+	rf.POST("/apply/:order_id", mw.Perm(domain.PermRefundCreate), ctl.RefundApply)
+	rf.POST("/list/:order_id", mw.Perm(domain.PermRefundView), ctl.RefundList)
+	rf.POST("/audit/:id", mw.Perm(domain.PermRefundAudit), ctl.RefundAudit)
 
-	// 交付
+	// 交付（读接口归 view，上传/选片/确认等推进动作归 update）
 	dv := g.Group("/delivery")
-	dv.POST("/list", ctl.DeliveryList)
-	dv.POST("/create/:order_id", ctl.DeliveryCreate)
-	dv.POST("/remind/:id", ctl.DeliveryRemind)
-	dv.POST("/detail/:id", ctl.DeliveryDetail)
-	dv.POST("/items/:id", ctl.DeliveryItems)
-	dv.POST("/upload-samples/:id", ctl.DeliveryUploadSamples)
-	dv.POST("/select/:id", ctl.DeliverySelect)
-	dv.POST("/upload-retouched/:id", ctl.DeliveryUploadRetouched)
-	dv.POST("/confirm/:id", ctl.DeliveryConfirm)
+	dv.POST("/list", mw.Perm(domain.PermDeliveryView), ctl.DeliveryList)
+	dv.POST("/create/:order_id", mw.Perm(domain.PermDeliveryCreate), ctl.DeliveryCreate)
+	dv.POST("/remind/:id", mw.Perm(domain.PermDeliveryUpdate), ctl.DeliveryRemind)
+	dv.POST("/detail/:id", mw.Perm(domain.PermDeliveryView), ctl.DeliveryDetail)
+	dv.POST("/items/:id", mw.Perm(domain.PermDeliveryView), ctl.DeliveryItems)
+	dv.POST("/upload-samples/:id", mw.Perm(domain.PermDeliveryUpdate), ctl.DeliveryUploadSamples)
+	dv.POST("/select/:id", mw.Perm(domain.PermDeliveryUpdate), ctl.DeliverySelect)
+	dv.POST("/upload-retouched/:id", mw.Perm(domain.PermDeliveryUpdate), ctl.DeliveryUploadRetouched)
+	dv.POST("/confirm/:id", mw.Perm(domain.PermDeliveryUpdate), ctl.DeliveryConfirm)
 
-	// 作品集
+	// 作品集（status 接口控制可见性/精选，属"发布审核"动作 → asset:audit；
+	// 故摄影师可上传/编辑自己的作品，但无权决定是否公开——需店长审核）
 	wk := g.Group("/asset")
-	wk.POST("/list", ctl.AssetList)
-	wk.POST("/detail/:id", ctl.AssetDetail)
-	wk.POST("/create", ctl.AssetCreate)
-	wk.POST("/update/:id", ctl.AssetUpdate)
-	wk.POST("/status/:id", ctl.AssetStatus)
-	wk.POST("/delete/:id", ctl.AssetDelete)
+	wk.POST("/list", mw.Perm(domain.PermAssetView), ctl.AssetList)
+	wk.POST("/detail/:id", mw.Perm(domain.PermAssetView), ctl.AssetDetail)
+	wk.POST("/create", mw.Perm(domain.PermAssetUpload), ctl.AssetCreate)
+	wk.POST("/update/:id", mw.Perm(domain.PermAssetUpdate), ctl.AssetUpdate)
+	wk.POST("/status/:id", mw.Perm(domain.PermAssetAudit), ctl.AssetStatus)
+	wk.POST("/delete/:id", mw.Perm(domain.PermAssetDelete), ctl.AssetDelete)
 
 	// 档期
 	cal := g.Group("/calendar")
-	cal.POST("/list", ctl.CalendarList)
-	cal.POST("/lock", ctl.CalendarLock)
-	cal.POST("/cancel/:id", ctl.CalendarCancel)
+	cal.POST("/list", mw.Perm(domain.PermCalendarView), ctl.CalendarList)
+	cal.POST("/lock", mw.Perm(domain.PermCalendarUpdate), ctl.CalendarLock)
+	cal.POST("/cancel/:id", mw.Perm(domain.PermCalendarUpdate), ctl.CalendarCancel)
 	// 档期规则（排班时段模板）
-	cal.POST("/slot-template/list", ctl.SlotTemplateList)
-	cal.POST("/slot-template/save", ctl.SlotTemplateSave)
-	cal.POST("/slot-template/save/:id", ctl.SlotTemplateSave)
-	cal.POST("/slot-template/delete/:id", ctl.SlotTemplateDelete)
+	cal.POST("/slot-template/list", mw.Perm(domain.PermCalendarView), ctl.SlotTemplateList)
+	cal.POST("/slot-template/save", mw.Perm(domain.PermCalendarUpdate), ctl.SlotTemplateSave)
+	cal.POST("/slot-template/save/:id", mw.Perm(domain.PermCalendarUpdate), ctl.SlotTemplateSave)
+	cal.POST("/slot-template/delete/:id", mw.Perm(domain.PermCalendarUpdate), ctl.SlotTemplateDelete)
 
-	// 财务
+	// 财务（导出单独收敛：可见不等于可带走）
 	fn := g.Group("/finance")
-	fn.POST("/summary", ctl.FinanceSummary)
-	fn.POST("/payments", ctl.FinancePayments)
-	fn.POST("/refunds", ctl.FinanceRefunds)
-	fn.POST("/export", ctl.FinanceExport)
+	fn.POST("/summary", mw.Perm(domain.PermFinanceView), ctl.FinanceSummary)
+	fn.POST("/payments", mw.Perm(domain.PermFinanceView), ctl.FinancePayments)
+	fn.POST("/refunds", mw.Perm(domain.PermFinanceView), ctl.FinanceRefunds)
+	fn.POST("/export", mw.Perm(domain.PermFinanceExport), ctl.FinanceExport)
 
 	// 工作台
 	dash := g.Group("/dashboard")
-	dash.POST("/overview", ctl.DashboardOverview)
+	dash.POST("/overview", mw.Perm(domain.PermDashboardView), ctl.DashboardOverview)
 
-	// 通知
+	// 通知（读通知是每个员工的基础能力；该点控制"能否进入通知中心"）
 	nt := g.Group("/notification")
-	nt.POST("/list", ctl.NotificationList)
-	nt.POST("/unread-count", ctl.NotificationUnreadCount)
-	nt.POST("/read/:id", ctl.NotificationRead)
-	nt.POST("/read-all", ctl.NotificationReadAll)
+	nt.POST("/list", mw.Perm(domain.PermNotificationView), ctl.NotificationList)
+	nt.POST("/unread-count", mw.Perm(domain.PermNotificationView), ctl.NotificationUnreadCount)
+	nt.POST("/read/:id", mw.Perm(domain.PermNotificationView), ctl.NotificationRead)
+	nt.POST("/read-all", mw.Perm(domain.PermNotificationView), ctl.NotificationReadAll)
 
-	// 设置
+	// 设置（operation-log 归 log:view；收款方式维护归 settings:update）
 	st := g.Group("/settings")
-	st.POST("/workspace", ctl.Workspace)
-	st.POST("/company/update", ctl.CompanyUpdate)
-	st.POST("/payment-method/list", ctl.PaymentMethodList)
-	st.POST("/payment-method/create", ctl.PaymentMethodCreate)
-	st.POST("/payment-method/update/:id", ctl.PaymentMethodUpdate)
-	st.POST("/payment-method/delete/:id", ctl.PaymentMethodDelete)
-	st.POST("/operation-log/list", ctl.OperationLogList)
-	st.POST("/studio/get", ctl.StudioGet)
-	st.POST("/studio/update", ctl.StudioUpdate)
+	st.POST("/workspace", mw.Perm(domain.PermSettingsView), ctl.Workspace)
+	st.POST("/company/update", mw.Perm(domain.PermSettingsUpdate), ctl.CompanyUpdate)
+	st.POST("/payment-method/list", mw.Perm(domain.PermSettingsView), ctl.PaymentMethodList)
+	st.POST("/payment-method/create", mw.Perm(domain.PermSettingsUpdate), ctl.PaymentMethodCreate)
+	st.POST("/payment-method/update/:id", mw.Perm(domain.PermSettingsUpdate), ctl.PaymentMethodUpdate)
+	st.POST("/payment-method/delete/:id", mw.Perm(domain.PermSettingsUpdate), ctl.PaymentMethodDelete)
+	st.POST("/operation-log/list", mw.Perm(domain.PermLogView), ctl.OperationLogList)
+	st.POST("/studio/get", mw.Perm(domain.PermSettingsView), ctl.StudioGet)
+	st.POST("/studio/update", mw.Perm(domain.PermSettingsUpdate), ctl.StudioUpdate)
 
-	// 上传
+	// 上传（通用文件上传能力，各业务链路共用 → 免挂权限点，见函数头说明）
 	up := g.Group("/upload")
 	up.POST("/file", ctl.UploadFile)
 }
