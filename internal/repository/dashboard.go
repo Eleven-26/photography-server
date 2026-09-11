@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -76,6 +77,8 @@ type TodoItem struct {
 
 // GetOverview 聚合多条统计 SQL。ctx 透传后所有查询均挂到当前请求链路。
 // 任一条统计失败即返回错误，避免"返回半份数据"让前端误判为零。
+// 每个子查询的错误都带 overview.<字段名> 标签（对应 API 响应字段），
+// 日志与链路可直接定位是哪条统计失败。
 func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64) (*Overview, error) {
 	var ov Overview
 
@@ -101,28 +104,33 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	// 线索表按 owner_id 过滤；未读通知按 receiver_id 天然收敛，无需过滤。
 	orders := func() *gorm.DB { return scopedOrder(q().Model(&model.Order{}), ctx) }
 	fromOrder := func() *gorm.DB { return r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID) }
-	leads := func() *gorm.DB { return applyScope(r.tenant(companyID).WithContext(ctx), opOf(ctx), scopeLead) }
+	// 注意：线索闭包必须显式挂 Model——tenant() 只生成裸 Where(company_id)，
+	// applyScope 只追加条件；Count/Scan 进基本类型时 gorm 无表名可推断，
+	// 会报 "unsupported data type ... Table not set"（2026-09-11 线上实证）。
+	leads := func() *gorm.DB {
+		return applyScope(r.tenant(companyID).WithContext(ctx).Model(&model.Lead{}), opOf(ctx), scopeLead)
+	}
 
 	// 今日 / 本月新增订单数
 	if err := orders().
 		Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&ov.TodayOrders).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.today_orders: %w", err)
 	}
 	if err := orders().
 		Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&ov.MonthOrders).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.month_orders: %w", err)
 	}
 
 	// 今日 / 本月确认到账金额（仅统计已核验通过的收款单）
 	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), dayStartStr, dayEndStr).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.TodayAmount).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.today_amount: %w", err)
 	}
 	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND paid_at >= ? AND paid_at < ?", int(enum.PaymentStatusConfirmed), monthStartStr, monthEndStr).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.MonthAmount).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.month_amount: %w", err)
 	}
 	ov.TodayConfirmed = ov.TodayAmount
 
@@ -130,27 +138,27 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ? AND created_at >= ? AND created_at < ?", int(enum.PaymentStatusPending), dayStart, dayEnd).
 		Select("COALESCE(SUM(amount),0)").Scan(&ov.TodayPending).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.today_pending: %w", err)
 	}
 
 	// 待核验收款单数 / 待交付订单数
 	if err := fromOrder().Model(&model.OrderPayment{}).
 		Where("status = ?", int(enum.PaymentStatusPending)).Count(&ov.PendingPayments).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.pending_payments: %w", err)
 	}
 	if err := orders().
 		Where("status = ?", int(enum.OrderStatusPendingDelivery)).Count(&ov.PendingDeliveries).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.pending_deliveries: %w", err)
 	}
 
 	// 待定金 / 精修中订单数
 	if err := orders().
 		Where("status = ?", int(enum.OrderStatusPendingDeposit)).Count(&ov.PendingDeposit).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.pending_deposit: %w", err)
 	}
 	if err := orders().
 		Where("status = ?", int(enum.OrderStatusRetouching)).Count(&ov.PendingRetouch).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.pending_retouch: %w", err)
 	}
 
 	// 未来待拍摄订单：已排期（待拍摄/拍摄中）且拍摄日期不早于今天
@@ -158,13 +166,13 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 		Where("status IN ? AND shoot_date IS NOT NULL AND shoot_date >= ?",
 			[]int{int(enum.OrderStatusPendingShoot), int(enum.OrderStatusShooting)}, dayStart.Format("2006-01-02")).
 		Count(&ov.UpcomingShoots).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.upcoming_shoots: %w", err)
 	}
 
 	// 线索：跟进中 / 逾期未跟进
 	if err := leads().
 		Where("status IN ?", openLeadStatus).Count(&ov.NewLeads).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.new_leads: %w", err)
 	}
 	// 逾期未跟进：next_follow_at 为 datetime 列，严格模式下与 '' 比较会直接报
 	// ERROR 1525 Incorrect DATETIME value: ''（空串需先转 datetime 才能比较）。
@@ -172,19 +180,19 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 	if err := leads().
 		Where("status IN ? AND next_follow_at IS NOT NULL AND next_follow_at < ?", openLeadStatus, nowStr).
 		Count(&ov.OverdueLeads).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.overdue_leads: %w", err)
 	}
 
 	// 当前登录人未读通知（receiver_id 已限定本人，无需数据权限过滤）
 	if err := q().Model(&model.SysNotification{}).
 		Where("receiver_id = ? AND is_read = ?", userID, int(enum.NotificationUnread)).Count(&ov.UnreadNotify).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.unread_notify: %w", err)
 	}
 
 	// 本月新增线索：作为成交率分母（与「本月新增订单」取同一时间窗，口径可解释）
 	if err := leads().
 		Where("created_at >= ? AND created_at < ?", monthStart, monthEnd).Count(&ov.MonthLeads).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.month_leads: %w", err)
 	}
 	if ov.MonthLeads > 0 {
 		ov.MonthDealRate = math.Round(float64(ov.MonthOrders)/float64(ov.MonthLeads)*1000) / 10
@@ -196,14 +204,14 @@ func (r *DashboardRepo) GetOverview(ctx context.Context, companyID, userID int64
 		Where("shoot_date = ? AND status IN ?", dayStart.Format("2006-01-02"),
 			[]int{int(enum.OrderStatusPendingShoot), int(enum.OrderStatusShooting)}).
 		Order("shoot_time ASC").Scan(&ov.TodayShoots).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.today_shoots: %w", err)
 	}
 
 	// 未来 7 天剩余可约时段（**有意不做数据权限过滤**：这是全店档期容量口径，
 	// 若按摄影师过滤会漏算他人已锁档期，导致可约数虚高）
 	slots, err := r.availableSlots(ctx, companyID, dayStart, 7)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("overview.available_slots: %w", err)
 	}
 	ov.AvailableSlots = slots
 
@@ -221,7 +229,7 @@ func (r *DashboardRepo) availableSlots(ctx context.Context, companyID int64, sta
 
 	var templates []model.SlotTemplate
 	if err := q().Model(&model.SlotTemplate{}).Where("status = ?", 1).Find(&templates).Error; err != nil {
-		return 0, err
+		return 0, fmt.Errorf("slot_templates: %w", err)
 	}
 	if len(templates) == 0 {
 		return 0, nil
@@ -238,7 +246,7 @@ func (r *DashboardRepo) availableSlots(ctx context.Context, companyID int64, sta
 		Where("status = ? AND date >= ? AND date < ?",
 			int(enum.BlockStatusLocked), start.Format("2006-01-02"), end.Format("2006-01-02")).
 		Group("date").Scan(&locks).Error; err != nil {
-		return 0, err
+		return 0, fmt.Errorf("calendar_block_locks: %w", err)
 	}
 	lockByDate := make(map[string]int64, len(locks))
 	for _, l := range locks {
@@ -283,6 +291,10 @@ func buildTodoItems(ov *Overview) []TodoItem {
 
 func (r *DashboardRepo) GetCalendarBlocks(ctx context.Context, companyID int64, weekStart, weekEnd string) ([]model.CalendarBlock, error) {
 	var list []model.CalendarBlock
-	err := r.tenant(companyID).WithContext(ctx).Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).Find(&list).Error
+	// Model 显式声明表名：不依赖 dest 推断，避免 schema 解析失败时报
+	// "unsupported data type ... Table not set"（2026-09-11 线上旧版本同类故障）。
+	err := r.tenant(companyID).WithContext(ctx).Model(&model.CalendarBlock{}).
+		Where("date BETWEEN ? AND ? AND status = ?", weekStart, weekEnd, int(enum.BlockStatusLocked)).
+		Find(&list).Error
 	return list, err
 }
