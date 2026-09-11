@@ -14,14 +14,15 @@
 
 ```
 docs/sql/
-├── ddl.sql                     # 【全量】建表结构（29 张表，最新结构）
-├── dml.sql                     # 【全量】初始化数据（公司/门店/角色/管理员/收款方式/示例业务数据）
+├── ddl.sql                     # 【全量】建表结构（30 张表，最新结构）
+├── dml.sql                     # 【全量】初始化数据（公司/门店/角色/角色权限/管理员/收款方式/示例业务数据）
 ├── 增量/                        # 【增量】升级脚本，按文件名排序依次执行
 │   ├── ddl-初版.sql              #   0. 初版基线结构（等价于上线时的 ddl.sql 快照）
 │   ├── dml-初版.sql              #   0. 初版基线数据
 │   ├── upgrade_client_20260907.sql      # 1. 客户端三端能力（+9 表、9 处 ALTER）
 │   ├── upgrade_p1_pc_modules_20260910.sql # 2. P1 交付工作台/工作室设置（sys_company +2 列、biz_delivery +2 列）
-│   └── upgrade_p2_customer_pref_20260910.sql # 3. P2 客户偏好与通知许可（crm_customer +3 列、level 默认值修正）
+│   ├── upgrade_p2_customer_pref_20260910.sql # 3. P2 客户偏好与通知许可（crm_customer +3 列、level 默认值修正）
+│   └── upgrade_role_permission_20260910.sql # 4. RBAC（+1 表 sys_role_permission、sys_role.data_scope、biz_asset.store_id + 回填 + 内置角色默认权限）
 └── README.md                   # 本文件
 ```
 
@@ -119,6 +120,6 @@ docker exec $DB mysql -u$U -p$P -e "DROP DATABASE IF EXISTS _v_full; DROP DATABA
 
 | 项 | 值 |
 |---|---|
-| 全量表数 | 29 |
-| 增量次数 | 3（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`、`upgrade_p2_customer_pref_20260910`） |
-| 最近校验 | 2026-09-10 ✅ 列 578 行 / 索引 175 行 / 表 29 行，全部零差异 |
+| 全量表数 | 30 |
+| 增量次数 | 4（`upgrade_client_20260907`、`upgrade_p1_pc_modules_20260910`、`upgrade_p2_customer_pref_20260910`、`upgrade_role_permission_20260910`） |
+| 最近校验 | ⏳ RBAC 增量（第 4 次）**待复验** —— 本机 Docker 引擎未运行，尚未实跑比对；上一次基线：列 578 / 索引 175 / 表 29 三视图零差异 |

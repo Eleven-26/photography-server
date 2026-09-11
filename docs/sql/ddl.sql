@@ -1,7 +1,7 @@
 -- =====================================================================
 -- SLOT 摄影工作室管理系统 数据库初始化脚本 (DDL · 全量)
 -- 库名：photography   字符集：utf8   排序规则：utf8_general_ci
--- 用途：新建环境 / 新租户部署时一次性初始化（29 张表的最新结构）
+-- 用途：新建环境 / 新租户部署时一次性初始化（30 张表的最新结构）
 --
 -- 【维护约定 · 重要】
 --   1) 本文件是「全量基线」。任何结构变更（建表/加字段/改索引）都必须：
@@ -84,10 +84,28 @@ CREATE TABLE `sys_role`
     `code`       varchar(50) NOT NULL COMMENT '角色编码 admin-超级管理员 manager-店长 photographer-摄影师 sales-销售',
     `remark`     varchar(200)         DEFAULT NULL COMMENT '备注',
     `status`     tinyint     NOT NULL DEFAULT '1' COMMENT '状态 1-启用 0-停用',
+    `data_scope` tinyint     NOT NULL DEFAULT '1' COMMENT '数据范围 1-全部数据 2-本门店 3-仅本人',
     PRIMARY KEY (`id`),
     KEY          `idx_role_company` (`company_id`),
     KEY          `idx_role_deleted` (`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='角色';
+
+-- 角色权限关联
+-- 只存「角色 → 权限点」绑定关系；权限点本身是编译期常量，不入库（见 internal/domain/perm.go）。
+-- 保存时全量覆盖（物理删旧 + 批量插新），故不设软删除列：uk_role_perm 唯一键下，
+-- 软删会让「删掉某权限后再加回来」命中旧记录导致冲突。
+DROP TABLE IF EXISTS `sys_role_permission`;
+CREATE TABLE `sys_role_permission`
+(
+    `id`         bigint      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `company_id` bigint      NOT NULL DEFAULT '0' COMMENT '公司ID',
+    `role_id`    bigint      NOT NULL DEFAULT '0' COMMENT '角色ID',
+    `permission` varchar(64) NOT NULL COMMENT '权限点 resource:action，如 order:view',
+    `created_at` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_role_perm` (`company_id`,`role_id`,`permission`),
+    KEY          `idx_roleperm_role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='角色权限关联';
 
 -- 后台管理员/员工
 DROP TABLE IF EXISTS `sys_user`;
@@ -801,6 +819,7 @@ CREATE TABLE `biz_asset`
     `updated_at`    datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `deleted`       bigint      NOT NULL DEFAULT '0' COMMENT '是否删除 0-否 1-是',
     `company_id`    bigint      NOT NULL DEFAULT '0' COMMENT '公司ID',
+    `store_id`      bigint      NOT NULL DEFAULT '0' COMMENT '所属门店ID',
     `code`          varchar(20) NOT NULL COMMENT '作品编号 WK-xxx',
     `title`         varchar(100)         DEFAULT NULL COMMENT '作品标题',
     `category`      varchar(50)          DEFAULT NULL COMMENT '作品类型(婚纱/写真/儿童/全家福/活动跟拍等)',
@@ -821,6 +840,7 @@ CREATE TABLE `biz_asset`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_asset_code` (`code`,`deleted`),
     KEY             `idx_asset_company` (`company_id`),
+    KEY             `idx_asset_store` (`store_id`),
     KEY             `idx_asset_category` (`category`),
     KEY             `idx_asset_status` (`status`),
     KEY             `idx_asset_deleted` (`deleted`),

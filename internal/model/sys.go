@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // SysCompany 公司/工作室
 type SysCompany struct {
 	Base
@@ -29,13 +31,34 @@ func (SysStore) TableName() string { return "sys_store" }
 // SysRole 角色
 type SysRole struct {
 	TenantBase
-	Name   string `gorm:"column:name;size:50;not null;comment:角色名称" json:"name"`
-	Code   string `gorm:"column:code;size:50;not null;comment:角色编码 admin-超级管理员 manager-店长 photograher-摄影师 sales-销售" json:"code"`
-	Remark string `gorm:"column:remark;size:200;comment:备注" json:"remark"`
-	Status int    `gorm:"column:status;type:tinyint;default:1;comment:状态 1-启用 0-停用" json:"status"`
+	Name      string `gorm:"column:name;size:50;not null;comment:角色名称" json:"name"`
+	Code      string `gorm:"column:code;size:50;not null;comment:角色编码 admin-超级管理员 manager-店长 photographer-摄影师 sales-销售" json:"code"`
+	Remark    string `gorm:"column:remark;size:200;comment:备注" json:"remark"`
+	Status    int    `gorm:"column:status;type:tinyint;default:1;comment:状态 1-启用 0-停用" json:"status"`
+	DataScope int    `gorm:"column:data_scope;type:tinyint;default:1;comment:数据范围 1-全部数据 2-本门店 3-仅本人" json:"data_scope"`
+
+	// PermissionCount 已配置的权限点数量。非数据库列（gorm:"-"），
+	// 由 ListRoles 聚合 sys_role_permission 后填充，供角色列表展示。
+	PermissionCount int `gorm:"-" json:"permission_count"`
 }
 
 func (SysRole) TableName() string { return "sys_role" }
+
+// SysRolePermission 角色权限关联。
+//
+// 本表**不继承 TenantBase**——它是纯关联表，无业务语义，且采用「全量覆盖式写入」
+// （保存时物理删除该角色旧记录再批量插入，见 repository.ReplaceRolePerms）。
+// 若继承 Base 的软删除字段，uk_role_perm(company_id,role_id,permission) 会在
+// "删掉某权限再加回来"时命中旧记录而冲突。
+type SysRolePermission struct {
+	ID         int64     `gorm:"column:id;primaryKey;autoIncrement;comment:主键ID" json:"id"`
+	CompanyID  int64     `gorm:"column:company_id;index;comment:公司ID" json:"company_id"`
+	RoleID     int64     `gorm:"column:role_id;index;comment:角色ID" json:"role_id"`
+	Permission string    `gorm:"column:permission;size:64;not null;comment:权限点 resource:action" json:"permission"`
+	CreatedAt  time.Time `gorm:"column:created_at;comment:创建时间" json:"created_at"`
+}
+
+func (SysRolePermission) TableName() string { return "sys_role_permission" }
 
 // SysUser 后台管理员/员工
 type SysUser struct {

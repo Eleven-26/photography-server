@@ -5,6 +5,7 @@ import (
 
 	"photography-server/internal/app"
 	"photography-server/internal/config"
+	"photography-server/internal/domain"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
 	"photography-server/internal/presentation/controller"
@@ -60,8 +61,8 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	// 管理端分组（员工认证）：pc-管理后台 miniapp-小程序管理后台
 	pc := api.Group("", mw.Auth(), mw.OperationLog())
 	miniapp := api.Group("/miniapp", mw.Auth(), mw.OperationLog())
-	registerCommon(pc, ctl)
-	registerCommon(miniapp, ctl)
+	registerCommon(pc, ctl, mw)
+	registerCommon(miniapp, ctl, mw)
 
 	// ---- 客户 H5（客户验证码登录 + CustomerAuth）----
 	h5Ctl := h5.New(svc, cfg)
@@ -103,8 +104,12 @@ func debugProfile(profile string) bool {
 	return false
 }
 
-// registerCommon 注册所有客户端共用的业务路由
-func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
+// registerCommon 注册所有客户端共用的业务路由。
+//
+// mw 仅用于在个别路由上追加权限点判定（mw.Perm(...)）；分组级认证由调用方的
+// pc / miniapp 分组统一挂载，此处不重复认证。
+// 权限点按批次逐步挂载中，未声明权限点的路由行为与改造前完全一致。
+func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middleware.Middlewares) {
 	// 用户与权限
 	u := g.Group("/user")
 	u.POST("/profile", ctl.Profile)
@@ -121,6 +126,11 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller) {
 	r.POST("/create", ctl.RoleCreate)
 	r.POST("/update/:id", ctl.RoleUpdate)
 	r.POST("/delete/:id", ctl.RoleDelete)
+	// 角色权限（RBAC）：配置入口是权限体系的"钥匙"，随接口一同挂载权限点，
+	// 避免 B1-1 上线到 B1-2 挂载之间出现可被任意登录员工改权限的安全空窗。
+	r.POST("/catalog", mw.Perm(domain.PermRoleView), ctl.RoleCatalog)
+	r.POST("/permissions/:id", mw.Perm(domain.PermRoleView), ctl.RolePerms)
+	r.POST("/grant/:id", mw.Perm(domain.PermRoleGrant), ctl.RoleGrant)
 
 	s := g.Group("/store")
 	s.POST("/list", ctl.StoreList)

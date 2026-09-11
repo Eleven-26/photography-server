@@ -144,6 +144,47 @@ func (h *Controller) RoleDelete(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// RoleGrant 保存角色权限（数据范围 + 权限点集合，全量覆盖式）
+func (h *Controller) RoleGrant(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	var req dto.RoleGrantReq
+	if err := h.bindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.GrantRolePerms(c.Request.Context(), op, id, req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// RolePerms 读取角色权限配置（权限配置界面回显）
+func (h *Controller) RolePerms(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := pathID(c)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	resp, err := h.Svc.GetRolePerms(c.Request.Context(), op, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, resp)
+}
+
+// RoleCatalog 全量权限点清单（前端渲染权限配置树的选项）
+func (h *Controller) RoleCatalog(c *gin.Context) {
+	response.OK(c, h.Svc.PermCatalog())
+}
+
 func (h *Controller) StoreList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	list, err := h.Svc.ListStores(c.Request.Context(), op)

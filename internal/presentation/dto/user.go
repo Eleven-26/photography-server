@@ -41,6 +41,22 @@ type RoleUpdateReq struct {
 	Status int    `json:"status"` // 状态: 1启用 0禁用
 }
 
+// RoleGrantReq 保存角色权限（全量覆盖式）
+// 权限点由前端按 domain.PermGroups() 渲染勾选树产生，服务端逐项校验合法性。
+type RoleGrantReq struct {
+	DataScope   int      `json:"data_scope"`  // 数据范围 1-全部 2-本门店 3-仅本人
+	Permissions []string `json:"permissions"` // 权限点集合（全量，覆盖式保存）
+}
+
+// RolePermsResp 角色权限配置（供权限配置界面回显）
+type RolePermsResp struct {
+	RoleID      int64    `json:"role_id"`
+	RoleName    string   `json:"role_name"`
+	RoleCode    string   `json:"role_code"`
+	DataScope   int      `json:"data_scope"`
+	Permissions []string `json:"permissions"`
+}
+
 // ======================== 门店 ========================
 
 // StoreCreateReq 创建门店

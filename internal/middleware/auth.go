@@ -64,6 +64,87 @@ func (m *Middlewares) loadStaffProfile(ctx context.Context, userID int64) (*auth
 	return p, nil
 }
 
+// loadRoleAuth 加载角色授权信息（角色编码 + 数据范围 + 权限点集合）。
+//
+// 缓存优先（30min TTL）→ 未命中回源 DB → 回写缓存；Redis 不可用时直查 DB
+// （fail-open：缓存故障不能导致全员 403）。
+//
+// 失败降级为「空权限」而非放行：角色不存在/已删除时返回空集合，该用户将无法通过
+// 任何权限点判定（安全优先）。admin 角色不受影响（按角色码短路，见 hasPerm）。
+func (m *Middlewares) loadRoleAuth(ctx context.Context, companyID, roleID int64) *authcache.RoleAuth {
+	empty := &authcache.RoleAuth{Permissions: []string{}}
+	if roleID <= 0 || m.DB == nil {
+		return empty
+	}
+	if rdb := m.Redis; rdb != nil {
+		if a, hit, err := authcache.GetRoleAuth(ctx, rdb, companyID, roleID); err == nil && hit && a != nil {
+			return a
+		}
+	}
+	db := m.DB.WithContext(ctx)
+	var role model.SysRole
+	if err := db.Where("company_id = ? AND id = ?", companyID, roleID).First(&role).Error; err != nil {
+		return empty
+	}
+	a := &authcache.RoleAuth{
+		RoleCode:    role.Code,
+		DataScope:   role.DataScope,
+		Permissions: make([]string, 0, 16),
+	}
+	var perms []string
+	db.Model(&model.SysRolePermission{}).
+		Where("company_id = ? AND role_id = ?", companyID, roleID).
+		Order("permission ASC").
+		Pluck("permission", &perms)
+	// 过滤代码中已删除的权限点（常量被移除后表中遗留的行），避免脏数据进入判定
+	for _, p := range perms {
+		if domain.IsValidPerm(p) {
+			a.Permissions = append(a.Permissions, p)
+		}
+	}
+	if rdb := m.Redis; rdb != nil {
+		authcache.SetRoleAuth(ctx, rdb, companyID, roleID, a)
+	}
+	return a
+}
+
+// hasPerm 判定操作人是否具备指定权限点之一（wants 为空表示不校验）。
+//
+// admin 角色短路放行，原因有二：①新增权限点自动对其生效，无需补数据；
+// ②避免管理员误配把自己的 role:grant 取消后永久锁死权限配置入口。
+func hasPerm(op domain.Operator, wants ...domain.Perm) bool {
+	if len(wants) == 0 {
+		return true
+	}
+	if op.RoleCode == domain.RoleCodeAdmin {
+		return true
+	}
+	return domain.HasAnyPerm(op.Permissions, wants...)
+}
+
+// requirePerms 认证通过后执行权限判定，不足则 403 并中断请求。
+func (m *Middlewares) requirePerms(c *gin.Context, wants ...domain.Perm) {
+	if len(wants) == 0 {
+		return
+	}
+	if !hasPerm(GetOperator(c), wants...) {
+		response.Fail(c, errs.Forbidden(""))
+		c.Abort()
+	}
+}
+
+// Perm 权限判定中间件（不含认证）。
+//
+// 用于已由分组级 mw.Auth() 完成认证的路由，在其上追加权限点要求 ——
+// 既避免重复执行认证链路（JWT 解析 + 缓存查询），又让权限点就近声明在路由旁：
+//
+//	r.POST("/grant/:id", mw.Perm(domain.PermRoleGrant), ctl.RoleGrant)
+func (m *Middlewares) Perm(perms ...domain.Perm) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		m.requirePerms(c, perms...)
+	}
+}
+
 // authenticateStaff 员工令牌统一认证（Auth / StaffAuth 共用）：
 // 解析 JWT（锁 HS256）→ jti 黑名单检查 → UserType 白名单 → 画像加载（缓存+DB）
 // → 状态校验 → 注入 Operator 到 gin + request context。
@@ -104,13 +185,18 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	// 加载角色授权（权限点 + 数据范围），供权限判定与行级数据过滤使用
+	auth := m.loadRoleAuth(c.Request.Context(), u.CompanyID, u.RoleID)
 	op := domain.Operator{
-		UserID:    claims.UserID,
-		Username:  u.Username,
-		Nickname:  u.Nickname,
-		CompanyID: u.CompanyID,
-		StoreID:   u.StoreID,
-		RoleID:    u.RoleID,
+		UserID:      claims.UserID,
+		Username:    u.Username,
+		Nickname:    u.Nickname,
+		CompanyID:   u.CompanyID,
+		StoreID:     u.StoreID,
+		RoleID:      u.RoleID,
+		RoleCode:    domain.RoleCode(auth.RoleCode),
+		DataScope:   domain.DataScope(auth.DataScope),
+		Permissions: auth.Permissions,
 	}
 	c.Set(string(OperatorKey), op)
 	ctx := context.WithValue(c.Request.Context(), OperatorKey, op)
@@ -118,17 +204,32 @@ func (m *Middlewares) authenticateStaff(c *gin.Context) {
 	c.Next()
 }
 
-// Auth JWT 认证中间件（PC 管理后台 / 小程序管理后台），仅接受员工令牌
-func (m *Middlewares) Auth() gin.HandlerFunc {
+// Auth JWT 认证中间件（PC 管理后台 / 小程序管理后台），仅接受员工令牌。
+//
+// perms 为可选的权限点要求（变参）：
+//   - 不传 → 仅认证，不做权限判定 —— 与改造前行为完全一致
+//   - 传入 → 认证通过后要求至少具备其中一个权限点，否则 403
+//
+// 变参设计使权限点可以**按批次逐步挂载**到 155 条路由上，
+// 无需一次性改动所有调用点，是本次改造风险控制的核心。
+func (m *Middlewares) Auth(perms ...domain.Perm) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		m.authenticateStaff(c)
+		if c.IsAborted() {
+			return
+		}
+		m.requirePerms(c, perms...)
 	}
 }
 
 // StaffAuth 员工 JWT 认证中间件（小程序员工区）：
-// 接受 UserType=staff 或旧令牌（空 UserType，向后兼容）
-func (m *Middlewares) StaffAuth() gin.HandlerFunc {
+// 接受 UserType=staff 或旧令牌（空 UserType，向后兼容）。perms 语义同 Auth。
+func (m *Middlewares) StaffAuth(perms ...domain.Perm) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		m.authenticateStaff(c)
+		if c.IsAborted() {
+			return
+		}
+		m.requirePerms(c, perms...)
 	}
 }

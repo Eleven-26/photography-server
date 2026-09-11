@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/domain"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
@@ -90,16 +91,55 @@ func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours 
 	}
 
 	u.Password = ""
-	return &dto.LoginResp{Token: token, User: *u}, nil
+	return &dto.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
 }
 
-func (s *Service) Profile(ctx context.Context, op Operator) (*model.SysUser, error) {
+func (s *Service) Profile(ctx context.Context, op Operator) (*dto.UserInfoVO, error) {
 	u, err := s.AuthRepo.GetByID(ctx, op.CompanyID, op.UserID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrUserNotFound)
 	}
 	u.Password = ""
-	return u, nil
+	vo := s.buildUserInfo(ctx, u)
+	return &vo, nil
+}
+
+// buildUserInfo 组装登录 / 个人资料返回的用户信息：SysUser + 角色 + 权限 + 数据范围。
+//
+// 前端权限判定依赖 role_code 与 permissions，缺失会导致按钮与路由控制整体失效
+// （改造前这两个字段就从未下发，前端 hasPerm 因此形同虚设）。
+//
+// admin 角色在此补齐全量权限点：后端判定靠角色码短路，但前端渲染菜单/按钮需要
+// 具体清单，否则管理员界面会被自身权限判定误隐藏。
+func (s *Service) buildUserInfo(ctx context.Context, u *model.SysUser) dto.UserInfoVO {
+	vo := dto.UserInfoVO{SysUser: *u, Permissions: []string{}}
+	if u.RoleID <= 0 {
+		return vo
+	}
+	if role, err := s.UserRepo.GetRoleByID(ctx, u.CompanyID, u.RoleID); err == nil {
+		vo.RoleCode = role.Code
+		vo.RoleName = role.Name
+		vo.DataScope = role.DataScope
+	}
+	if perms, err := s.UserRepo.ListPermsByRole(ctx, u.CompanyID, u.RoleID); err == nil {
+		valid := make([]string, 0, len(perms))
+		for _, p := range perms {
+			if domain.IsValidPerm(p) {
+				valid = append(valid, p)
+			}
+		}
+		vo.Permissions = valid
+	}
+	if domain.RoleCode(vo.RoleCode) == domain.RoleCodeAdmin {
+		all := domain.AllPermissions()
+		flat := make([]string, 0, len(all))
+		for _, p := range all {
+			flat = append(flat, string(p))
+		}
+		vo.Permissions = flat
+		vo.DataScope = int(domain.ScopeAll)
+	}
+	return vo
 }
 
 func (s *Service) ChangePassword(ctx context.Context, op Operator, oldPwd, newPwd string) error {

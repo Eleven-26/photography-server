@@ -89,6 +89,15 @@ const (
 	ErrStoreNotFound = "门店不存在"
 )
 
+// ======================== 权限（RBAC） ========================
+
+const (
+	ErrPermInvalid      = "权限点不合法"
+	ErrDataScopeInvalid = "数据范围不合法（1-全部 2-本门店 3-仅本人）"
+	ErrAdminRoleLocked  = "内置超管角色权限固定，不支持修改"
+	ErrRoleInUse        = "该角色下仍有成员，请先调整成员角色"
+)
+
 // ======================== 其他 ========================
 
 const (

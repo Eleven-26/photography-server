@@ -9,6 +9,14 @@ type Operator struct {
 	CompanyID int64
 	StoreID   int64
 	RoleID    int64
+
+	// 以下字段由认证阶段加载角色授权信息后填充（见 middleware/auth.go）。
+	// RoleCode 用于 admin 短路判定；DataScope 供 repository 层行级过滤；
+	// Permissions 为权限点集合（元素形如 "order:view"）。
+	// 权限体系未启用（角色无任何配置）时 DataScope 为零值、Permissions 为空切片。
+	RoleCode    RoleCode
+	DataScope   DataScope
+	Permissions []string
 }
 
 // ClientUser 客户端（H5/小程序）登录上下文，由 CustomerAuth 中间件注入

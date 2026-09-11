@@ -105,3 +105,55 @@ func SetCustomer(ctx context.Context, rdb *redis.Client, companyID, customerID i
 func DelCustomer(ctx context.Context, rdb *redis.Client, companyID, customerID int64) {
 	rdb.Del(ctx, CustomerKey(companyID, customerID))
 }
+
+// ---- 角色授权缓存（RBAC）----
+//
+// 认证阶段需要角色的权限点集合与数据范围。这两项变更频率极低（只在角色配置界面改动），
+// 但每请求都要用，故单独缓存且 TTL 远长于画像（画像 60s 为的是"停用即时生效"，
+// 授权变更则由保存动作主动失效，无需靠短 TTL 兜底）。
+//
+// 键设计 perm:role:{companyID}:{roleID} —— 按角色缓存而非按用户，
+// 同角色 N 个成员共享一份，成员改角色时自然切换（画像缓存失效已在 UpdateUser 处理）。
+
+// roleTTL 角色授权缓存有效期
+const roleTTL = 30 * time.Minute
+
+// RoleAuth 角色授权信息（认证阶段判定所需最小集合）
+type RoleAuth struct {
+	RoleCode    string   `json:"role_code"`   // 角色编码，admin 短路放行全部权限
+	DataScope   int      `json:"data_scope"`  // 数据范围 1-全部 2-本门店 3-仅本人
+	Permissions []string `json:"permissions"` // 权限点集合，如 ["order:view","order:create"]
+}
+
+func RoleKey(companyID, roleID int64) string {
+	return fmt.Sprintf("perm:role:%d:%d", companyID, roleID)
+}
+
+// GetRoleAuth 读角色授权缓存；hit=false 表示未命中（可回源 DB）
+func GetRoleAuth(ctx context.Context, rdb *redis.Client, companyID, roleID int64) (a *RoleAuth, hit bool, err error) {
+	b, err := rdb.Get(ctx, RoleKey(companyID, roleID)).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if err := json.Unmarshal(b, &a); err != nil {
+		return nil, false, err
+	}
+	return a, true, nil
+}
+
+// SetRoleAuth 写角色授权缓存（序列化失败仅丢缓存，不影响主流程）
+func SetRoleAuth(ctx context.Context, rdb *redis.Client, companyID, roleID int64, a *RoleAuth) {
+	b, err := json.Marshal(a)
+	if err != nil {
+		return
+	}
+	rdb.Set(ctx, RoleKey(companyID, roleID), b, roleTTL)
+}
+
+// DelRoleAuth 删除角色授权缓存（角色权限/数据范围变更后调用，即时生效）
+func DelRoleAuth(ctx context.Context, rdb *redis.Client, companyID, roleID int64) {
+	rdb.Del(ctx, RoleKey(companyID, roleID))
+}

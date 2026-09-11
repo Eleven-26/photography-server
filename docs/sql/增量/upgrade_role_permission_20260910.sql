@@ -1,29 +1,84 @@
 -- =====================================================================
--- SLOT 摄影工作室管理系统 初始化数据脚本 (DML)
--- 依赖 docs/sql/ddl.sql 先执行
--- 默认超级管理员账号：admin / admin123456
+-- 增量升级：角色权限管理（RBAC）· 2026-09-10
+-- 上游基线：upgrade_p2_customer_pref_20260910.sql
+--
+-- 变更内容：
+--   1) 新增表 sys_role_permission —— 角色与权限点的绑定关系
+--   2) sys_role 增加 data_scope 列 —— 行级数据范围 1-全部 2-本门店 3-仅本人
+--   3) biz_asset 增加 store_id 列 + 索引，并按创建人所属门店回填存量
+--   4) 为 4 个内置角色写入默认权限与默认数据范围（结果须与 dml.sql 一致）
+--
+-- 说明：
+--   - 权限点本身**不入库**（编译期常量，见 internal/domain/perm.go），
+--     本表只存「角色 → 权限点」的绑定关系；新增权限点无需改数据。
+--   - sys_role_permission 不做软删除：唯一键 uk_role_perm 配合
+--     「保存时全量覆盖（物理删旧 + 批量插新）」写入策略，若软删则
+--     "删掉某权限再加回来" 会命中旧记录导致唯一键冲突。本表无追溯价值。
+--   - 权限种子用 JOIN sys_role ON code 生成 role_id，不写死角色 ID，
+--     多租户环境下每个公司的同名内置角色都会获得默认权限。
+--   - 本脚本**不保证幂等**：重复执行会报「表/字段已存在」，属预期，请勿重复执行。
 -- =====================================================================
 
 USE `photography`;
 
--- 公司/工作室
-INSERT INTO `sys_company` (`created_by`,`updated_by`,`name`,`contact_name`,`contact_phone`,`address`,`status`)
-VALUES (1, 1, 'SLOT摄影工作室', '王店长', '13800000000', '上海市静安区某某路88号', 1);
+-- ---------------------------------------------------------------------
+-- 1. 新增表：角色权限关联
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_role_permission`;
+CREATE TABLE `sys_role_permission`
+(
+    `id`         bigint      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `company_id` bigint      NOT NULL DEFAULT '0' COMMENT '公司ID',
+    `role_id`    bigint      NOT NULL DEFAULT '0' COMMENT '角色ID',
+    `permission` varchar(64) NOT NULL COMMENT '权限点 resource:action，如 order:view',
+    `created_at` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_role_perm` (`company_id`,`role_id`,`permission`),
+    KEY          `idx_roleperm_role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='角色权限关联';
 
--- 门店
-INSERT INTO `sys_store` (`created_by`,`updated_by`,`company_id`,`name`,`address`,`phone`,`status`)
-VALUES (1, 1, 1, 'SLOT主门店', '上海市静安区某某路88号', '021-00000000', 1);
+-- ---------------------------------------------------------------------
+-- 2. sys_role 增加数据范围列
+-- ---------------------------------------------------------------------
+ALTER TABLE `sys_role`
+    ADD COLUMN `data_scope` tinyint NOT NULL DEFAULT '1' COMMENT '数据范围 1-全部数据 2-本门店 3-仅本人' AFTER `status`;
 
--- 角色（data_scope 数据范围：1-全部数据 2-本门店 3-仅本人）
-INSERT INTO `sys_role` (`created_by`,`updated_by`,`company_id`,`name`,`code`,`remark`,`status`,`data_scope`) VALUES
-(1, 1, 1, '超级管理员', 'admin', '拥有全部权限', 1, 1),
-(1, 1, 1, '店长', 'manager', '门店经营管理', 1, 2),
-(1, 1, 1, '摄影师', 'photographer', '拍摄与交付', 1, 3),
-(1, 1, 1, '销售', 'sales', '线索与客户跟进', 1, 2);
+-- ---------------------------------------------------------------------
+-- 3. biz_asset 增加所属门店列（补齐全链路门店口径）
+--    原因：biz_asset 既无 store_id 也无关联订单，行级过滤只能靠创建人，
+--    会让店长看不到店内其他摄影师上传的作品（功能残缺，非权限收紧）。
+-- ---------------------------------------------------------------------
+ALTER TABLE `biz_asset`
+    ADD COLUMN `store_id` bigint NOT NULL DEFAULT '0' COMMENT '所属门店ID' AFTER `company_id`,
+    ADD KEY `idx_asset_store` (`store_id`);
 
--- 角色权限（RBAC 默认绑定；权限点清单见 internal/domain/perm.go）
--- 各角色权限点数：admin 72 / manager 55 / photographer 23 / sales 31
--- 用 JOIN code 生成 role_id，不写死 ID，保证与增量脚本结果一致
+-- 存量回填：按创建人所属门店推断。
+-- 若创建人已换门店或已停用，回填值可能有偏差，属可接受的历史数据误差；
+-- 新数据的 store_id 由业务写入时带上。
+UPDATE `biz_asset` a
+    JOIN `sys_user` u ON u.id = a.created_by
+SET a.store_id = u.store_id
+WHERE a.store_id = 0;
+
+-- ---------------------------------------------------------------------
+-- 4. 内置角色默认数据范围
+--    admin 锁定不可改（代码按角色码短路给全权限）；sales 取「本门店」而非
+--    「仅本人」—— 客户交接给新销售后若按仅本人过滤，新人将查不到该客户。
+-- ---------------------------------------------------------------------
+UPDATE `sys_role` SET `data_scope` = 1 WHERE `code` = 'admin';
+UPDATE `sys_role` SET `data_scope` = 2 WHERE `code` = 'manager';
+UPDATE `sys_role` SET `data_scope` = 3 WHERE `code` = 'photographer';
+UPDATE `sys_role` SET `data_scope` = 2 WHERE `code` = 'sales';
+
+-- ---------------------------------------------------------------------
+-- 5. 内置角色默认权限（与 dml.sql 保持一致）
+--    先清理内置角色的既有绑定，再整体写入，保证升级结果可预期。
+-- ---------------------------------------------------------------------
+DELETE rp
+FROM `sys_role_permission` rp
+         JOIN `sys_role` r ON r.id = rp.role_id
+WHERE r.code IN ('admin', 'manager', 'photographer', 'sales');
+
 INSERT INTO `sys_role_permission` (`company_id`, `role_id`, `permission`)
 SELECT r.company_id,
        r.id,
@@ -392,39 +447,10 @@ FROM `sys_role` r
     SELECT 'sales' AS code, 'device:view' AS permission) x ON x.code = r.code
 WHERE r.deleted = 0;
 
--- 超级管理员 (密码 admin123456)
-INSERT INTO `sys_user` (`created_by`,`updated_by`,`company_id`,`store_id`,`username`,`password`,`nickname`,`mobile`,`role_id`,`status`)
-VALUES (1, 1, 1, 1, 'admin', '$2a$10$LInYkTZNMY1PCJT.tFB3Sugee3I5/xj1f1MBS8E6Q2FhwinLYAfES', '超级管理员', '13800000000', 1, 1);
-
--- 收款方式
-INSERT INTO `biz_payment_method` (`created_by`,`updated_by`,`company_id`,`name`,`type`,`account_name`,`account_no`,`status`,`sort`) VALUES
-(1, 1, 1, '微信支付', 'wechat', 'SLOT摄影', 'wx_001', 1, 1),
-(1, 1, 1, '支付宝', 'alipay', 'SLOT摄影', 'alipay_001', 1, 2),
-(1, 1, 1, '银行转账', 'bank', 'SLOT摄影工作室', '6222 0000 0000 0000', 1, 3),
-(1, 1, 1, '现金', 'cash', '', '', 1, 4);
-
--- 套餐
-INSERT INTO `biz_package`
-(`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`name`,`category`,`base_price`,`deposit_rate`,`deposit_amt`,`photos_included`,`shoot_hours`,`content_desc`,`addon_unit_price`,`status`,`version`,`base_version`,`published_at`)
-VALUES
-(1, 1, 1, 1, 'PK-001', '婚纱经典套餐', '婚纱', 6999.00, 30.00, 2099.70, 25, 8.00, '含化妆造型2套、外景拍摄、精修25张、赠送全部底片', 100.00, 1, 1, 0, NOW()),
-(1, 1, 1, 1, 'PK-002', '个人写真轻奢套餐', '写真', 2999.00, 30.00, 899.70, 15, 4.00, '含妆造1套、棚拍+外景、精修15张', 80.00, 1, 1, 0, NOW()),
-(1, 1, 1, 1, 'PK-003', '儿童成长套餐', '儿童', 3999.00, 30.00, 1199.70, 20, 5.00, '含主题拍摄、抓拍跟拍、精修20张', 90.00, 1, 1, 0, NOW());
-
--- 示例客户
-INSERT INTO `crm_customer`
-(`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`name`,`mobile`,`wechat`,`gender`,`level`,`source`,`tags`,`status`,`remark`)
-VALUES
-(1, 1, 1, 1, 'CU-001', '林女士', '13911112222', 'lin2026', 'female', 3, '小红书', '婚纱,外景', 2, '意向12月婚纱拍摄');
-
--- 示例线索
-INSERT INTO `crm_lead`
-(`created_by`,`updated_by`,`company_id`,`store_id`,`code`,`customer_id`,`name`,`mobile`,`source`,`project_type`,`budget_min`,`budget_max`,`status`,`shoot_date`,`remark`,`owner_id`)
-VALUES
-(1, 1, 1, 1, 'LD-001', 1, '林女士', '13911112222', '小红书', '婚纱', 6000.00, 8000.00, 2, '2026-12-12', '看重外景拍摄质量', 1);
-
--- 示例报价单
-INSERT INTO `biz_quote`
-(`created_by`,`updated_by`,`company_id`,`code`,`lead_id`,`customer_id`,`package_id`,`version`,`title`,`package_name`,`base_price`,`addon_price`,`total_price`,`status`,`owner_id`,`shoot_date`)
-VALUES
-(1, 1, 1, 'QT-001', 1, 1, 1, 1, '林女士婚纱报价', '婚纱经典套餐', 6999.00, 0.00, 6999.00, 2, 1, '2026-12-12');
+-- ---------------------------------------------------------------------
+-- 6. 校验（可选，人工确认用）：
+--    各内置角色权限点数量应为 admin 72 / manager 55 / photographer 23 / sales 31
+-- ---------------------------------------------------------------------
+-- SELECT r.code, r.data_scope, COUNT(rp.id) AS perm_count
+-- FROM sys_role r LEFT JOIN sys_role_permission rp ON rp.role_id = r.id
+-- WHERE r.deleted = 0 GROUP BY r.id, r.code, r.data_scope ORDER BY r.id;

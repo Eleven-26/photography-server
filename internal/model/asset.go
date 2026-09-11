@@ -5,6 +5,7 @@ import "photography-server/internal/enum"
 // Asset 作品集
 type Asset struct {
 	TenantBase
+	StoreID       int64            `gorm:"column:store_id;index;comment:所属门店ID" json:"store_id"`
 	Code          string           `gorm:"column:code;size:20;not null;uniqueIndex:uk_asset_code,priority:1;comment:作品编号 WK-xxx" json:"code"`
 	Title         string           `gorm:"column:title;size:100;comment:作品标题" json:"title"`
 	Category      string           `gorm:"column:category;size:50;comment:作品类型(婚纱/写真/儿童/全家福/活动跟拍等)" json:"category"`

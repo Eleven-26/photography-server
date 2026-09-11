@@ -30,6 +30,7 @@ func (s *Service) CreateAsset(ctx context.Context, op Operator, req dto.AssetCre
 			CompanyID: op.CompanyID,
 		},
 		Code:          domain.GenCode("WK"),
+		StoreID:       op.StoreID,
 		Title:         req.Title,
 		Category:      req.Category,
 		Cover:         req.Cover,
