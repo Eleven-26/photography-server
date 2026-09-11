@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,8 @@ func Recovery() gin.HandlerFunc {
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
 				logger.Errorf("panic recovered: %v\nstack: %s\nreq: %s %s", r, stack, c.Request.Method, c.Request.URL.Path)
-				response.Fail(c, errs.Internal(""))
+				// InternalWrap：panic 值进 cause —— Fail 会写入 span（exception.message）与日志
+				response.Fail(c, errs.InternalWrap(fmt.Errorf("%v", r)))
 				c.Abort()
 			}
 		}()
