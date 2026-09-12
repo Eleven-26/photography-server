@@ -51,7 +51,11 @@ func miniappEndpoint(mw *middleware.Middlewares) endpoint.Endpoint {
 // finance:export、asset 增删改审核、quote、package、calendar/lock 等。
 // 存疑待确认（当前未开放，与历史行为一致）：
 //   - /order/cancel/:id、/order/reschedule/apply/:order_id（移动端只审批不发起？）
-//   - /notification/*（移动端最需要通知，倾向是遗漏）
+//
+// 2026-09-12 决策：**补开 /notification/***。此前员工端缺失通知属遗漏（整理前就未注册，
+// 非整理引入）。通知在 service 层已按 receiver_type=1（员工）+ 操作人 UserID 隔离，
+// 即"员工本人的通知"，与员工端语义天然匹配；因此直接复用 PC 的 ctl.Notification* 实现
+// （同一函数指针），不新建员工端 handler。
 var staffInclude = []string{
 	// 订单（复用 PC 端同一 handler 与 service）
 	"/order/list",
@@ -82,6 +86,11 @@ var staffInclude = []string{
 	// 客户档案
 	"/customer/list",
 	"/customer/detail/:id",
+	// 通知（员工本人通知；service 按 receiver_type=1 + 操作人 UserID 隔离）
+	"/notification/list",
+	"/notification/unread-count",
+	"/notification/read/:id",
+	"/notification/read-all",
 }
 
 // staffEndpoint 员工端（挂 /wechat/staff，员工认证 + 操作日志）。
