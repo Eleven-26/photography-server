@@ -4,14 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) CustomerList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListCustomers(c.Request.Context(), op, page, pageSize, queryStr(c, "keyword"))
+	page, pageSize := bind.Pager(c)
+	list, total, err := h.Svc.ListCustomers(c.Request.Context(), op, page, pageSize, bind.ParamStr(c, "keyword"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -21,7 +22,7 @@ func (h *Controller) CustomerList(c *gin.Context) {
 
 func (h *Controller) CustomerDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -37,7 +38,7 @@ func (h *Controller) CustomerDetail(c *gin.Context) {
 func (h *Controller) CustomerCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.CustomerCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -51,13 +52,13 @@ func (h *Controller) CustomerCreate(c *gin.Context) {
 
 func (h *Controller) CustomerUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.CustomerUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -70,7 +71,7 @@ func (h *Controller) CustomerUpdate(c *gin.Context) {
 
 func (h *Controller) CustomerDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -95,12 +96,12 @@ func (h *Controller) CustomerStats(c *gin.Context) {
 // CustomerOrders 客户名下订单
 func (h *Controller) CustomerOrders(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, "", id)
 	if err != nil {
 		response.Fail(c, err)

@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/response"
 )
 
@@ -19,8 +20,8 @@ func (h *Controller) DashboardOverview(c *gin.Context) {
 
 func (h *Controller) NotificationList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListNotifications(c.Request.Context(), op, page, pageSize, queryStr(c, "unread") == "1")
+	page, pageSize := bind.Pager(c)
+	list, total, err := h.Svc.ListNotifications(c.Request.Context(), op, page, pageSize, bind.ParamStr(c, "unread") == "1")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -40,7 +41,7 @@ func (h *Controller) NotificationUnreadCount(c *gin.Context) {
 
 func (h *Controller) NotificationRead(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

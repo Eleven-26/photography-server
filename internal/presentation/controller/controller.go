@@ -1,15 +1,10 @@
 package controller
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/app"
-	"photography-server/internal/common"
 	"photography-server/internal/config"
-	"photography-server/internal/pkg/errs"
-	"photography-server/internal/pkg/params"
 	"photography-server/internal/service"
 )
 
@@ -25,14 +20,6 @@ func New(svc *service.Service, cfg *config.Config, a *app.App) *Controller {
 	return &Controller{Svc: svc, Cfg: cfg, App: a}
 }
 
-// bindJSON 绑定 JSON 请求体
-func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
-	if err := c.ShouldBindJSON(obj); err != nil {
-		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
-	}
-	return nil
-}
-
 // bearerToken 从 Authorization: Bearer 头取令牌（登出/吊销等场景用）
 func bearerToken(c *gin.Context) string {
 	auth := c.GetHeader("Authorization")
@@ -42,39 +29,6 @@ func bearerToken(c *gin.Context) string {
 	return ""
 }
 
-func pager(c *gin.Context) (int, int) {
-	page := params.Int(c, "page")
-	pageSize := params.Int(c, "page_size")
-	if page <= 0 {
-		page = common.DefaultPage
-	}
-	if pageSize <= 0 {
-		pageSize = common.DefaultPageSize
-	}
-	if pageSize > common.MaxPageSize {
-		pageSize = common.MaxPageSize
-	}
-	return page, pageSize
-}
-
-// queryStr 取字符串参数：统一从 POST body 取（见 pkg/params），不再读 query
-func queryStr(c *gin.Context, key string) string {
-	return params.Str(c, key)
-}
-
-// queryInt 取整型参数：同样统一从 POST body 取
-func queryInt(c *gin.Context, key string) int {
-	return params.Int(c, key)
-}
-
-func pathID(c *gin.Context) (int64, error) {
-	return pathParam(c, "id")
-}
-
-func pathParam(c *gin.Context, name string) (int64, error) {
-	id, err := strconv.ParseInt(c.Param(name), 10, 64)
-	if err != nil || id <= 0 {
-		return 0, errs.BadRequest("参数错误")
-	}
-	return id, nil
-}
+// 说明（2026-09-12 路由整理）：原先本文件自带的 bindJSON / pager / queryStr / queryInt /
+// pathID / pathParam 六个 helper 已收敛到 internal/presentation/bind，
+// 与 h5 / wechat 端共用同一实现（此前三处各一份、签名还不一致）。

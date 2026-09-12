@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
@@ -21,7 +22,7 @@ func (h *Controller) Workspace(c *gin.Context) {
 func (h *Controller) CompanyUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.CompanyUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -45,7 +46,7 @@ func (h *Controller) PaymentMethodList(c *gin.Context) {
 func (h *Controller) PaymentMethodCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.PaymentMethodReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -58,13 +59,13 @@ func (h *Controller) PaymentMethodCreate(c *gin.Context) {
 
 func (h *Controller) PaymentMethodUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.PaymentMethodReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -77,7 +78,7 @@ func (h *Controller) PaymentMethodUpdate(c *gin.Context) {
 
 func (h *Controller) PaymentMethodDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -91,9 +92,9 @@ func (h *Controller) PaymentMethodDelete(c *gin.Context) {
 
 func (h *Controller) OperationLogList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListOperationLogs(c.Request.Context(), op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "module"), queryStr(c, "status"))
+		bind.ParamStr(c, "keyword"), bind.ParamStr(c, "module"), bind.ParamStr(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -120,7 +121,7 @@ func (h *Controller) StudioGet(c *gin.Context) {
 func (h *Controller) StudioUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.StaffStudioSettingReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

@@ -368,21 +368,6 @@ func (s *Service) DeleteSlotTemplate(ctx context.Context, op Operator, id int64)
 	return s.SlotTemplateRepo.Delete(ctx, op.CompanyID, id)
 }
 
-// StaffSlotTemplates 档期时段模板列表（员工端入口）
-func (s *Service) StaffSlotTemplates(ctx context.Context, op Operator, photographerID int64) ([]model.SlotTemplate, error) {
-	return s.SlotTemplates(ctx, op, photographerID)
-}
-
-// StaffSaveSlotTemplate 新建/更新档期时段模板（员工端入口）
-func (s *Service) StaffSaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
-	return s.SaveSlotTemplate(ctx, op, id, req)
-}
-
-// StaffDeleteSlotTemplate 删除档期时段模板（员工端入口）
-func (s *Service) StaffDeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
-	return s.DeleteSlotTemplate(ctx, op, id)
-}
-
 // ---------------------------------------------------------------------
 // 评价回复 / 工作室设置
 // ---------------------------------------------------------------------
@@ -417,16 +402,6 @@ func (s *Service) UpdateStudioSetting(ctx context.Context, op Operator, updates 
 	}
 	updates["updated_by"] = op.UserID
 	return s.StudioSettingRepo.Update(ctx, op.CompanyID, updates)
-}
-
-// StaffStudioSettingGet 工作室设置（员工端查看/编辑）
-func (s *Service) StaffStudioSettingGet(ctx context.Context, op Operator) (*model.StudioSetting, error) {
-	return s.StudioSetting(ctx, op)
-}
-
-// StaffStudioSettingUpdate 工作室设置更新（员工端入口）
-func (s *Service) StaffStudioSettingUpdate(ctx context.Context, op Operator, updates map[string]interface{}) error {
-	return s.UpdateStudioSetting(ctx, op, updates)
 }
 
 // StaffCustomRequests 定制需求列表（待处理优先）

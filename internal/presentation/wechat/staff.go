@@ -1,132 +1,27 @@
 package wechat
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"photography-server/internal/domain"
-	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
-	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 // 小程序员工区接口（订单处理 + 日程 + 线索 AI 简报 + 个人中心）。
-// 员工（摄影师/助理）通过小程序处理业务，身份经 StaffAuth 注入 Operator；订单状态流转/收款/交付等
-// 复用 PC 端既有 service 方法（同一业务规则，两端入口分开）。
+// 员工（摄影师/助理）通过小程序处理业务，身份经 StaffAuth 注入 Operator。
+//
+// 路由注册（2026-09-12 路由整理后）已迁到 router/endpoints.go 的 staffEndpoint：
+// 与 PC 同路径的路由直接复用管理端 handler（同一函数指针，表在 routes 包），
+// 本文件只保留【员工端独有 handler】与【真实端差异实现】（退款审核 approve / 创建交付单不收 body）。
 // Controller 类型与 New 构造见 wechat.go。
 
 // RegisterStaffPublic 注册员工区公开路由（验证码登录，挂 /wechat/staff）
 func (h *Controller) RegisterStaffPublic(g *gin.RouterGroup) {
 	g.POST("/auth/sms-code", h.StaffSmsCode)
 	g.POST("/auth/login", h.StaffLogin)
-}
-
-// RegisterStaffAuthed 注册员工区需登录路由（StaffAuth 注入 Operator，挂 /wechat/staff）。
-//
-// 权限点与 PC 端**同源**（domain.Perm 常量、同一张 sys_role_permission），
-// 即"员工端与 PC 同权"：某角色能在 PC 做的事，在员工端也放行；反之亦然。
-// 若将来需要按端差异化（如禁止员工端导出财务），应另设端维度而非复制权限点。
-//
-// 【免挂权限点】/device/list、/device/remove —— 操作对象是登录者本人的登录设备，
-// 属账号自助能力而非角色能力边界，任何登录员工都必须能管自己的设备。
-func (h *Controller) RegisterStaffAuthed(g *gin.RouterGroup, mw *middleware.Middlewares) {
-	// 工作台
-	g.POST("/overview", mw.Perm(domain.PermDashboardView), h.Overview)
-	// 订单（复用 PC 端 service）
-	g.POST("/order/list", mw.Perm(domain.PermOrderView), h.StaffOrderList)
-	g.POST("/order/detail/:id", mw.Perm(domain.PermOrderView), h.StaffOrderDetail)
-	g.POST("/order/status/:id", mw.Perm(domain.PermOrderStatus), h.OrderStatus)
-	g.POST("/order/logs/:id", mw.Perm(domain.PermOrderView), h.OrderLogs)
-	g.POST("/order/create", mw.Perm(domain.PermOrderCreate), h.OrderCreate)
-	// 收款（拍照上传凭证 → 工作室核验）
-	g.POST("/payment/create/:order_id", mw.Perm(domain.PermPaymentCreate), h.PaymentCreate)
-	g.POST("/payment/list/:order_id", mw.Perm(domain.PermPaymentView), h.PaymentList)
-	// 交付
-	g.POST("/delivery/detail/:id", mw.Perm(domain.PermDeliveryView), h.StaffDeliveryDetail)
-	g.POST("/delivery/create/:order_id", mw.Perm(domain.PermDeliveryCreate), h.DeliveryCreate)
-	g.POST("/delivery/upload-samples/:id", mw.Perm(domain.PermDeliveryUpdate), h.DeliveryUploadSamples)
-	g.POST("/delivery/upload-retouched/:id", mw.Perm(domain.PermDeliveryUpdate), h.DeliveryUploadRetouched)
-	// 改期审批（列表归订单查看，审批独立成点）
-	g.POST("/reschedule/list", mw.Perm(domain.PermOrderView), h.RescheduleList)
-	g.POST("/reschedule/audit/:id", mw.Perm(domain.PermOrderRescheduleAudit), h.RescheduleAudit)
-	// 退款（查看/审核复用 PC 端）
-	g.POST("/refund/list/:order_id", mw.Perm(domain.PermRefundView), h.RefundList)
-	g.POST("/refund/audit/:id", mw.Perm(domain.PermRefundAudit), h.RefundAudit)
-	// 日程
-	g.POST("/schedule/list", mw.Perm(domain.PermCalendarView), h.ScheduleList)
-	// 线索跟进 + AI 简报（读归 view，跟进/生成/发送归 update）
-	g.POST("/lead/list", mw.Perm(domain.PermLeadView), h.LeadList)
-	g.POST("/lead/detail/:id", mw.Perm(domain.PermLeadView), h.LeadDetail)
-	g.POST("/lead/messages/:id", mw.Perm(domain.PermLeadView), h.LeadMessages)
-	g.POST("/lead/message/send/:id", mw.Perm(domain.PermLeadUpdate), h.LeadMessageSend)
-	g.POST("/brief/generate/:lead_id", mw.Perm(domain.PermLeadUpdate), h.BriefGenerate)
-	g.POST("/brief/list/:lead_id", mw.Perm(domain.PermLeadView), h.BriefList)
-	g.POST("/brief/send/:id", mw.Perm(domain.PermLeadUpdate), h.BriefSend)
-	g.POST("/brief/confirm/:id", mw.Perm(domain.PermLeadUpdate), h.BriefConfirm)
-	// 定制需求
-	g.POST("/custom-request/list", mw.Perm(domain.PermRequestView), h.StaffCustomRequestList)
-	g.POST("/custom-request/respond/:id", mw.Perm(domain.PermRequestHandle), h.CustomRequestRespond)
-	// 档期时段模板
-	g.POST("/slot-template/list", mw.Perm(domain.PermCalendarView), h.SlotTemplateList)
-	g.POST("/slot-template/save", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateSave)
-	g.POST("/slot-template/save/:id", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateSave)
-	g.POST("/slot-template/delete/:id", mw.Perm(domain.PermCalendarUpdate), h.SlotTemplateDelete)
-	// 评价
-	g.POST("/review/list", mw.Perm(domain.PermReviewView), h.ReviewList)
-	g.POST("/review/reply/:id", mw.Perm(domain.PermReviewReply), h.ReviewReply)
-	// 工作室设置
-	g.POST("/studio/get", mw.Perm(domain.PermSettingsView), h.StudioGet)
-	g.POST("/studio/update", mw.Perm(domain.PermSettingsUpdate), h.StudioUpdate)
-	// 个人中心（设备管理）：操作对象是本人设备，属自助类 → 免挂权限点
-	g.POST("/device/list", h.DeviceList)
-	g.POST("/device/remove/:id", h.DeviceRemove)
-	// 客户档案（报告 H7）：列表 / 档案 / 今日待跟进（跟进对象是线索）
-	g.POST("/customer/list", mw.Perm(domain.PermCustomerView), h.CustomerList)
-	g.POST("/customer/detail/:id", mw.Perm(domain.PermCustomerView), h.CustomerDetail)
-	g.POST("/customer/today-follow", mw.Perm(domain.PermLeadView), h.TodayFollow)
-	// 客户手机号换绑（报告 H8）
-	g.POST("/customer/mobile", mw.Perm(domain.PermCustomerUpdate), h.CustomerMobileUpdate)
-	// 收款核验到账（报告 H9）
-	g.POST("/payment/confirm/:id", mw.Perm(domain.PermPaymentConfirm), h.PaymentConfirm)
-	// 订单加项（报告 H10，复用 PC 端同一 service，金额同事务重算）
-	g.POST("/order/addon/list/:order_id", mw.Perm(domain.PermOrderView), h.OrderAddonList)
-	g.POST("/order/addon/create/:order_id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonCreate)
-	g.POST("/order/addon/update/:id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonUpdate)
-	g.POST("/order/addon/delete/:id", mw.Perm(domain.PermOrderUpdate), h.OrderAddonDelete)
-	// 反馈整理（报告 H11）
-	g.POST("/delivery/feedback/list", mw.Perm(domain.PermDeliveryView), h.FeedbackList)
-	g.POST("/delivery/feedback/handle/:item_id", mw.Perm(domain.PermDeliveryUpdate), h.FeedbackHandle)
-}
-
-func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
-	if err := c.ShouldBindJSON(obj); err != nil {
-		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
-	}
-	return nil
-}
-
-func pager(c *gin.Context) (int, int) {
-	page := params.Int(c, "page")
-	pageSize := params.Int(c, "page_size")
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 || pageSize > 100 {
-		pageSize = 10
-	}
-	return page, pageSize
-}
-
-func pathID(c *gin.Context, name string) (int64, error) {
-	id, err := strconv.ParseInt(c.Param(name), 10, 64)
-	if err != nil || id <= 0 {
-		return 0, errs.BadRequest("参数错误")
-	}
-	return id, nil
 }
 
 // ---------------------------------------------------------------------
@@ -138,7 +33,7 @@ func (h *Controller) StaffSmsCode(c *gin.Context) {
 	var req struct {
 		Mobile string `json:"mobile" binding:"required"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -157,7 +52,7 @@ func (h *Controller) StaffLogin(c *gin.Context) {
 		DeviceName string `json:"device_name"` // 设备名称（选填，用于设备管理）
 		Platform   string `json:"platform"`    // ios/android
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -195,147 +90,14 @@ func (h *Controller) Overview(c *gin.Context) {
 	response.OK(c, ov)
 }
 
-// OrderList 订单列表（body: status）
-func (h *Controller) StaffOrderList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize, params.Str(c, "status"), 0)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, gin.H{"list": list, "total": total})
-}
-
-// OrderDetail 订单详情
-func (h *Controller) StaffOrderDetail(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	detail, err := h.Svc.GetOrderDetail(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, detail)
-}
-
-// OrderCreate 创建订单
-func (h *Controller) OrderCreate(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	var req dto.OrderCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	o, err := h.Svc.CreateOrder(c.Request.Context(), op, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, o)
-}
-
-// OrderStatus 订单状态流转
-func (h *Controller) OrderStatus(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.OrderStatusReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.ChangeOrderStatus(c.Request.Context(), op, id, enum.OrderStatus(req.Status), req.Content); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
-// OrderLogs 订单操作日志
-func (h *Controller) OrderLogs(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	detail, err := h.Svc.GetOrderDetail(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, detail.Logs)
-}
-
 // ---------------------------------------------------------------------
 // 收款 / 交付 / 改期 / 退款
 // ---------------------------------------------------------------------
 
-// PaymentCreate 录入收款（小程序拍照上传凭证）
-func (h *Controller) PaymentCreate(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.PaymentCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	p, err := h.Svc.CreatePayment(c.Request.Context(), op, orderID, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, p)
-}
-
-// PaymentList 收款记录
-func (h *Controller) PaymentList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	list, err := h.Svc.ListPayments(c.Request.Context(), op, orderID)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
-}
-
-// DeliveryDetail 交付单明细
-func (h *Controller) StaffDeliveryDetail(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	d, err := h.Svc.GetDeliveryByOrder(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, d)
-}
-
 // DeliveryCreate 创建交付单
 func (h *Controller) DeliveryCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -348,73 +110,29 @@ func (h *Controller) DeliveryCreate(c *gin.Context) {
 	response.OK(c, d)
 }
 
-// DeliveryUploadSamples 上传样片
-func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req struct {
-		Items []dto.DeliveryItemReq `json:"items" binding:"required"`
-	}
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.UploadSamples(c.Request.Context(), op, id, req.Items); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
-// DeliveryUploadRetouched 上传精修成品
-func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req struct {
-		Items []dto.DeliveryItemReq `json:"items" binding:"required"`
-	}
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.UploadRetouched(c.Request.Context(), op, id, req.Items); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
 // RescheduleList 改期单列表
 func (h *Controller) RescheduleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	status := params.Int(c, "status")
 	list, total, err := h.Svc.StaffRescheduleList(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // RescheduleAudit 改期审批
 func (h *Controller) RescheduleAudit(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffRescheduleAuditReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -425,26 +143,10 @@ func (h *Controller) RescheduleAudit(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// RefundList 退款记录
-func (h *Controller) RefundList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	list, err := h.Svc.ListRefunds(c.Request.Context(), op, orderID)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
-}
-
 // RefundAudit 退款审核
 func (h *Controller) RefundAudit(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -453,7 +155,7 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 		Approve bool   `json:"approve"` // 是否通过（false=驳回，不使用 required 以放行布尔零值）
 		Remark  string `json:"remark"`  // 审核备注
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -480,76 +182,10 @@ func (h *Controller) ScheduleList(c *gin.Context) {
 	response.OK(c, list)
 }
 
-// LeadList 线索列表
-func (h *Controller) LeadList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
-	ownerID := params.Int64(c, "owner_id")
-	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize, params.Str(c, "keyword"), params.Str(c, "status"), ownerID)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, gin.H{"list": list, "total": total})
-}
-
-// LeadDetail 线索详情
-func (h *Controller) LeadDetail(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	l, err := h.Svc.GetLeadDetail(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, l)
-}
-
-// LeadMessages 线索沟通记录
-func (h *Controller) LeadMessages(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	list, err := h.Svc.StaffLeadMessages(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
-}
-
-// LeadMessageSend 发送线索沟通消息
-func (h *Controller) LeadMessageSend(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.StaffLeadMessageReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	m, err := h.Svc.StaffSendLeadMessage(c.Request.Context(), op, id, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, m)
-}
-
 // BriefGenerate 生成线索 AI 简报
 func (h *Controller) BriefGenerate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	leadID, err := pathID(c, "lead_id")
+	leadID, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -565,7 +201,7 @@ func (h *Controller) BriefGenerate(c *gin.Context) {
 // BriefList 简报项列表
 func (h *Controller) BriefList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	leadID, err := pathID(c, "lead_id")
+	leadID, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -581,7 +217,7 @@ func (h *Controller) BriefList(c *gin.Context) {
 // BriefSend 发送追问
 func (h *Controller) BriefSend(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -596,13 +232,13 @@ func (h *Controller) BriefSend(c *gin.Context) {
 // BriefConfirm 确认简报项
 func (h *Controller) BriefConfirm(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffBriefConfirmReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -620,26 +256,26 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 // CustomRequestList 定制需求列表
 func (h *Controller) StaffCustomRequestList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	status := params.Int(c, "status")
 	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize, status)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // CustomRequestRespond 响应定制需求
 func (h *Controller) CustomRequestRespond(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffCustomRequestRespondReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -650,112 +286,33 @@ func (h *Controller) CustomRequestRespond(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// SlotTemplateList 档期时段模板列表
-func (h *Controller) SlotTemplateList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	photographerID := params.Int64(c, "photographer_id")
-	list, err := h.Svc.StaffSlotTemplates(c.Request.Context(), op, photographerID)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
-}
-
-// SlotTemplateSave 新建/更新档期时段模板
-func (h *Controller) SlotTemplateSave(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	var id int64
-	if raw := c.Param("id"); raw != "" {
-		parsed, err := pathID(c, "id")
-		if err != nil {
-			response.Fail(c, err)
-			return
-		}
-		id = parsed
-	}
-	var req dto.StaffSlotTemplateReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	m, err := h.Svc.StaffSaveSlotTemplate(c.Request.Context(), op, id, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, m)
-}
-
-// SlotTemplateDelete 删除档期时段模板
-func (h *Controller) SlotTemplateDelete(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.StaffDeleteSlotTemplate(c.Request.Context(), op, id); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
 // ReviewList 评价列表
 func (h *Controller) ReviewList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	minRating := params.Int(c, "min_rating")
 	list, total, err := h.Svc.StaffReviewList(c.Request.Context(), op, page, pageSize, minRating)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // ReviewReply 回复评价
 func (h *Controller) ReviewReply(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffReviewReplyReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
 	if err := h.Svc.StaffReviewReply(c.Request.Context(), op, id, req.Reply); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
-// StudioGet 工作室设置
-func (h *Controller) StudioGet(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	st, err := h.Svc.StaffStudioSettingGet(c.Request.Context(), op)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, st)
-}
-
-// StudioUpdate 工作室设置更新
-func (h *Controller) StudioUpdate(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	var req dto.StaffStudioSettingReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	updates := req.ToUpdates()
-	if err := h.Svc.StaffStudioSettingUpdate(c.Request.Context(), op, updates); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -776,7 +333,7 @@ func (h *Controller) DeviceList(c *gin.Context) {
 // DeviceRemove 踢出登录设备
 func (h *Controller) DeviceRemove(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -791,34 +348,6 @@ func (h *Controller) DeviceRemove(c *gin.Context) {
 // ---------------------------------------------------------------------
 // 客户档案 / 手机号换绑（报告 H7、H8）
 // ---------------------------------------------------------------------
-
-// CustomerList 客户列表（body: keyword/page 等）
-func (h *Controller) CustomerList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
-	list, total, err := h.Svc.ListCustomers(c.Request.Context(), op, page, pageSize, params.Str(c, "keyword"))
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, gin.H{"list": list, "total": total})
-}
-
-// CustomerDetail 客户档案
-func (h *Controller) CustomerDetail(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	cu, err := h.Svc.GetCustomer(c.Request.Context(), op, id)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, cu)
-}
 
 // TodayFollow 今日待跟进（到期/逾期且未成交未流失的线索）
 func (h *Controller) TodayFollow(c *gin.Context) {
@@ -835,7 +364,7 @@ func (h *Controller) TodayFollow(c *gin.Context) {
 func (h *Controller) CustomerMobileUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.StaffCustomerMobileReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -850,94 +379,6 @@ func (h *Controller) CustomerMobileUpdate(c *gin.Context) {
 // 收款核验 / 订单加项（报告 H9、H10）
 // ---------------------------------------------------------------------
 
-// PaymentConfirm 收款确认到账（核验客户提交的收款/调度费凭证）
-func (h *Controller) PaymentConfirm(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.ConfirmPayment(c.Request.Context(), op, id); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
-// OrderAddonList 订单加项列表
-func (h *Controller) OrderAddonList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	list, err := h.Svc.ListOrderAddons(c.Request.Context(), op, orderID)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, list)
-}
-
-// OrderAddonCreate 新增加项（同事务重算订单金额）
-func (h *Controller) OrderAddonCreate(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	orderID, err := pathID(c, "order_id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.OrderAddonReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	a, err := h.Svc.CreateOrderAddon(c.Request.Context(), op, orderID, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, a)
-}
-
-// OrderAddonUpdate 修改加项（同事务重算订单金额）
-func (h *Controller) OrderAddonUpdate(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.OrderAddonReq
-	if err := h.bindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	a, err := h.Svc.UpdateOrderAddon(c.Request.Context(), op, id, req)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OK(c, a)
-}
-
-// OrderAddonDelete 删除加项（同事务重算订单金额）
-func (h *Controller) OrderAddonDelete(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := pathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.DeleteOrderAddon(c.Request.Context(), op, id); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
-
 // ---------------------------------------------------------------------
 // 反馈整理（报告 H11）
 // ---------------------------------------------------------------------
@@ -945,25 +386,25 @@ func (h *Controller) OrderAddonDelete(c *gin.Context) {
 // FeedbackList 客户修图反馈列表（body: status 1-待处理 2-已处理，0-全部）
 func (h *Controller) FeedbackList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListFeedbackItems(c.Request.Context(), op, params.Int(c, "status"), page, pageSize)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // FeedbackHandle 标记反馈已处理并记录处理备注
 func (h *Controller) FeedbackHandle(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	itemID, err := pathID(c, "item_id")
+	itemID, err := bind.PathID(c, "item_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffFeedbackHandleReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

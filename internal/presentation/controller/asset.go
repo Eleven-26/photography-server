@@ -4,15 +4,16 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) AssetList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListAssets(c.Request.Context(), op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "category"), queryStr(c, "status"), queryStr(c, "featured"))
+		bind.ParamStr(c, "keyword"), bind.ParamStr(c, "category"), bind.ParamStr(c, "status"), bind.ParamStr(c, "featured"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -22,7 +23,7 @@ func (h *Controller) AssetList(c *gin.Context) {
 
 func (h *Controller) AssetDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -38,7 +39,7 @@ func (h *Controller) AssetDetail(c *gin.Context) {
 func (h *Controller) AssetCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.AssetCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -52,13 +53,13 @@ func (h *Controller) AssetCreate(c *gin.Context) {
 
 func (h *Controller) AssetUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.AssetUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -71,7 +72,7 @@ func (h *Controller) AssetUpdate(c *gin.Context) {
 
 func (h *Controller) AssetDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -86,13 +87,13 @@ func (h *Controller) AssetDelete(c *gin.Context) {
 // AssetStatus 作品「发布状态 / 可见性 / 精选」开关（局部更新，不要求回传全字段）
 func (h *Controller) AssetStatus(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.AssetFlagsReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

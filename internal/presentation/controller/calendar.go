@@ -5,6 +5,7 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
@@ -12,7 +13,7 @@ import (
 func (h *Controller) CalendarList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	photographerID := params.Int64(c, "photographer_id")
-	list, err := h.Svc.ListCalendar(c.Request.Context(), op, queryStr(c, "start_date"), queryStr(c, "end_date"), photographerID)
+	list, err := h.Svc.ListCalendar(c.Request.Context(), op, bind.ParamStr(c, "start_date"), bind.ParamStr(c, "end_date"), photographerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -23,7 +24,7 @@ func (h *Controller) CalendarList(c *gin.Context) {
 func (h *Controller) CalendarLock(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.CalendarBlockReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -37,7 +38,7 @@ func (h *Controller) CalendarLock(c *gin.Context) {
 
 func (h *Controller) CalendarCancel(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -69,7 +70,7 @@ func (h *Controller) SlotTemplateSave(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var id int64
 	if raw := c.Param("id"); raw != "" {
-		parsed, err := pathID(c)
+		parsed, err := bind.PathID(c, "id")
 		if err != nil {
 			response.Fail(c, err)
 			return
@@ -77,7 +78,7 @@ func (h *Controller) SlotTemplateSave(c *gin.Context) {
 		id = parsed
 	}
 	var req dto.StaffSlotTemplateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -92,7 +93,7 @@ func (h *Controller) SlotTemplateSave(c *gin.Context) {
 // SlotTemplateDelete 删除档期时段模板
 func (h *Controller) SlotTemplateDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

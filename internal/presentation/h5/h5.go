@@ -1,14 +1,13 @@
 package h5
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 	"photography-server/internal/service"
@@ -111,34 +110,6 @@ func (h *Controller) requireCompany(c *gin.Context) (int64, error) {
 	return companyID, nil
 }
 
-// bindJSON 绑定 JSON 请求体
-func (h *Controller) bindJSON(c *gin.Context, obj interface{}) error {
-	if err := c.ShouldBindJSON(obj); err != nil {
-		return errs.BadRequest(errs.ErrBadRequest + "：" + err.Error())
-	}
-	return nil
-}
-
-func pager(c *gin.Context) (int, int) {
-	page := params.Int(c, "page")
-	pageSize := params.Int(c, "page_size")
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 || pageSize > 100 {
-		pageSize = 10
-	}
-	return page, pageSize
-}
-
-func pathID(c *gin.Context, name string) (int64, error) {
-	id, err := strconv.ParseInt(c.Param(name), 10, 64)
-	if err != nil || id <= 0 {
-		return 0, errs.BadRequest("参数错误")
-	}
-	return id, nil
-}
-
 // ---------------------------------------------------------------------
 // 公开接口
 // ---------------------------------------------------------------------
@@ -148,7 +119,7 @@ func (h *Controller) SmsCode(c *gin.Context) {
 	var req struct {
 		Mobile string `json:"mobile" binding:"required"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -168,7 +139,7 @@ func (h *Controller) Login(c *gin.Context) {
 		Code   string `json:"code" binding:"required"`
 		OpenID string `json:"openid"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -207,7 +178,7 @@ func (h *Controller) PackageList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ClientPackages(c.Request.Context(), companyID, page, pageSize, params.Str(c, "category"))
 	if err != nil {
 		response.Fail(c, err)
@@ -223,7 +194,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -270,7 +241,7 @@ func (h *Controller) SlotList(c *gin.Context) {
 // CustomRequestSubmit 提交定制需求（游客/登录均可）
 func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 	var req dto.ClientCustomRequestReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -304,7 +275,7 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 func (h *Controller) BookingSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	var req dto.ClientBookingReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -319,7 +290,7 @@ func (h *Controller) BookingSubmit(c *gin.Context) {
 // BookingConfirm 确认预约单
 func (h *Controller) BookingConfirm(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -334,7 +305,7 @@ func (h *Controller) BookingConfirm(c *gin.Context) {
 // BookingCancel 取消预约单
 func (h *Controller) BookingCancel(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -353,7 +324,7 @@ func (h *Controller) BookingCancel(c *gin.Context) {
 // OrderList 我的订单
 func (h *Controller) OrderList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ClientOrders(c.Request.Context(), cu, page, pageSize, params.Str(c, "status"))
 	if err != nil {
 		response.Fail(c, err)
@@ -365,7 +336,7 @@ func (h *Controller) OrderList(c *gin.Context) {
 // OrderDetail 订单详情
 func (h *Controller) OrderDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -381,13 +352,13 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 // RescheduleApply 申请改期
 func (h *Controller) RescheduleApply(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	orderID, err := pathID(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientRescheduleReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -402,7 +373,7 @@ func (h *Controller) RescheduleApply(c *gin.Context) {
 // RescheduleCancel 撤回改期申请
 func (h *Controller) RescheduleCancel(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -417,13 +388,13 @@ func (h *Controller) RescheduleCancel(c *gin.Context) {
 // RefundApply 申请退款
 func (h *Controller) RefundApply(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	orderID, err := pathID(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientRefundReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -438,13 +409,13 @@ func (h *Controller) RefundApply(c *gin.Context) {
 // ReviewCreate 评价订单
 func (h *Controller) ReviewCreate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	orderID, err := pathID(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientReviewReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -459,7 +430,7 @@ func (h *Controller) ReviewCreate(c *gin.Context) {
 // DeliveryDetail 交付单与明细（选片页/成片页）
 func (h *Controller) DeliveryDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -475,7 +446,7 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 // SelectPhotos 提交选片
 func (h *Controller) SelectPhotos(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -483,7 +454,7 @@ func (h *Controller) SelectPhotos(c *gin.Context) {
 	var req struct {
 		ItemIDs []int64 `json:"item_ids" binding:"required"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -497,7 +468,7 @@ func (h *Controller) SelectPhotos(c *gin.Context) {
 // ConfirmExtra 确认加片费用
 func (h *Controller) ConfirmExtra(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -512,7 +483,7 @@ func (h *Controller) ConfirmExtra(c *gin.Context) {
 // ConfirmDelivery 确认成片
 func (h *Controller) ConfirmDelivery(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -527,13 +498,13 @@ func (h *Controller) ConfirmDelivery(c *gin.Context) {
 // FeedbackSubmit 提交精修反馈
 func (h *Controller) FeedbackSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	itemID, err := pathID(c, "item_id")
+	itemID, err := bind.PathID(c, "item_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientFeedbackReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -547,7 +518,7 @@ func (h *Controller) FeedbackSubmit(c *gin.Context) {
 // CustomRequestList 我的定制需求
 func (h *Controller) CustomRequestList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ClientCustomRequests(c.Request.Context(), cu, page, pageSize)
 	if err != nil {
 		response.Fail(c, err)
@@ -567,7 +538,7 @@ func (h *Controller) AssetList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ClientAssets(c.Request.Context(), companyID, page, pageSize,
 		params.Str(c, "category"), params.Str(c, "featured") == "1")
 	if err != nil {
@@ -584,7 +555,7 @@ func (h *Controller) AssetDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -615,7 +586,7 @@ func (h *Controller) QuoteList(c *gin.Context) {
 // QuoteAccept 接受报价
 func (h *Controller) QuoteAccept(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -630,13 +601,13 @@ func (h *Controller) QuoteAccept(c *gin.Context) {
 // QuoteModify 对报价提出修改意见
 func (h *Controller) QuoteModify(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientQuoteModifyReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -654,7 +625,7 @@ func (h *Controller) QuoteModify(c *gin.Context) {
 // RescheduleDetail 改期单详情 + 调度费支付状态
 func (h *Controller) RescheduleDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -670,13 +641,13 @@ func (h *Controller) RescheduleDetail(c *gin.Context) {
 // ReschedulePay 提交改期调度费支付凭证
 func (h *Controller) ReschedulePay(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientReschedulePayReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -691,7 +662,7 @@ func (h *Controller) ReschedulePay(c *gin.Context) {
 // ExtraQuote 加片费试算（body 可为空：按当前已选张数试算）
 func (h *Controller) ExtraQuote(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -709,13 +680,13 @@ func (h *Controller) ExtraQuote(c *gin.Context) {
 // OrderRequirementUpdate 客户修改拍摄需求（仅待定金/待拍摄，白名单字段）
 func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ClientOrderRequirementReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -733,7 +704,7 @@ func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
 // NotificationList 我的通知列表（body: unread=1 只看未读）
 func (h *Controller) NotificationList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListClientNotifications(c.Request.Context(), cu, page, pageSize, params.Str(c, "unread") == "1")
 	if err != nil {
 		response.Fail(c, err)
@@ -756,7 +727,7 @@ func (h *Controller) NotificationUnreadCount(c *gin.Context) {
 // NotificationRead 标记单条已读
 func (h *Controller) NotificationRead(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	id, err := pathID(c, "id")
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

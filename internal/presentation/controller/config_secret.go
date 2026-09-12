@@ -11,6 +11,7 @@ package controller
 import (
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/response"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,7 @@ type configEncryptReq struct {
 // POST /test/config/encrypt
 func (h *Controller) ConfigEncrypt(c *gin.Context) {
 	var req configEncryptReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

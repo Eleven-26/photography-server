@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
@@ -11,7 +12,7 @@ import (
 // Login 登录
 func (h *Controller) Login(c *gin.Context) {
 	var req dto.LoginReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -38,7 +39,7 @@ func (h *Controller) Profile(c *gin.Context) {
 func (h *Controller) ChangePassword(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.ChangePasswordReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

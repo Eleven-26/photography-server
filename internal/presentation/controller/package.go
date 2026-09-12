@@ -5,15 +5,16 @@ import (
 
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) PackageList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	list, total, err := h.Svc.ListPackages(c.Request.Context(), op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "status"), queryStr(c, "category"))
+		bind.ParamStr(c, "keyword"), bind.ParamStr(c, "status"), bind.ParamStr(c, "category"))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -23,7 +24,7 @@ func (h *Controller) PackageList(c *gin.Context) {
 
 func (h *Controller) PackageDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -39,7 +40,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 func (h *Controller) PackageCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.PackageReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -53,13 +54,13 @@ func (h *Controller) PackageCreate(c *gin.Context) {
 
 func (h *Controller) PackageUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.PackageReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -76,7 +77,7 @@ func (h *Controller) PackageUpdate(c *gin.Context) {
 // "cannot unmarshal number into Go struct field .status of type string"，即用户看到的类型错误。
 func (h *Controller) PackageStatus(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -84,7 +85,7 @@ func (h *Controller) PackageStatus(c *gin.Context) {
 	var req struct {
 		Status int `json:"status" binding:"required"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -97,7 +98,7 @@ func (h *Controller) PackageStatus(c *gin.Context) {
 
 func (h *Controller) PackageDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

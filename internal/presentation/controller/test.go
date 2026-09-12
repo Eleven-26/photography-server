@@ -22,6 +22,7 @@ import (
 
 	"photography-server/internal/enum"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/response"
 )
 
@@ -42,7 +43,7 @@ type redisSetReq struct {
 // POST /test/redis/set
 func (h *Controller) RedisSet(c *gin.Context) {
 	var req redisSetReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -67,7 +68,7 @@ type redisGetReq struct {
 // POST /test/redis/get
 func (h *Controller) RedisGet(c *gin.Context) {
 	var req redisGetReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -88,7 +89,7 @@ func (h *Controller) RedisGet(c *gin.Context) {
 // POST /test/redis/del
 func (h *Controller) RedisDel(c *gin.Context) {
 	var req redisGetReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -132,7 +133,7 @@ type natsPubReq struct {
 // POST /test/nats/pub
 func (h *Controller) NATSPub(c *gin.Context) {
 	var req natsPubReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -151,7 +152,7 @@ func (h *Controller) NATSPub(c *gin.Context) {
 // POST /test/nats/pub-persistent
 func (h *Controller) NATSPubPersistent(c *gin.Context) {
 	var req natsPubReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -183,7 +184,7 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 // POST /test/nats/request
 func (h *Controller) NATSRequest(c *gin.Context) {
 	var req natsPubReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -225,7 +226,7 @@ func (h *Controller) NATSStatus(c *gin.Context) {
 // POST /test/nats/pub-pull
 func (h *Controller) NATSPubPull(c *gin.Context) {
 	var req natsPubReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -290,7 +291,7 @@ func (h *Controller) ESIndex(c *gin.Context) {
 		return
 	}
 	var req esIndexReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -323,7 +324,7 @@ func (h *Controller) ESSearch(c *gin.Context) {
 		return
 	}
 	var req esSearchReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -376,7 +377,7 @@ func (h *Controller) ESList(c *gin.Context) {
 		return
 	}
 	var req esListReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -433,7 +434,7 @@ func (h *Controller) ESDelete(c *gin.Context) {
 		return
 	}
 	var req esDeleteReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -480,7 +481,7 @@ func (h *Controller) MongoInsert(c *gin.Context) {
 		return
 	}
 	var req mongoInsertReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -507,7 +508,7 @@ func (h *Controller) MongoInsertMany(c *gin.Context) {
 		return
 	}
 	var req mongoInsertManyReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -540,7 +541,7 @@ func (h *Controller) MongoFind(c *gin.Context) {
 		return
 	}
 	var req mongoFindReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -601,7 +602,7 @@ func (h *Controller) MongoFindOne(c *gin.Context) {
 		return
 	}
 	var req mongoFindOneReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -630,7 +631,7 @@ func (h *Controller) MongoUpdate(c *gin.Context) {
 		return
 	}
 	var req mongoUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -661,7 +662,7 @@ func (h *Controller) MongoDelete(c *gin.Context) {
 		return
 	}
 	var req mongoDeleteReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -688,7 +689,7 @@ func (h *Controller) MongoDeleteByID(c *gin.Context) {
 		return
 	}
 	var req mongoDeleteIDReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
@@ -14,7 +15,7 @@ import (
 func (h *Controller) OrderCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.OrderCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -28,10 +29,10 @@ func (h *Controller) OrderCreate(c *gin.Context) {
 
 func (h *Controller) OrderList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	customerID := params.Int64(c, "customer_id")
 	list, total, err := h.Svc.ListOrders(c.Request.Context(), op, page, pageSize,
-		queryStr(c, "status"), customerID)
+		bind.ParamStr(c, "status"), customerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -41,7 +42,7 @@ func (h *Controller) OrderList(c *gin.Context) {
 
 func (h *Controller) OrderDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -56,13 +57,13 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 
 func (h *Controller) OrderUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.OrderUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -76,13 +77,13 @@ func (h *Controller) OrderUpdate(c *gin.Context) {
 // OrderStatus 订单状态流转，body: {status, content}
 func (h *Controller) OrderStatus(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.OrderStatusReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -95,7 +96,7 @@ func (h *Controller) OrderStatus(c *gin.Context) {
 
 func (h *Controller) OrderCancel(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -103,7 +104,7 @@ func (h *Controller) OrderCancel(c *gin.Context) {
 	var req struct {
 		Reason string `json:"reason"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -116,7 +117,7 @@ func (h *Controller) OrderCancel(c *gin.Context) {
 
 func (h *Controller) OrderLogs(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -133,13 +134,13 @@ func (h *Controller) OrderLogs(c *gin.Context) {
 
 func (h *Controller) PaymentCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "order_id")
+	id, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.PaymentCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -153,7 +154,7 @@ func (h *Controller) PaymentCreate(c *gin.Context) {
 
 func (h *Controller) PaymentList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "order_id")
+	id, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -168,7 +169,7 @@ func (h *Controller) PaymentList(c *gin.Context) {
 
 func (h *Controller) PaymentConfirm(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -183,7 +184,7 @@ func (h *Controller) PaymentConfirm(c *gin.Context) {
 // PaymentDelete 删除收款记录（仅允许删除未确认的收款，已确认需走退款）
 func (h *Controller) PaymentDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -199,13 +200,13 @@ func (h *Controller) PaymentDelete(c *gin.Context) {
 
 func (h *Controller) RefundApply(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "order_id")
+	id, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.RefundCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -219,7 +220,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 
 func (h *Controller) RefundList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "order_id")
+	id, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -238,7 +239,7 @@ func (h *Controller) RefundList(c *gin.Context) {
 // auditRefund(id, {approved}) 对齐（原后端读 approve，前端传 approved，恒不匹配）。
 func (h *Controller) RefundAudit(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -247,7 +248,7 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 		Approved *bool  `json:"approved"`
 		Remark   string `json:"remark"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -267,7 +268,7 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 
 func (h *Controller) OrderAddonList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := pathParam(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -282,13 +283,13 @@ func (h *Controller) OrderAddonList(c *gin.Context) {
 
 func (h *Controller) OrderAddonCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := pathParam(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.OrderAddonReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -302,13 +303,13 @@ func (h *Controller) OrderAddonCreate(c *gin.Context) {
 
 func (h *Controller) OrderAddonUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.OrderAddonReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -322,7 +323,7 @@ func (h *Controller) OrderAddonUpdate(c *gin.Context) {
 
 func (h *Controller) OrderAddonDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -339,7 +340,7 @@ func (h *Controller) OrderAddonDelete(c *gin.Context) {
 
 func (h *Controller) OrderRescheduleList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := pathParam(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -354,13 +355,13 @@ func (h *Controller) OrderRescheduleList(c *gin.Context) {
 
 func (h *Controller) OrderRescheduleApply(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := pathParam(c, "order_id")
+	orderID, err := bind.PathID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.RescheduleApplyReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -375,7 +376,7 @@ func (h *Controller) OrderRescheduleApply(c *gin.Context) {
 // OrderRescheduleAudit 改期审批，body: {approved, remark}（同样用 *bool，避免驳回被误判未传参）
 func (h *Controller) OrderRescheduleAudit(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -384,7 +385,7 @@ func (h *Controller) OrderRescheduleAudit(c *gin.Context) {
 		Approved *bool  `json:"approved"`
 		Remark   string `json:"remark"`
 	}
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}

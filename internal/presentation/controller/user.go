@@ -5,15 +5,16 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) UserList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	storeID := params.Int64(c, "store_id")
-	list, total, err := h.Svc.ListUsers(c.Request.Context(), op, page, pageSize, queryStr(c, "keyword"), storeID)
+	list, total, err := h.Svc.ListUsers(c.Request.Context(), op, page, pageSize, bind.ParamStr(c, "keyword"), storeID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -24,7 +25,7 @@ func (h *Controller) UserList(c *gin.Context) {
 func (h *Controller) UserCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.UserCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -37,13 +38,13 @@ func (h *Controller) UserCreate(c *gin.Context) {
 
 func (h *Controller) UserUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.UserUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -56,7 +57,7 @@ func (h *Controller) UserUpdate(c *gin.Context) {
 
 func (h *Controller) UserDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -70,13 +71,13 @@ func (h *Controller) UserDelete(c *gin.Context) {
 
 func (h *Controller) UserResetPassword(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.ResetPasswordReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -100,7 +101,7 @@ func (h *Controller) RoleList(c *gin.Context) {
 func (h *Controller) RoleCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.RoleCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -113,13 +114,13 @@ func (h *Controller) RoleCreate(c *gin.Context) {
 
 func (h *Controller) RoleUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.RoleUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -132,7 +133,7 @@ func (h *Controller) RoleUpdate(c *gin.Context) {
 
 func (h *Controller) RoleDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -147,13 +148,13 @@ func (h *Controller) RoleDelete(c *gin.Context) {
 // RoleGrant 保存角色权限（数据范围 + 权限点集合，全量覆盖式）
 func (h *Controller) RoleGrant(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.RoleGrantReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -167,7 +168,7 @@ func (h *Controller) RoleGrant(c *gin.Context) {
 // RolePerms 读取角色权限配置（权限配置界面回显）
 func (h *Controller) RolePerms(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -198,7 +199,7 @@ func (h *Controller) StoreList(c *gin.Context) {
 func (h *Controller) StoreCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.StoreCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -211,13 +212,13 @@ func (h *Controller) StoreCreate(c *gin.Context) {
 
 func (h *Controller) StoreUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StoreUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -230,7 +231,7 @@ func (h *Controller) StoreUpdate(c *gin.Context) {
 
 func (h *Controller) StoreDelete(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

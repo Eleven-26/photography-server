@@ -5,16 +5,17 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/presentation/bind"
 	"photography-server/internal/presentation/dto"
 	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) LeadList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	page, pageSize := pager(c)
+	page, pageSize := bind.Pager(c)
 	ownerID := params.Int64(c, "owner_id")
 	list, total, err := h.Svc.ListLeads(c.Request.Context(), op, page, pageSize,
-		queryStr(c, "keyword"), queryStr(c, "status"), ownerID)
+		bind.ParamStr(c, "keyword"), bind.ParamStr(c, "status"), ownerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -24,7 +25,7 @@ func (h *Controller) LeadList(c *gin.Context) {
 
 func (h *Controller) LeadDetail(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -40,7 +41,7 @@ func (h *Controller) LeadDetail(c *gin.Context) {
 func (h *Controller) LeadCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	var req dto.LeadCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -54,13 +55,13 @@ func (h *Controller) LeadCreate(c *gin.Context) {
 
 func (h *Controller) LeadUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.LeadUpdateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -77,13 +78,13 @@ func (h *Controller) LeadDelete(c *gin.Context) {
 
 func (h *Controller) LeadFollow(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.LeadFollowReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -96,7 +97,7 @@ func (h *Controller) LeadFollow(c *gin.Context) {
 
 func (h *Controller) LeadConvert(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -113,13 +114,13 @@ func (h *Controller) LeadConvert(c *gin.Context) {
 
 func (h *Controller) QuoteCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathParam(c, "lead_id")
+	id, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.QuoteCreateReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -133,7 +134,7 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 
 func (h *Controller) QuoteList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	leadID, err := pathParam(c, "lead_id")
+	leadID, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -148,13 +149,13 @@ func (h *Controller) QuoteList(c *gin.Context) {
 
 func (h *Controller) QuoteStatus(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.QuoteStatusReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -170,7 +171,7 @@ func (h *Controller) QuoteStatus(c *gin.Context) {
 // LeadMessages 线索沟通记录（客户来讯 + 工作室发出）
 func (h *Controller) LeadMessages(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -186,13 +187,13 @@ func (h *Controller) LeadMessages(c *gin.Context) {
 // LeadMessageSend 发送沟通消息（追问/报价通知/作品分享）
 func (h *Controller) LeadMessageSend(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := pathID(c)
+	id, err := bind.PathID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	var req dto.StaffLeadMessageReq
-	if err := h.bindJSON(c, &req); err != nil {
+	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -207,7 +208,7 @@ func (h *Controller) LeadMessageSend(c *gin.Context) {
 // LeadBriefList 需求摘要项列表（已确认 + 待追问）
 func (h *Controller) LeadBriefList(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	leadID, err := pathParam(c, "lead_id")
+	leadID, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -223,7 +224,7 @@ func (h *Controller) LeadBriefList(c *gin.Context) {
 // LeadBriefGenerate 依据线索信息重建需求摘要（已确认项 + 待追问项，覆盖旧数据）
 func (h *Controller) LeadBriefGenerate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	leadID, err := pathParam(c, "lead_id")
+	leadID, err := bind.PathID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
