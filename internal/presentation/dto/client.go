@@ -125,6 +125,31 @@ type ClientReschedulePayReq struct {
 	Voucher  string `json:"voucher"`   // 支付凭证图片
 }
 
+// ClientPaymentMarkReq 客户登记转账（H5「我已完成转账，通知摄影师」）。
+// 资金不经平台（需求文档 §1）：客户登记 → 员工端核验到账（/payment/confirm/:id），
+// 与 PC 端 CreatePayment 落同一张 biz_order_payment（status=1 待核验），只是发起方不同。
+type ClientPaymentMarkReq struct {
+	OrderID  int64   `json:"order_id" binding:"required"` // 订单ID
+	Type     string  `json:"type" binding:"required"`     // 收款类型 deposit-定金 final-尾款 addon-加选
+	Amount   float64 `json:"amount"`                      // 金额（传 0 或不传 = 按订单剩余应收自动取值）
+	MethodID int64   `json:"method_id"`                   // 收款方式（biz_payment_method.id，选填）
+	Voucher  string  `json:"voucher"`                     // 转账凭证图片（银行转账类渠道必传）
+	PaidAt   string  `json:"paid_at"`                     // 转账时间（选填，如 2006-01-02 15:04:05）
+	Remark   string  `json:"remark"`                      // 备注
+}
+
+// ClientPaymentMethodResp 客户可见的收款方式（只出启用项，供支付页展示收款码/账号）。
+// 刻意不直接返回 model.PaymentMethod：客户侧不需要 status/sort/租户字段，
+// 用独立 DTO 固定对外契约，避免后续给模型加内部列时被动泄露。
+type ClientPaymentMethodResp struct {
+	ID          int64  `json:"id"`           // 收款方式ID
+	Name        string `json:"name"`         // 名称（如「微信收款」「对公转账」）
+	Type        string `json:"type"`         // wechat/alipay/bank/cash/other
+	AccountName string `json:"account_name"` // 收款账户名称
+	AccountNo   string `json:"account_no"`   // 收款账号
+	Qrcode      string `json:"qrcode"`       // 收款二维码
+}
+
 // 改期调度费支付状态（客户端展示用，由该改期单的收款单推导，不落库）
 const (
 	RescheduleFeeNoNeed  = 0 // 无需支付（免费改期）

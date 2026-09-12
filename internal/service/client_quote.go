@@ -22,6 +22,13 @@ func (s *Service) ClientQuotes(ctx context.Context, cu *ClientUser) ([]model.Quo
 	return s.LeadRepo.ListQuotesByCustomer(ctx, cu.CompanyID, cu.CustomerID)
 }
 
+// ClientQuoteDetail 单张报价详情。
+// 与 /quote/list 同一份数据（列表已含明细），独立接口是为了报价详情页可按 id 直取，
+// 不必先拉全量列表再前端筛选；归属校验复用 getOwnedQuote（含线索兜底）。
+func (s *Service) ClientQuoteDetail(ctx context.Context, cu *ClientUser, quoteID int64) (*model.Quote, error) {
+	return s.getOwnedQuote(ctx, cu, quoteID)
+}
+
 // getOwnedQuote 取报价单并校验归属当前客户。
 // 「不存在」与「无权」返回同一提示，避免用 ID 遍历探测他人报价。
 func (s *Service) getOwnedQuote(ctx context.Context, cu *ClientUser, quoteID int64) (*model.Quote, error) {

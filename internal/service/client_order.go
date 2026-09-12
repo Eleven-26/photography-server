@@ -221,20 +221,24 @@ func (s *Service) ClientReviewCreate(ctx context.Context, cu *ClientUser, orderI
 	return &rv, nil
 }
 
-// ClientDeliveryItems 客户查看交付明细（选片页/成片页）
-func (s *Service) ClientDeliveryItems(ctx context.Context, cu *ClientUser, deliveryID int64) (*model.Delivery, []model.DeliveryItem, error) {
-	d, err := s.DeliveryRepo.GetByID(ctx, cu.CompanyID, deliveryID)
-	if err != nil {
-		return nil, nil, errs.NotFound(errs.ErrDeliveryNotFound)
-	}
-	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, d.OrderID)
-	if err != nil {
-		return nil, nil, errs.NotFound(errs.ErrOrderNotFound)
-	}
-	if err := clientOrderOwned(o, cu); err != nil {
+// ClientDeliveryDetail 客户查看交付单与明细（选片页/成片页）。
+//
+// 入参是 **order_id**（按订单反查交付单），与 PC 端 `/delivery/detail/:id` 的语义一致
+// （service.ListDeliveryItemsByOrder 亦为 order_id）——此前客户端这条路由用的是
+// delivery_id，与 PC 同 Path 不同语义，前端按 order_id 调用必然 404（2026-09-12 联调修正）。
+// 交付单尚未创建时返回 (nil, 空列表)，前端展示空态而非报错。
+func (s *Service) ClientDeliveryDetail(ctx context.Context, cu *ClientUser, orderID int64) (*model.Delivery, []model.DeliveryItem, error) {
+	if _, err := s.clientOwnedOrder(ctx, cu, orderID); err != nil {
 		return nil, nil, err
 	}
-	items, err := s.DeliveryRepo.ListItems(ctx, cu.CompanyID, deliveryID)
+	d, err := s.DeliveryRepo.GetByOrderID(ctx, cu.CompanyID, orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, []model.DeliveryItem{}, nil
+		}
+		return nil, nil, err
+	}
+	items, err := s.DeliveryRepo.ListItems(ctx, cu.CompanyID, d.ID)
 	if err != nil {
 		return nil, nil, err
 	}

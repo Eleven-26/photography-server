@@ -40,6 +40,13 @@ func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
 }
 
 // RegisterAuthed 注册需登录路由（CustomerAuth 注入 ClientUser）
+//
+// 口径说明（2026-09-12 联调补齐）：
+//   - 所有接口一律 **POST + JSON body**，路径参数用 :id/:order_id（后端不读 query，见 pkg/params）；
+//   - `/delivery/detail/:id` 与 `/delivery/items/:id` 的 :id 均为 **order_id**（与 PC 端同语义，
+//     按订单反查交付单）；真正的 delivery_id 出现在 `/delivery/select/:id` 等推进类接口上；
+//   - 列表统一 `response.PageOK`（`{list,total,page,page_size}`），
+//     逐单明细（退款/收款/改期）为不分页的业务集合，沿用 PC 同路径的裸数组口径。
 func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	// 预约/订单
 	g.POST("/order/submit", h.BookingSubmit)
@@ -47,23 +54,34 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/order/cancel/:id", h.BookingCancel)
 	g.POST("/order/list", h.OrderList)
 	g.POST("/order/detail/:id", h.OrderDetail)
+	// 拍前准备已读（biz_order.prep_read_at）
+	g.POST("/order/prep/read/:id", h.OrderPrepRead)
 	// 改期
 	g.POST("/reschedule/apply/:order_id", h.RescheduleApply)
 	g.POST("/reschedule/cancel/:id", h.RescheduleCancel)
+	g.POST("/reschedule/list/:order_id", h.RescheduleList)
 	// 退款
 	g.POST("/refund/apply/:order_id", h.RefundApply)
+	g.POST("/refund/list/:order_id", h.RefundList)
+	g.POST("/refund/confirm/:id", h.RefundConfirm)
+	// 收款：记录 / 登记转账（资金不经平台，仅登记） / 收款方式
+	g.POST("/payment/list/:order_id", h.PaymentList)
+	g.POST("/pay/mark", h.PaymentMark)
+	g.POST("/payment-method/list", h.PaymentMethods)
 	// 评价
 	g.POST("/review/create/:order_id", h.ReviewCreate)
 	// 选片与交付
 	g.POST("/delivery/detail/:id", h.DeliveryDetail)
+	g.POST("/delivery/items/:id", h.DeliveryItems)
 	g.POST("/delivery/select/:id", h.SelectPhotos)
 	g.POST("/delivery/confirm-extra/:id", h.ConfirmExtra)
 	g.POST("/delivery/confirm/:id", h.ConfirmDelivery)
 	g.POST("/delivery/feedback/:item_id", h.FeedbackSubmit)
 	// 定制需求
 	g.POST("/custom-request/list", h.CustomRequestList)
-	// 报价（报告 H1）：查看 / 接受 / 提出修改
+	// 报价（报告 H1）：列表 / 详情 / 接受 / 提出修改
 	g.POST("/quote/list", h.QuoteList)
+	g.POST("/quote/detail/:id", h.QuoteDetail)
 	g.POST("/quote/accept/:id", h.QuoteAccept)
 	g.POST("/quote/modify/:id", h.QuoteModify)
 	// 改期调度费（报告 H2）：详情含支付状态，支付走「上传凭证 → 工作室核验」
@@ -184,7 +202,7 @@ func (h *Controller) PackageList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // PackageDetail 套餐详情
@@ -330,7 +348,7 @@ func (h *Controller) OrderList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // OrderDetail 订单详情
@@ -347,6 +365,21 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 		return
 	}
 	response.OK(c, detail)
+}
+
+// OrderPrepRead 客户确认已读「拍前准备清单」（写 biz_order.prep_read_at，幂等）
+func (h *Controller) OrderPrepRead(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := bind.PathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientReadOrderPrep(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
 }
 
 // RescheduleApply 申请改期
@@ -385,6 +418,22 @@ func (h *Controller) RescheduleCancel(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// RescheduleList 我的订单改期单列表（改期进度页；不分页，逐单明细集合）
+func (h *Controller) RescheduleList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := bind.PathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ClientReschedules(c.Request.Context(), cu, orderID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
 // RefundApply 申请退款
 func (h *Controller) RefundApply(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
@@ -404,6 +453,81 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		return
 	}
 	response.OK(c, rf)
+}
+
+// RefundList 我的订单退款记录（退款进度页 C21；不分页，逐单明细集合）
+func (h *Controller) RefundList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := bind.PathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ClientRefunds(c.Request.Context(), cu, orderID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// RefundConfirm 客户确认收到退款（写 customer_confirm_at，与员工端审批闭环；幂等）
+func (h *Controller) RefundConfirm(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := bind.PathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ClientConfirmRefundReceived(c.Request.Context(), cu, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// PaymentList 我的订单收款记录（支付页展示登记状态）
+func (h *Controller) PaymentList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	orderID, err := bind.PathID(c, "order_id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	list, err := h.Svc.ClientPayments(c.Request.Context(), cu, orderID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// PaymentMark 客户登记转账（「我已完成转账，通知摄影师」）。
+// 资金不经平台：仅落 status=1 待核验记录，到账确认仍在员工端 /payment/confirm/:id。
+func (h *Controller) PaymentMark(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	var req dto.ClientPaymentMarkReq
+	if err := bind.BindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	p, err := h.Svc.ClientRegisterPayment(c.Request.Context(), cu, req.OrderID, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, p)
+}
+
+// PaymentMethods 客户可见的收款方式（只出启用项，供支付页展示收款码/账号）
+func (h *Controller) PaymentMethods(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	list, err := h.Svc.ClientPaymentMethods(c.Request.Context(), cu)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
 }
 
 // ReviewCreate 评价订单
@@ -427,7 +551,7 @@ func (h *Controller) ReviewCreate(c *gin.Context) {
 	response.OK(c, rv)
 }
 
-// DeliveryDetail 交付单与明细（选片页/成片页）
+// DeliveryDetail 交付单与明细（选片页/成片页）。:id 为 **order_id**（与 PC 端同语义）。
 func (h *Controller) DeliveryDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -435,12 +559,29 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	d, items, err := h.Svc.ClientDeliveryItems(c.Request.Context(), cu, id)
+	d, items, err := h.Svc.ClientDeliveryDetail(c.Request.Context(), cu, id)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 	response.OK(c, gin.H{"delivery": d, "items": items})
+}
+
+// DeliveryItems 交付文件明细（按订单反查）。:id 为 **order_id**。
+// 与 /delivery/detail/:id 数据同源，供「文件管理」tab 直接取列表；未建交付单返回空列表。
+func (h *Controller) DeliveryItems(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := bind.PathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	_, items, err := h.Svc.ClientDeliveryDetail(c.Request.Context(), cu, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, items)
 }
 
 // SelectPhotos 提交选片
@@ -524,7 +665,7 @@ func (h *Controller) CustomRequestList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // ---------------------------------------------------------------------
@@ -545,7 +686,7 @@ func (h *Controller) AssetList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // AssetDetail 公开作品详情（浏览数 +1）
@@ -581,6 +722,22 @@ func (h *Controller) QuoteList(c *gin.Context) {
 		return
 	}
 	response.OK(c, list)
+}
+
+// QuoteDetail 单张报价详情（报价详情页，按 id 直取；归属校验含线索兜底）
+func (h *Controller) QuoteDetail(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	id, err := bind.PathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	q, err := h.Svc.ClientQuoteDetail(c.Request.Context(), cu, id)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, q)
 }
 
 // QuoteAccept 接受报价
@@ -710,7 +867,7 @@ func (h *Controller) NotificationList(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{"list": list, "total": total})
+	response.PageOK(c, list, total, page, pageSize)
 }
 
 // NotificationUnreadCount 未读通知数（铃铛红点）

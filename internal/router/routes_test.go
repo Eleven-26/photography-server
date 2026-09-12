@@ -31,10 +31,10 @@ var permExempt = map[string]bool{
 }
 
 // staffRouteCountBaseline 员工端路由数基线：
-// 26（与 PC 同路径复用，含 2026-09-12 补开的 4 条 /notification/*）
-// + 6（异路径别名）+ 2（真实端差异）+ 18（移动端独有）= 52。
+// 29（与 PC 同路径复用，含补开的 4 条 /notification/*、2 条取消/改期发起、1 条 /delivery/items/:id）
+// + 6（异路径别名）+ 2（真实端差异）+ 18（移动端独有）= 55。
 // 有意增减员工端暴露面时须同步更新此基线——它防的是"悄悄多挂 / 漏挂"。
-const staffRouteCountBaseline = 52
+const staffRouteCountBaseline = 55
 
 // commonRouteCountBaseline 管理端业务路由数基线（PC 与小程序共用）。
 const commonRouteCountBaseline = 108
