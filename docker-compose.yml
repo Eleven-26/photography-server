@@ -77,8 +77,13 @@ services:
     networks:
       - backend-net
 
-  # 搜索引擎
+  # 搜索引擎（Elasticsearch）——【可选组件，默认不随 up 启动】
+  # 现状：service / repository 层零引用（grep 计数 0），仅 /test/es/* 调试接口使用；
+  #   prod 的 nacos 配置 elasticsearch.enable=false，代码侧未启用时 App.ES=nil 并降级，非强依赖。
+  # 故列入 debug profile：避免每次 up 白起容器（默认 512MB heap）并拖慢后端启动。
+  # 需要本地调试时：docker compose --profile debug up -d   （或 make docker-up-debug）
   elasticsearch:
+    profiles: ["debug"]
     image: elasticsearch:${ES_VERSION:-8.19.0}
     container_name: photography-elasticsearch
     environment:
@@ -99,8 +104,11 @@ services:
     networks:
       - backend-net
 
-  # 文档数据库
+  # 文档数据库（MongoDB）——【可选组件，默认不随 up 启动】
+  # 现状：service / repository 层零引用，仅 /test/mongo/* 调试接口使用；
+  #   prod 的 nacos 配置 mongodb.enable=false。同 ES，列入 debug profile。
   mongo:
+    profiles: ["debug"]
     image: mongo:${MONGO_VERSION:-7.0}
     container_name: photography-mongo
     environment:
@@ -253,6 +261,9 @@ services:
         SW_AGENT_VERSION: ${SW_AGENT_VERSION:-0.7.0}
         SW_AGENT_SERVICE: ${SW_AGENT_SERVICE:-photography-server}
         SW_AGENT_BACKEND: ${SW_AGENT_BACKEND:-skywalking-oap:11800}
+        # Go 构建标签：默认空 = 生产纯净二进制（不含 /test 基础设施调试接口）；
+        # 容器内需要调试时在 .env 设 GO_BUILD_TAGS=debug 后重新 build。
+        GO_BUILD_TAGS: ${GO_BUILD_TAGS:-}
     image: chenkangfu/photography-server:${VERSION:-latest}  # 通过环境变量传入版本
     container_name: photography-backend
     depends_on:
@@ -264,10 +275,10 @@ services:
         condition: service_started
       xxl-job-admin:
         condition: service_started
-      elasticsearch:
-        condition: service_healthy
-      mongo:
-        condition: service_started
+      # elasticsearch / mongo 已从 depends_on 移除：二者属 debug profile 的可选组件，
+      # 且代码侧为可选依赖（未启用 → App.ES/App.Mongo 为 nil，调用方判空降级），
+      # 不应阻塞后端启动（原先 elasticsearch: service_healthy 会让后端被 ES 拖住，甚至 ES 起不来则后端永不起）。
+      # 如需在容器里联调：docker compose --profile debug up -d
       # 仅 native 通道需要（OAP 未就绪时 agent 上报会自行重试）；
       # 只跑 Jaeger 通道时可注释掉本项，避免每次 up 都拉起整套 SkyWalking 栈
       skywalking-oap:

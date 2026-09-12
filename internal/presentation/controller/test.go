@@ -1,3 +1,9 @@
+//go:build debug
+
+// 本文件是 dev/test 环境专用的「基础设施调试控制台」，通过构建标签 debug 做编译期隔离：
+// 默认构建（含生产镜像）**不编译本文件**，这些接口在二进制层面即不存在；
+// 需要时以 -tags debug 构建（本地 Makefile 默认携带；容器内设 GO_BUILD_TAGS=debug）。
+
 package controller
 
 import (

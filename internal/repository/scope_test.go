@@ -20,7 +20,9 @@ func dryRunDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN:                       "root:root@tcp(127.0.0.1:3306)/photography?charset=utf8&parseTime=True",
 		SkipInitializeWithVersion: true,
-	}), &gorm.Config{DryRun: true, Logger: logger.Discard})
+		// DisableAutomaticPing：GORM 默认在 Open 时 ping 一次，会让"纯 DryRun"单测
+		// 隐式依赖 MySQL（无库环境/CI 直接失败）。DryRun 只编译 SQL、不执行，无需真实连接。
+	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true, Logger: logger.Discard})
 	if err != nil {
 		t.Fatalf("打开 DryRun 连接失败: %v", err)
 	}

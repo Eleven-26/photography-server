@@ -84,24 +84,15 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	wcStaffAuth := api.Group("/wechat/staff", mw.StaffAuth(), mw.OperationLog())
 	wcCtl.RegisterStaffAuthed(wcStaffAuth, mw)
 
-	// 调试路由（Redis/NATS/ES/Mongo 读写删除 + 配置密文生成，无业务鉴权）：
-	// 以 profile（服务端启动参数/APP_PROFILE，可信）白名单为准——只有 dev/test/docker.dev 注册；
-	// 生产（prod）无论 app.mode 是否误配为 debug/空 都不暴露（旧实现按 mode!="release" 黑名单判断，
-	// mode 为空即等于非 release → 生产误配会全量暴露，是 P0 隐患）。
-	if debugProfile(cfg.App.Profile) {
-		registerDebug(api, ctl)
-	}
+	// 调试路由（配置密文生成 + [仅 debug 构建] 基础设施读写实验，均无业务鉴权）：
+	// 两级把关——
+	//   ① 编译期（debug 构建标签）：Redis/NATS/ES/Mongo/Jaeger 调试接口只在 -tags debug 产物中
+	//      编译（见 debug_on.go），默认构建（含生产镜像）在二进制层面即不含这些代码；
+	//   ② 运行期（profile 白名单 dev/test/docker.dev）：prod 无论 app.mode 是否误配为 debug/空
+	//      都不注册（旧实现按 mode!="release" 黑名单判断，mode 为空即等于非 release → 生产误配会全量暴露，是 P0 隐患）。
+	registerDebugRoutes(api, ctl, cfg.App.Profile)
 
 	return engine
-}
-
-// debugProfile 判断当前 profile 是否允许注册调试路由
-func debugProfile(profile string) bool {
-	switch profile {
-	case "dev", "test", "docker.dev":
-		return true
-	}
-	return false
 }
 
 // registerCommon 注册所有客户端共用的业务路由（PC 管理后台与小程序管理后台共用挂载点，权限点挂一次两端生效）。
@@ -289,39 +280,4 @@ func registerCommon(g *gin.RouterGroup, ctl *controller.Controller, mw *middlewa
 	// 上传（通用文件上传能力，各业务链路共用 → 免挂权限点，见函数头说明）
 	up := g.Group("/upload")
 	up.POST("/file", ctl.UploadFile)
-}
-
-// registerDebug 注册基础设施调试路由（Redis / NATS / ES / Mongo 连通性与读写实验）。
-// 仅由 New 在非 release 环境调用；这些处理器直连 infrastructure 单例（调试控制台），
-// 不经过 service 层，也未挂业务鉴权——禁止在生产环境启用。
-func registerDebug(g *gin.RouterGroup, ctl *controller.Controller) {
-	t := g.Group("/test")
-	t.POST("/redis/ping", ctl.RedisPing)
-	t.POST("/redis/set", ctl.RedisSet)
-	t.POST("/redis/get", ctl.RedisGet)
-	t.POST("/redis/del", ctl.RedisDel)
-	t.POST("/nats/status", ctl.NATSStatus)
-	t.POST("/nats/pub", ctl.NATSPub)
-	t.POST("/nats/pub-persistent", ctl.NATSPubPersistent)
-	t.POST("/nats/pub-pull", ctl.NATSPubPull)
-	t.POST("/nats/request", ctl.NATSRequest)
-	t.POST("/es/status", ctl.ESStatus)
-	t.POST("/es/index", ctl.ESIndex)
-	t.POST("/es/search", ctl.ESSearch)
-	t.POST("/es/list", ctl.ESList)
-	t.POST("/es/delete", ctl.ESDelete)
-	t.POST("/mongo/status", ctl.MongoStatus)
-	t.POST("/mongo/insert", ctl.MongoInsert)
-	t.POST("/mongo/insert-many", ctl.MongoInsertMany)
-	t.POST("/mongo/find", ctl.MongoFind)
-	t.POST("/mongo/find-one", ctl.MongoFindOne)
-	t.POST("/mongo/update", ctl.MongoUpdate)
-	t.POST("/mongo/delete", ctl.MongoDelete)
-	t.POST("/mongo/delete-by-id", ctl.MongoDeleteByID)
-	t.POST("/jaeger/status", ctl.JaegerStatus)
-	t.POST("/jaeger/trace", ctl.JaegerTrace)
-	// 配置密文生成（只加密不解密，未挂业务鉴权，仅非 release 注册）
-	t.POST("/config/encrypt", ctl.ConfigEncrypt)
-
-	t.POST("/test", ctl.Test)
 }

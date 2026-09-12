@@ -11,6 +11,12 @@ ENV GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 GOFLAGS=-mod=mod
 # 注意：注入构建会强制 -a 全量 rebuild（编译时间明显变长）；agent 版本需与 go.mod 依赖一致，
 # 且 build/agent/ 下存在 skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64（从官方 bin.tgz 解压即可；
 # 该二进制已 gitignore，目录由 .gitkeep 占位，缺失时注入分支会直接报文件不存在）。
+# Go 构建标签（--build-arg 传入）：留空（默认）= 产出不含基础设施调试接口
+# （/test/redis|nats|es|mongo|jaeger，源码见 internal/presentation/controller/test.go 的 debug 标签）；
+# 需要容器内调试时传 GO_BUILD_TAGS=debug（compose 由 .env 的 GO_BUILD_TAGS 透传）。
+# 注：/test/config/encrypt（配置密文生成）不受此影响，始终编译。
+ARG GO_BUILD_TAGS=""
+
 ARG SW_AGENT_ENABLE=false
 ARG SW_AGENT_VERSION=0.7.0
 ARG SW_AGENT_SERVICE=photography-server
@@ -35,9 +41,9 @@ RUN if [ "$SW_AGENT_ENABLE" = "true" ]; then \
       printf 'agent:\n  service_name: ${SW_AGENT_NAME:%s}\n  sampler: ${SW_AGENT_SAMPLE:1}\nreporter:\n  grpc:\n    backend_service: ${SW_AGENT_REPORTER_GRPC_BACKEND_SERVICE:%s}\n' \
         "${SW_AGENT_SERVICE}" "${SW_AGENT_BACKEND}" > /tmp/agent.config && \
       echo ">>> building with local agent: ${AGENT_BIN}" && \
-      go build -trimpath -ldflags "-s -w" -toolexec="${AGENT_BIN} -config /tmp/agent.config" -a -o /out/photography-server ./cmd/server; \
+      go build -trimpath -ldflags "-s -w" ${GO_BUILD_TAGS:+-tags $GO_BUILD_TAGS} -toolexec="${AGENT_BIN} -config /tmp/agent.config" -a -o /out/photography-server ./cmd/server; \
     else \
-      go build -trimpath -ldflags "-s -w" -o /out/photography-server ./cmd/server; \
+      go build -trimpath -ldflags "-s -w" ${GO_BUILD_TAGS:+-tags $GO_BUILD_TAGS} -o /out/photography-server ./cmd/server; \
     fi
 
 # ---------- 运行阶段 ----------
