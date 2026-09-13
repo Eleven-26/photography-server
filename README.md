@@ -164,9 +164,11 @@ cp ./photography-server/config/nats.example.conf ./volume/nats/conf/nats.conf
 prod
 ├── photography-server
 ├── photography-frontend
+├── photography-wechat
+├── photography-h5
 ├── volume # 存放挂载数据
-├── docker-compose.yml
 ├── .env
+├── docker-compose.yml
 
 # 在prod目录下执行
 docker compose up -d --build
