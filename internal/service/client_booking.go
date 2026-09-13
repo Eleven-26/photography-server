@@ -34,7 +34,10 @@ func clientOrderOwned(o *model.Order, cu *ClientUser) error {
 
 // ClientSubmitBooking 客户提交预约单（来源=客户预约，状态=待确认）。
 // 事务内：建线索 → 建订单（快照）→ 锁档期 → 写线索消息 → 订单日志。
-func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req dto.ClientBookingReq) (*model.Order, error) {
+//
+// staffID：分享链接携带的员工账号 ID（0 = 非分享进入，或链接未带参）。
+// 命中同租户在职员工时写入订单 photographer_id，实现「谁分享、单算谁的」。
+func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req dto.ClientBookingReq, staffID int64) (*model.Order, error) {
 	if req.PackageID <= 0 {
 		return nil, errs.BadRequest("请选择套餐")
 	}
@@ -63,6 +66,27 @@ func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req d
 	for _, b := range blocks {
 		if b.Status != enum.BlockStatusCancelled && (b.TimeRange == req.ShootTime || b.TimeRange == "") {
 			return nil, errs.BadRequest("该时段已被预约，请选择其他时段")
+		}
+	}
+
+	// 分享链接携带的员工账号（staffID）——「谁分享的，单就算谁的」。
+	// 仅接受同租户且在职的员工，写入订单 photographer_id + photographer（姓名快照），
+	// 员工端「仅本人」数据范围（见 repository/scope.go → scopeOrder 的 photographer_id 列）
+	// 据此看到自己链接带来的客户单。校验失败**不阻断下单**（链接过期、账号停用不该让客户
+	// 下不了单），只是订单不落归属，由工作室后续自行指派。
+	var shooterID int64
+	var shooterName string
+	if staffID > 0 {
+		u, err := s.AuthRepo.GetByID(ctx, cu.CompanyID, staffID)
+		if err != nil || u.Status != 1 {
+			logger.Warnf("ClientSubmitBooking: 分享人无效，订单不落归属, companyID=%d, staffID=%d, err=%v",
+				cu.CompanyID, staffID, err)
+		} else {
+			shooterID = u.ID
+			shooterName = u.Nickname
+			if shooterName == "" {
+				shooterName = u.Username
+			}
 		}
 	}
 
@@ -100,6 +124,9 @@ func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req d
 		PeopleCount:    req.PeopleCount,
 		ShootStyle:     req.ShootStyle,
 		SourceType:     2, // 客户预约
+		// 分享人归属：来自分享链接的员工账号（0 = 非分享进入或校验未通过，由工作室指派）
+		PhotographerID: shooterID,
+		Photographer:   shooterName,
 		Status:         enum.OrderStatusPendingConfirm,
 		PaymentStatus:  enum.PaymentStatusPending,
 		Remark:         req.Remark,

@@ -61,7 +61,7 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 		c.JSON(200, gin.H{"code": 0, "msg": "ok", "data": "photography-server running"})
 	})
 
-	// 公共接口：登录（四个客户端统一走 /auth/login）
+	// 公共接口：管理端登录（pc / miniapp 两个管理后台共用 /auth/login，账号密码）
 	api.POST("/auth/login", ctl.Login)
 
 	// ---- 管理端（员工认证）：pc-管理后台 miniapp-小程序管理后台 ----
@@ -83,7 +83,8 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	wcCtl.RegisterPublic(wcPub)
 	wcAuth := api.Group("/wechat", mw.CustomerAuth())
 	wcCtl.RegisterAuthed(wcAuth)
-	// 员工区（员工验证码登录 + StaffAuth）：摄影师/助理用小程序处理订单、日程、线索
+	// 员工区（员工账号密码登录 + StaffAuth）：摄影师/助理用小程序处理订单、日程、线索
+	// 公开登录出口挂 /wechat/staff/auth/*（account+password；短信验证码登录为预留能力）
 	// 共享 PC 路由子集 + 员工端独有路由，均引用同一 handler（见 endpoints.go）
 	wcStaffPub := api.Group("/wechat/staff")
 	wcCtl.RegisterStaffPublic(wcStaffPub)

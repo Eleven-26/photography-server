@@ -1,6 +1,12 @@
 package dto
 
-import "photography-server/internal/model"
+import (
+	"net/url"
+	"strconv"
+	"strings"
+
+	"photography-server/internal/model"
+)
 
 // ======================== 客户端（H5/小程序） ========================
 
@@ -252,6 +258,43 @@ func (req StaffStudioSettingReq) ToUpdates() map[string]interface{} {
 		updates["service_flow"] = req.ServiceFlow
 	}
 	return updates
+}
+
+// StaffStudioSettingResp 工作室设置读取响应。
+//
+// 在 model.StudioSetting 之上追加 homepage_url —— 员工端「我的预约主页」直接展示与复制该地址。
+// 域名由服务端按 share.homepage_base_url 拼装，前端不自己拼域名：改域名只需改 Nacos 配置，
+// 不必重新发版小程序。
+type StaffStudioSettingResp struct {
+	*model.StudioSetting
+	// HomepageURL 预约主页分享链接，形如
+	// https://slot.app/?slug=lusheng-photography&staff_id=12。
+	// slug 未配置、或服务端未配 share.homepage_base_url 时为空串（员工端据此给兜底提示）。
+	// staff_id 为分享人（员工）账号 ID，客户从该链接下单时订单即归到这位员工名下；
+	// 取不到员工 ID 时省略该参数，链接退化为只定位租户的普通主页地址。
+	HomepageURL string `json:"homepage_url"`
+}
+
+// NewStaffStudioSettingResp 组装读取响应：基址与 slug 同时具备才产出分享链接。
+//
+// staffID 为当前登录员工账号 ID（由调用方传 op.UserID）——分享即归属：
+// 同一条主页链接被不同员工分享出去，客户凭各自链接下单，订单分别落到各自账号名下，
+// 员工端「仅本人」数据范围（scopeOrder 的 photographer_id 列）因此能看到自己的客户单。
+func NewStaffStudioSettingResp(st *model.StudioSetting, baseURL string, staffID int64) *StaffStudioSettingResp {
+	resp := &StaffStudioSettingResp{StudioSetting: st}
+	if st == nil {
+		return resp
+	}
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/") // 去尾斜杠，避免拼出 https://host//?slug=
+	slug := strings.TrimSpace(st.HomepageSlug)
+	if base != "" && slug != "" {
+		// query 形式：H5 端 utils/slug.js（?slug=）与 utils/referrer.js（?staff_id=）读 window.location.search
+		resp.HomepageURL = base + "/?slug=" + url.QueryEscape(slug)
+		if staffID > 0 {
+			resp.HomepageURL += "&staff_id=" + strconv.FormatInt(staffID, 10)
+		}
+	}
+	return resp
 }
 
 // StaffRescheduleAuditReq 改期审批

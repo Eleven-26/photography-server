@@ -16,6 +16,13 @@ app:
     - http://localhost:5173
     - http://127.0.0.1:5173
 
+# 对外分享链接基址：员工端「我的预约主页」分享给客户的 H5 地址，
+# 客户在微信内打开后落到 photography-h5 预约主页，由 ?slug= 定位租户。
+# 留空时 staff studio/get 的 homepage_url 返回空串（员工端提示「主页标识未设置」）。
+# 测试环境按实际对外地址填写。APP_SHARE_HOMEPAGE_BASE_URL 可覆盖。
+share:
+  homepage_base_url: ""
+
 jwt:
   secret: "ENCv1:0nc7MRuGb1X0Ne8KOT0O0EwoM11qjGBLGySqZBATSuRWPJLOeSEFCslPRtclpOGdWnqs4GWOd04h"
   issuer: photography-server

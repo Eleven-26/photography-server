@@ -13,64 +13,20 @@ import (
 	"photography-server/internal/presentation/dto"
 )
 
-// Login 登录。ctx 由 controller 传入（c.Request.Context()），透传给 repo 使 SQL 挂到当前链路。
+// Login 登录（PC 管理后台 / 小程序管理后台）。ctx 由 controller 传入
+// （c.Request.Context()），透传给 repo 使 SQL 挂到当前链路。
 // 修复 #45.2：添加失败限流，防止暴力破解
+//
+// 凭据校验（bcrypt 比对 + 失败锁定）已抽到 verifyPasswordCredential，与员工端
+// 账号密码登录（StaffPasswordLogin）共用同一实现——两端的限流口径与错误文案
+// 必须一致，各写一份必然漂移出安全缺口。
 func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
-	rdb := s.redis()
-
-	// 检查 IP 是否被锁定（失败 10 次）
-	if rdb != nil {
-		ipLockKey := "login:ip:" + ip + "_locked"
-		if locked, _ := rdb.Exists(ctx, ipLockKey).Result(); locked > 0 {
-			return nil, errs.BadRequest("登录失败次数过多，请 15 分钟后再试")
-		}
-	}
-
-	// 检查用户名是否被锁定（失败 5 次）
-	if rdb != nil {
-		userLockKey := "login:user:" + req.Username + "_locked"
-		if locked, _ := rdb.Exists(ctx, userLockKey).Result(); locked > 0 {
-			return nil, errs.BadRequest("账号已被锁定，请 15 分钟后再试")
-		}
-	}
-
-	u, err := s.AuthRepo.GetByUsername(ctx, req.Username)
+	u, err := s.verifyPasswordCredential(ctx, req.Username, req.Password, ip)
 	if err != nil {
-		// 统一错误消息，不泄露账号是否存在
-		return nil, errs.BadRequest(errs.ErrAccountWrong)
+		return nil, err
 	}
 
-	// 账号停用也返回统一错误，避免泄露账号状态
-	if u.Status != 1 {
-		return nil, errs.BadRequest(errs.ErrAccountWrong)
-	}
-
-	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)) != nil {
-		// 密码错误，记录失败次数
-		if rdb != nil {
-			// IP 维度计数
-			ipKey := "login:ip:" + ip
-			ipCount, _ := rdb.Incr(ctx, ipKey).Result()
-			if ipCount == 1 {
-				rdb.Expire(ctx, ipKey, 15*time.Minute)
-			}
-			if ipCount >= 10 {
-				rdb.Set(ctx, ipKey+"_locked", "1", 15*time.Minute)
-			}
-
-			// 用户名维度计数
-			userKey := "login:user:" + req.Username
-			userCount, _ := rdb.Incr(ctx, userKey).Result()
-			if userCount == 1 {
-				rdb.Expire(ctx, userKey, 15*time.Minute)
-			}
-			if userCount >= 5 {
-				rdb.Set(ctx, userKey+"_locked", "1", 15*time.Minute)
-			}
-		}
-		return nil, errs.BadRequest(errs.ErrAccountWrong)
-	}
-
+	// 管理端令牌不带 utype（沿存量口径，parse 后为空串按员工放行）；员工端令牌另带 utype=staff
 	token, err := jwtpkg.Generate(secret, issuer, expireHours, jwtpkg.Claims{
 		UserID:    u.ID,
 		Username:  u.Username,
@@ -84,14 +40,81 @@ func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours 
 
 	s.AuthRepo.UpdateLoginInfo(ctx, u.ID, ip)
 
+	u.Password = ""
+	return &dto.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
+}
+
+// verifyPasswordCredential 账号密码凭据校验（含失败限流），
+// PC 登录（Login）与员工端登录（StaffPasswordLogin）共用。
+//
+// 共用是刻意的，三件事必须两端逐字一致：
+//  1. 失败限流（IP 10 次 / 账号 5 次，各 15 分钟锁定）——任何一端放宽都等于开了暴力破解口子；
+//  2. 错误文案统一为 ErrAccountWrong，不泄露「账号是否存在」「是否被停用」；
+//  3. bcrypt 比对方式（sys_user.password 存 bcrypt 密文）。
+//
+// 成功时清除失败计数并返回用户行；Password 字段仍是密文，由调用方按需清空后再下发。
+func (s *Service) verifyPasswordCredential(ctx context.Context, username, password, ip string) (*model.SysUser, error) {
+	rdb := s.redis()
+
+	// 检查 IP 是否被锁定（失败 10 次）
+	if rdb != nil {
+		ipLockKey := "login:ip:" + ip + "_locked"
+		if locked, _ := rdb.Exists(ctx, ipLockKey).Result(); locked > 0 {
+			return nil, errs.BadRequest("登录失败次数过多，请 15 分钟后再试")
+		}
+	}
+
+	// 检查用户名是否被锁定（失败 5 次）
+	if rdb != nil {
+		userLockKey := "login:user:" + username + "_locked"
+		if locked, _ := rdb.Exists(ctx, userLockKey).Result(); locked > 0 {
+			return nil, errs.BadRequest("账号已被锁定，请 15 分钟后再试")
+		}
+	}
+
+	u, err := s.AuthRepo.GetByUsername(ctx, username)
+	if err != nil {
+		// 统一错误消息，不泄露账号是否存在
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
+	}
+
+	// 账号停用也返回统一错误，避免泄露账号状态
+	if u.Status != 1 {
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)) != nil {
+		// 密码错误，记录失败次数
+		if rdb != nil {
+			// IP 维度计数
+			ipKey := "login:ip:" + ip
+			ipCount, _ := rdb.Incr(ctx, ipKey).Result()
+			if ipCount == 1 {
+				rdb.Expire(ctx, ipKey, 15*time.Minute)
+			}
+			if ipCount >= 10 {
+				rdb.Set(ctx, ipKey+"_locked", "1", 15*time.Minute)
+			}
+
+			// 用户名维度计数
+			userKey := "login:user:" + username
+			userCount, _ := rdb.Incr(ctx, userKey).Result()
+			if userCount == 1 {
+				rdb.Expire(ctx, userKey, 15*time.Minute)
+			}
+			if userCount >= 5 {
+				rdb.Set(ctx, userKey+"_locked", "1", 15*time.Minute)
+			}
+		}
+		return nil, errs.BadRequest(errs.ErrAccountWrong)
+	}
+
 	// 登录成功，清除失败计数
 	if rdb != nil {
 		rdb.Del(ctx, "login:ip:"+ip)
-		rdb.Del(ctx, "login:user:"+req.Username)
+		rdb.Del(ctx, "login:user:"+username)
 	}
-
-	u.Password = ""
-	return &dto.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
+	return u, nil
 }
 
 func (s *Service) Profile(ctx context.Context, op Operator) (*dto.UserInfoVO, error) {

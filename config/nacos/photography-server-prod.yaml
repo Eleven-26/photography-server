@@ -17,6 +17,14 @@ app:
   cors_origins:
     - https://admin.example.com
 
+# 对外分享链接基址：员工端「我的预约主页」分享给客户的 H5 地址。
+# 客户在微信内打开后落到 photography-h5 预约主页，由 ?slug= 定位租户（h5.go→slugFrom）。
+# ⚠️ 上线前必填：替换为 H5 站点的真实对外域名（不带尾斜杠亦可，服务端会归一化）。
+# 留空时 staff studio/get 的 homepage_url 返回空串，员工端提示「主页标识未设置」，
+# 不会拼出指向错误域名的链接。APP_SHARE_HOMEPAGE_BASE_URL 可覆盖（优先级最高）。
+share:
+  homepage_base_url: ""
+
 jwt:
   secret: "ENCv1:ALskJ6HYkWcOtO3TEZPZyFxR9s/m8kIHrnmSPL+q8ErYbV1Bdp4pRbjdgwZz+IZaMZOmOWAcKql57N/+BiyGNXBFcA==" # 密文；原值从 .env 的 APP_JWT_SECRET 迁入
   issuer: photography-server

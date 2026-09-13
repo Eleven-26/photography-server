@@ -16,6 +16,7 @@ import (
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
 	"photography-server/internal/pkg/logger"
+	"photography-server/internal/presentation/dto"
 )
 
 // ClientUser 客户端（H5/小程序）登录上下文，由 CustomerAuth 中间件注入
@@ -178,24 +179,50 @@ func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile,
 	return c, token, nil
 }
 
-// StaffSmsLogin 摄影师 App 手机号验证码登录（按 sys_user.mobile 匹配员工）
-func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, platform, ip string) (*model.SysUser, string, error) {
+// StaffPasswordLogin 员工账号密码登录（小程序员工端 POST /wechat/staff/auth/login）。
+//
+// 凭据校验与 PC 登录**共用同一实现**（verifyPasswordCredential）：同一套 bcrypt 比对、
+// 同一失败限流（IP 10 次 / 账号 5 次，各 15 分钟锁定）、同一错误文案。
+// 差异只在登录成功之后——员工端签发 utype=staff 令牌（7 天，见 staffToken）并登记设备。
+func (s *Service) StaffPasswordLogin(ctx context.Context, username, password, deviceName, platform, ip string) (*dto.LoginResp, error) {
+	u, err := s.verifyPasswordCredential(ctx, username, password, ip)
+	if err != nil {
+		return nil, err
+	}
+	return s.finishStaffLogin(ctx, u, deviceName, platform, ip)
+}
+
+// StaffSmsLogin 摄影师 App 手机号验证码登录（按 sys_user.mobile 匹配员工）。
+//
+// ⚠️ 预留能力：员工端 UI 当前只用账号密码登录，此路径暂未被前端调用。
+// 路由挂在 /wechat/staff/auth/login-by-code，与 auth/sms-code 成对保留，
+// 待「手机验证码登录」上线时接入即可，无需再动后端。
+func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, platform, ip string) (*dto.LoginResp, error) {
 	if err := s.verifySmsCode(ctx, "login", mobile, code); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	u, err := s.AuthRepo.GetByMobile(ctx, mobile)
 	if err != nil {
-		return nil, "", errs.NotFound("账号不存在，请联系工作室开通")
+		return nil, errs.NotFound("账号不存在，请联系工作室开通")
 	}
 	if u.Status != 1 {
-		return nil, "", errs.Forbidden("账号已被停用")
+		return nil, errs.Forbidden("账号已被停用")
 	}
+	return s.finishStaffLogin(ctx, u, deviceName, platform, ip)
+}
+
+// finishStaffLogin 员工登录成功后的公共收尾：
+// 签发员工令牌 → 刷新最近登录时间/IP → 登记登录设备 → 组装响应（清空密码密文）。
+//
+// 两种登录方式（账号密码 / 手机验证码）共用，保证返回结构完全一致：
+// 前端 store 只写一套 login(token, user) 逻辑，后续新增登录方式无需改前端。
+func (s *Service) finishStaffLogin(ctx context.Context, u *model.SysUser, deviceName, platform, ip string) (*dto.LoginResp, error) {
 	token, err := s.staffToken(u)
 	if err != nil {
-		return nil, "", errs.Internal("")
+		return nil, errs.Internal("")
 	}
 	if err := s.AuthRepo.TouchLogin(ctx, u.ID, ip); err != nil {
-		logger.Warnf("StaffSmsLogin: TouchLogin failed, userID=%d, err=%v", u.ID, err)
+		logger.Warnf("staff login: TouchLogin failed, userID=%d, err=%v", u.ID, err)
 	}
 	if deviceName != "" {
 		now := time.Now()
@@ -212,10 +239,12 @@ func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, p
 			LastActiveAt: &nowStr,
 		}
 		if err := s.DeviceRepo.Create(ctx, d); err != nil {
-			logger.Warnf("StaffSmsLogin: create device failed, userID=%d, err=%v", u.ID, err)
+			logger.Warnf("staff login: create device failed, userID=%d, err=%v", u.ID, err)
 		}
 	}
-	return u, token, nil
+	// 清密码密文后再组装（buildUserInfo 内嵌 SysUser 整行，不清会随响应下发 bcrypt 哈希）
+	u.Password = ""
+	return &dto.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
 }
 
 // CustomerTokenClaims 签发客户 JWT（UserType=customer）

@@ -1,6 +1,9 @@
 package h5
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/config"
@@ -110,6 +113,26 @@ func slugFrom(c *gin.Context) string {
 		return v
 	}
 	return c.Query("slug")
+}
+
+// staffFrom 提取分享链接携带的员工账号 ID：X-Staff-Id 头 → body staff_id → query ?staff_id=
+// （与 slugFrom 同款优先级）。链接形如 https://host/?slug=xxx&staff_id=12，由员工端
+// 「我的预约主页」分享出去（见 dto.NewStaffStudioSettingResp）。
+// 用途：客户从谁的链接进来下单，订单就归到该员工名下（biz_order.photographer_id），
+// 员工端「仅本人」数据范围据此能查到自己的客户单。
+// 缺失或非法一律返回 0 —— 视为「非分享进入」，不报错，订单由工作室后续指派。
+func staffFrom(c *gin.Context) int64 {
+	candidates := []string{c.GetHeader("X-Staff-Id"), params.Str(c, "staff_id"), c.Query("staff_id")}
+	for _, raw := range candidates {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		if id, err := strconv.ParseInt(raw, 10, 64); err == nil && id > 0 {
+			return id
+		}
+	}
+	return 0
 }
 
 // requireCompany 按 slug 反查并校验租户（数据库不存在/未配置 slug 时返回业务错误）
@@ -289,7 +312,9 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 // 登录后接口
 // ---------------------------------------------------------------------
 
-// BookingSubmit 提交预约单
+// BookingSubmit 提交预约单。
+// 分享人归属：链接参数 staff_id（头/body/query 三选一，见 staffFrom）随预约一并落到订单，
+// 客户从谁的预约主页进来下单，订单就算谁的。
 func (h *Controller) BookingSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	var req dto.ClientBookingReq
@@ -297,7 +322,7 @@ func (h *Controller) BookingSubmit(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	o, err := h.Svc.ClientSubmitBooking(c.Request.Context(), cu, req)
+	o, err := h.Svc.ClientSubmitBooking(c.Request.Context(), cu, req, staffFrom(c))
 	if err != nil {
 		response.Fail(c, err)
 		return

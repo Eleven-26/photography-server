@@ -18,17 +18,29 @@ import (
 // 本文件只保留【员工端独有 handler】与【真实端差异实现】（退款审核 approve / 创建交付单不收 body）。
 // Controller 类型与 New 构造见 wechat.go。
 
-// RegisterStaffPublic 注册员工区公开路由（验证码登录，挂 /wechat/staff）
+// RegisterStaffPublic 注册员工区公开路由（挂 /wechat/staff）。
+//
+// 员工端**登录方式集合**（2026-09-14：主登录方式由「手机号+验证码」改为「账号+密码」，与 PC 一致）：
+//
+//	auth/login          账号+密码登录   ← 当前唯一被前端调用的方式，复用 PC 同一套凭据校验与失败锁定
+//	auth/sms-code       发送短信验证码  ← 保留（前端暂不调用）
+//	auth/login-by-code  手机验证码登录  ← 预留（后端已就绪，员工端 UI 未接入）
+//	（规划）auth/login-by-wechat        微信授权登录
+//
+// 三条路径全部公开、不挂 StaffAuth —— 登录本身发生在拿到令牌之前。
+// 注意：sms-code 与 login-by-code 是一对，只留发码接口而摘掉登录接口等于能力残缺，
+// 故两者一并保留；将来接验证码登录时前端直接调它们即可，无需再动后端。
 func (h *Controller) RegisterStaffPublic(g *gin.RouterGroup) {
 	g.POST("/auth/sms-code", h.StaffSmsCode)
-	g.POST("/auth/login", h.StaffLogin)
+	g.POST("/auth/login", h.StaffPasswordLogin)
+	g.POST("/auth/login-by-code", h.StaffLoginByCode)
 }
 
 // ---------------------------------------------------------------------
 // 公开接口
 // ---------------------------------------------------------------------
 
-// SmsCode 发送登录验证码
+// StaffSmsCode 发送登录验证码（保留：员工端 UI 当前未调用，待手机验证码登录上线）
 func (h *Controller) StaffSmsCode(c *gin.Context) {
 	var req struct {
 		Mobile string `json:"mobile" binding:"required"`
@@ -44,8 +56,32 @@ func (h *Controller) StaffSmsCode(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// StaffLogin 员工手机号验证码登录（按 sys_user.mobile 匹配员工）
-func (h *Controller) StaffLogin(c *gin.Context) {
+// StaffPasswordLogin 员工账号密码登录（与 PC 同一套凭据校验：bcrypt + 失败锁定）。
+//
+// 响应结构与 PC 的 /auth/login 完全一致：{ token, user: UserInfoVO }，
+// user 内嵌 sys_user 全字段（含 id/username/nickname/avatar/mobile/role_id/store_id）
+// 并追加 role_code / role_name / data_scope / permissions。
+func (h *Controller) StaffPasswordLogin(c *gin.Context) {
+	var req struct {
+		Username   string `json:"username" binding:"required"` // 登录账号
+		Password   string `json:"password" binding:"required"` // 登录密码
+		DeviceName string `json:"device_name"`                 // 设备名称（选填，用于登录设备管理）
+		Platform   string `json:"platform"`                    // ios/android
+	}
+	if err := bind.BindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	resp, err := h.Svc.StaffPasswordLogin(c.Request.Context(), req.Username, req.Password, req.DeviceName, req.Platform, c.ClientIP())
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, resp)
+}
+
+// StaffLoginByCode 员工手机号验证码登录（预留：员工端 UI 未接入，契约已就位）
+func (h *Controller) StaffLoginByCode(c *gin.Context) {
 	var req struct {
 		Mobile     string `json:"mobile" binding:"required"`
 		Code       string `json:"code" binding:"required"`
@@ -56,23 +92,12 @@ func (h *Controller) StaffLogin(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	u, token, err := h.Svc.StaffSmsLogin(c.Request.Context(), req.Mobile, req.Code, req.DeviceName, req.Platform, c.ClientIP())
+	resp, err := h.Svc.StaffSmsLogin(c.Request.Context(), req.Mobile, req.Code, req.DeviceName, req.Platform, c.ClientIP())
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, gin.H{
-		"token": token,
-		"user": gin.H{
-			"id":       u.ID,
-			"username": u.Username,
-			"nickname": u.Nickname,
-			"avatar":   u.Avatar,
-			"mobile":   u.Mobile,
-			"role_id":  u.RoleID,
-			"store_id": u.StoreID,
-		},
-	})
+	response.OK(c, resp)
 }
 
 // ---------------------------------------------------------------------

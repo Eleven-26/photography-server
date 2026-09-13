@@ -15,6 +15,7 @@ import (
 
 type Config struct {
 	App    App    `mapstructure:"app"`
+	Share  Share  `mapstructure:"share"`
 	JWT    JWT    `mapstructure:"jwt"`
 	DB     DB     `mapstructure:"db"`
 	Redis  Redis  `mapstructure:"redis"`
@@ -124,6 +125,19 @@ type App struct {
 	Timezone    string   `mapstructure:"timezone"`
 	Profile     string   `mapstructure:"profile"`
 	CORSOrigins []string `mapstructure:"cors_origins"` // CORS 可信来源白名单（精确 Origin，如 http://localhost:5173）
+}
+
+// Share 对外分享链接配置。
+//
+// 背景：员工端「我的预约主页」要把工作室主页地址分享给客户，客户在微信里打开后
+// 落到 H5 预约主页（photography-h5），由 `?slug=` 定位租户（见 h5.go→slugFrom）。
+// 域名由**服务端**下发而非写死在小程序里：改域名只需改 Nacos 配置、不必重新发版小程序。
+//
+// 环境变量覆盖：APP_SHARE_HOMEPAGE_BASE_URL。
+type Share struct {
+	// HomepageBaseURL H5 预约主页对外基址，如 https://slot.app（带不带尾斜杠均可）。
+	// 留空时 staff studio/get 的 homepage_url 返回空串，员工端据此提示「主页标识未设置」。
+	HomepageBaseURL string `mapstructure:"homepage_base_url"`
 }
 
 type JWT struct {
