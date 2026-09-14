@@ -35,10 +35,10 @@ var permExempt = map[string]bool{
 // 2026-09-14 补开的 8 条：/customer/create、账号自助 /user/{profile,change-password,logout}、
 // 收款方式 /settings/payment-method/{list,create,update,delete}，
 // 以及同日第四批补开的 15 条：套餐 /package/* 6 条、作品集 /asset/* 6 条、报价 /quote/* 3 条，
-// 同日第五批补开的 1 条：/delivery/select/:id（小程序选片结果页））
-// + 6（异路径别名）+ 2（真实端差异）+ 18（移动端独有）= 79。
+// 同日第五批补开的 2 条：/delivery/select/:id（选片结果页）、/customer/orders/:id（客户档案订单列表））
+// + 6（异路径别名）+ 2（真实端差异）+ 18（移动端独有）= 80。
 // 有意增减员工端暴露面时须同步更新此基线——它防的是"悄悄多挂 / 漏挂"。
-const staffRouteCountBaseline = 79
+const staffRouteCountBaseline = 80
 
 // commonRouteCountBaseline 管理端业务路由数基线（PC 与小程序共用）。
 const commonRouteCountBaseline = 108

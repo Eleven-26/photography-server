@@ -23,6 +23,11 @@ func paymentRefundDelivery(ctl *controller.Controller) []Route {
 		{Path: "/refund/list/:order_id", Perm: domain.PermRefundView, Handler: ctl.RefundList},
 		{Path: "/refund/audit/:id", Perm: domain.PermRefundAudit, Handler: ctl.RefundAudit},
 
+		// 交付路径参数语义（三端一致，勿混）：
+		//   · create 的 :order_id、detail / items 的 :id  → **订单ID**（按订单反查交付单）
+		//   · remind / upload-samples / select / upload-retouched / confirm 的 :id → **交付单主键**
+		//     （service 内部走 DeliveryRepo.GetByID）
+		// 2026-09-14 PC 把 order_id 传给 upload-retouched，触发 40400「交付单不存在」。
 		{Path: "/delivery/list", Perm: domain.PermDeliveryView, Handler: ctl.DeliveryList},
 		{Path: "/delivery/create/:order_id", Perm: domain.PermDeliveryCreate, Handler: ctl.DeliveryCreate},
 		{Path: "/delivery/remind/:id", Perm: domain.PermDeliveryUpdate, Handler: ctl.DeliveryRemind},

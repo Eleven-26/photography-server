@@ -43,7 +43,7 @@ func (h *Controller) DeliveryList(c *gin.Context) {
 	response.PageOK(c, list, total, page, pageSize)
 }
 
-// DeliveryRemind 提醒交付负责人
+// DeliveryRemind 提醒交付负责人（:id 为交付单 ID）
 func (h *Controller) DeliveryRemind(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := bind.PathID(c, "id")
@@ -90,7 +90,7 @@ func (h *Controller) DeliveryItems(c *gin.Context) {
 	response.OK(c, list)
 }
 
-// DeliveryUploadSamples 上传样片 body: {items:[{url,...}]}
+// DeliveryUploadSamples 上传样片（:id 为交付单 ID）body: {items:[{url,...}]}
 func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := bind.PathID(c, "id")
@@ -112,7 +112,7 @@ func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// DeliverySelect 客户选片 body: {item_ids:[...]}
+// DeliverySelect 客户选片（:id 为交付单 ID）body: {item_ids:[...]}
 func (h *Controller) DeliverySelect(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := bind.PathID(c, "id")
@@ -132,7 +132,7 @@ func (h *Controller) DeliverySelect(c *gin.Context) {
 	response.OKNil(c)
 }
 
-// DeliveryUploadRetouched 上传精修成品 body: {items:[...]}
+// DeliveryUploadRetouched 上传精修成品（:id 为交付单 ID）body: {items:[...]}
 func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := bind.PathID(c, "id")
@@ -154,6 +154,7 @@ func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// DeliveryConfirm 标记交付完成（:id 为交付单 ID）
 func (h *Controller) DeliveryConfirm(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	id, err := bind.PathID(c, "id")

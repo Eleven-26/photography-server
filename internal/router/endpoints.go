@@ -128,6 +128,8 @@ var staffInclude = []string{
 	// 客户档案
 	"/customer/list",
 	"/customer/detail/:id",
+	// 客户名下订单（小程序「客户档案」页订单列表；权限点 customer:view，与客户详情同权）
+	"/customer/orders/:id",
 	// 客户建档（小程序 customer/create 页；权限点沿用 PC 的 customer:create —— 需该权限的角色才放行）
 	"/customer/create",
 	// 通知（员工本人通知；service 按 receiver_type=1 + 操作人 UserID 隔离）
