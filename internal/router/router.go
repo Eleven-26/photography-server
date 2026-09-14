@@ -1,6 +1,8 @@
 package router
 
 import (
+	"path/filepath"
+
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/app"
@@ -55,6 +57,15 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	// 访问需携带有效登录令牌（员工或客户均可）；文件名服务端生成不可枚举（见 service/upload.go）
 	uploads := engine.Group("/uploads", mw.AssetAuth())
 	uploads.Static("/", svc.UploadDir)
+
+	// 静态资源：公开媒体（作品集封面/图集）
+	// 对外宣传物料，浏览者（H5 分享页）通常未登录，故**不挂鉴权**；
+	// 与 /uploads 物理隔离（落盘在 <UploadDir>/media 子目录，见 service.UploadOptions.Public），
+	// 订单样片/成片/付款凭证等隐私文件仍只在 /uploads 下、必须带令牌。
+	// 上传侧由 /upload/file 的 public=1 显式指定，不存在"默认公开"路径。
+	// 目录名与 URL 根路径由同一个常量推出（URL 根 = "/" + 目录名）：
+	// 两处各写字面量一旦漂移，症状是"上传成功但图片 404"，排查成本高。
+	engine.Static("/"+service.PublicMediaDir, filepath.Join(svc.UploadDir, service.PublicMediaDir))
 
 	api := engine.Group("")
 	api.GET("/health", func(c *gin.Context) {

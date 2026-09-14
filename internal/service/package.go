@@ -56,7 +56,9 @@ func (s *Service) UpdatePackage(ctx context.Context, op Operator, id int64, req 
 		return errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if p.Status == enum.PackageStatusActive {
-		return errs.BadRequest(errs.ErrPackageActiveDelete)
+		// 已上架（在售）套餐不允许直接编辑：先下线再改，避免在售套餐被静默改价。
+		// 文案与删除守卫不同——此处复用过 `ErrPackageActiveDelete`，会弹出「不可删除」误导用户。
+		return errs.BadRequest(errs.ErrPackageActiveUpdate)
 	}
 	return s.PackageRepo.Update(ctx, op.CompanyID, id, map[string]interface{}{
 		"name":             req.Name,

@@ -394,8 +394,8 @@ func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID in
 // StudioSetting 工作室设置（PC / 员工端共用，不存在时自动建默认行）。
 //
 // 预约主页短链标识（homepage_slug）为空时按公司 ID 派生补写并落库：
-// 分享链接需 slug 与 share.homepage_base_url **同时具备**才拼得出
-// （见 dto.NewStaffStudioSettingResp），slug 为空则员工端「我的预约主页」拿到空串、
+// 分享链接需 slug 与 share.h5_base_url **同时具备**才拼得出
+// （见 dto.NewStaffStudioSettingResp），slug 为空则前端「我的预约主页」拿到空串、
 // 无从分享。自动兜底保证开箱即用；管理员仍可在 PC「设置」页改成更好记的标识
 // （已有值不再覆盖）。
 func (s *Service) StudioSetting(ctx context.Context, op Operator) (*model.StudioSetting, error) {

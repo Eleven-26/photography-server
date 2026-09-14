@@ -107,8 +107,8 @@ func (h *Controller) OperationLogList(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // StudioGet 工作室设置读取（不存在时自动建默认行）。
-// 响应在 model.StudioSetting 之上追加 homepage_url（服务端按 share.homepage_base_url 拼装），
-// 供员工端「我的预约主页」直接展示与复制，前端不再自行拼域名。
+// 响应在 model.StudioSetting 之上追加 homepage_url / portfolio_url
+// （服务端按 share.h5_base_url 拼装），供前端直接展示与复制，前端不再自行拼域名。
 // 链接另行拼入分享人账号 ID（&staff_id=op.UserID）：客户从谁的链接下单，订单就归到谁名下。
 func (h *Controller) StudioGet(c *gin.Context) {
 	op := middleware.GetOperator(c)
@@ -117,7 +117,7 @@ func (h *Controller) StudioGet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, dto.NewStaffStudioSettingResp(st, h.Cfg.Share.HomepageBaseURL, op.UserID))
+	response.OK(c, dto.NewStaffStudioSettingResp(st, h.Cfg.Share.H5BaseURL, op.UserID))
 }
 
 // StudioUpdate 工作室设置更新（仅更新传入字段，数值支持改为 0）

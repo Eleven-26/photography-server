@@ -29,6 +29,7 @@ const (
 const (
 	ErrPackageNotFound      = "套餐不存在"
 	ErrPackageActiveDelete  = "已上架套餐不可删除，请先下线"
+	ErrPackageActiveUpdate  = "已上架套餐不可编辑，请先下线"
 	ErrPackageStatusInvalid = "套餐状态不合法（1-草稿 2-已上架 3-已下线）"
 )
 

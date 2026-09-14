@@ -30,6 +30,8 @@ elasticsearch:
   enable: false
   urls:
     - http://127.0.0.1:9200
+share:
+  h5_base_url: ""
 `
 
 func TestEnvVarNameMapping(t *testing.T) {
@@ -48,6 +50,8 @@ func TestEnvVarNameMapping(t *testing.T) {
 	t.Setenv("APP_MODE", "debug") // 旧名，必须无效
 	t.Setenv("APP_NACOS_REGISTER_IP", "10.0.0.9")
 	t.Setenv("APP_NACOS_TIMEOUT_MS", "8000")
+	t.Setenv("APP_SHARE_H5_BASE_URL", "https://probed.example.com")
+	t.Setenv("APP_SHARE_HOMEPAGE_BASE_URL", "https://dead.example.com") // 旧名，必须无效
 
 	cfg, err := LoadWithFetcher(base, "dev", fakeFetcher(envMapRemote))
 	if err != nil {
@@ -71,5 +75,8 @@ func TestEnvVarNameMapping(t *testing.T) {
 	}
 	if cfg.Nacos.RegisterIp != "10.0.0.9" || cfg.Nacos.TimeoutMs != 8000 {
 		t.Errorf("nacos 连接字段 env 覆盖未生效: ip=%q timeout=%d", cfg.Nacos.RegisterIp, cfg.Nacos.TimeoutMs)
+	}
+	if cfg.Share.H5BaseURL != "https://probed.example.com" {
+		t.Errorf("APP_SHARE_H5_BASE_URL 未生效: %q（旧名 APP_SHARE_HOMEPAGE_BASE_URL 必须无效）", cfg.Share.H5BaseURL)
 	}
 }

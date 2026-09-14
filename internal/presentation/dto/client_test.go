@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"strings"
 	"testing"
 
 	"photography-server/internal/model"
@@ -40,6 +41,53 @@ func TestNewStaffStudioSettingResp_HomepageURL(t *testing.T) {
 	}
 }
 
+// TestNewStaffStudioSettingResp_PortfolioURL 覆盖 portfolio_url 的拼装边界。
+// 与 homepage_url 同基址、同租户参数，只把落地页换成 H5 作品集页（画板 C24）。
+//
+// **核心断言是 hash 的位置**：H5 用 hash 路由（photography-h5/src/manifest.json →
+// h5.router.mode=hash），slug / staff_id 必须在 # 之前 —— 若写成
+// `.../#/pages/works/index?slug=xxx`，H5 端 utils/slug.js 读的是 window.location.search
+// （不含 hash 内部），取不到租户 → 页面退化成「未定位工作室」，
+// 而这种错误在浏览器里"链接能打开、只是内容不对"，极易漏检。
+func TestNewStaffStudioSettingResp_PortfolioURL(t *testing.T) {
+	cases := []struct {
+		name    string
+		slug    string
+		base    string
+		staffID int64
+		want    string
+	}{
+		{"正常拼装（含分享人）", "lusheng-photography", "https://slot.app", 12,
+			"https://slot.app/?slug=lusheng-photography&staff_id=12#/pages/works/index"},
+		{"分享人缺省（0）→ 省略 staff_id", "lusheng-photography", "https://slot.app", 0,
+			"https://slot.app/?slug=lusheng-photography#/pages/works/index"},
+		{"分享人为负值 → 视同缺省", "a", "https://slot.app", -1,
+			"https://slot.app/?slug=a#/pages/works/index"},
+		{"基址带尾斜杠归一化", "a", "https://slot.app///", 0,
+			"https://slot.app/?slug=a#/pages/works/index"},
+		{"slug 含需转义字符（空格与斜杠）", "a b/c", "https://slot.app", 0,
+			"https://slot.app/?slug=a+b%2Fc#/pages/works/index"},
+		{"slug 为空 → 不产出链接（即便有分享人）", "", "https://slot.app", 12, ""},
+		{"基址为空 → 不产出链接", "lusheng-photography", "", 12, ""},
+		{"两侧均空 → 空串", "", "", 0, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := NewStaffStudioSettingResp(&model.StudioSetting{HomepageSlug: c.slug}, c.base, c.staffID)
+			if got.PortfolioURL != c.want {
+				t.Errorf("portfolio_url = %q, want %q", got.PortfolioURL, c.want)
+			}
+			// slug 必须落在 # 之前（H5 读 search 而非 hash 内部）
+			if got.PortfolioURL != "" {
+				beforeHash := strings.SplitN(got.PortfolioURL, "#", 2)[0]
+				if !strings.Contains(beforeHash, "slug=") {
+					t.Errorf("slug 必须位于 # 之前，否则 H5 取不到租户：%q", got.PortfolioURL)
+				}
+			}
+		})
+	}
+}
+
 // TestNewStaffStudioSettingResp_NilSetting 设置行为 nil 时不得 panic，且不产出链接。
 func TestNewStaffStudioSettingResp_NilSetting(t *testing.T) {
 	got := NewStaffStudioSettingResp(nil, "https://slot.app", 12)
@@ -48,6 +96,9 @@ func TestNewStaffStudioSettingResp_NilSetting(t *testing.T) {
 	}
 	if got.HomepageURL != "" {
 		t.Errorf("st 为 nil 时 homepage_url 应为空串，得到 %q", got.HomepageURL)
+	}
+	if got.PortfolioURL != "" {
+		t.Errorf("st 为 nil 时 portfolio_url 应为空串，得到 %q", got.PortfolioURL)
 	}
 }
 

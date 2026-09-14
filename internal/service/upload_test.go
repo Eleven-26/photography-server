@@ -1,6 +1,8 @@
 package service
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"photography-server/internal/enum"
@@ -59,6 +61,49 @@ func TestSanitizeExt(t *testing.T) {
 		if got := sanitizeExt(c.in); got != c.want {
 			t.Errorf("sanitizeExt(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// TestUploadTarget 锁定「公开 / 私有」两条上传路径的映射关系。
+//
+// 落盘子目录与 URL 前缀必须**同步**切换：只改一侧（例如 URL 给 /media 但文件仍落在
+// UploadDir 根下）会让请求 404，而上传接口照常返回成功 —— 症状是"上传成功但图片打不开"，
+// 极难反查。另一层意图：公开文件必须落在 media/ 子目录里，不能与鉴权目录混放，
+// 否则放开 /media 等于顺带暴露同目录下的客户隐私文件。
+func TestUploadTarget(t *testing.T) {
+	cases := []struct {
+		name    string
+		public  bool
+		month   string
+		wantDir string
+		wantURL string
+	}{
+		{"私有：落根目录 + /uploads 前缀", false, "202609", "202609", "/uploads/"},
+		{"公开：落 media 子目录 + /media 前缀", true, "202609", filepath.Join("media", "202609"), "/media/"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir, prefix := uploadTarget(c.public, c.month)
+			if dir != c.wantDir {
+				t.Errorf("落盘目录 = %q, want %q", dir, c.wantDir)
+			}
+			if prefix != c.wantURL {
+				t.Errorf("URL 前缀 = %q, want %q", prefix, c.wantURL)
+			}
+		})
+	}
+
+	// 常量与行为一致性：公开路径必须落在 PublicMediaDir 之下、URL 用 PublicMediaURLPrefix
+	dir, prefix := uploadTarget(true, "202609")
+	if !strings.HasPrefix(dir, PublicMediaDir+string(filepath.Separator)) {
+		t.Errorf("公开文件应落在 %s/ 下，得到 %q", PublicMediaDir, dir)
+	}
+	if prefix != PublicMediaURLPrefix {
+		t.Errorf("公开 URL 前缀应与 PublicMediaURLPrefix 一致，得到 %q", prefix)
+	}
+	// 私有路径不得出现 media 段（防有人把两条路径写成同一个）
+	if privDir, privPrefix := uploadTarget(false, "202609"); strings.Contains(privDir, PublicMediaDir) {
+		t.Errorf("私有文件不应落在 %s 下，得到 %q（前缀 %q）", PublicMediaDir, privDir, privPrefix)
 	}
 }
 
