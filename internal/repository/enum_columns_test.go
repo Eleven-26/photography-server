@@ -111,6 +111,23 @@ func TestEnumColumnsBindAsInt(t *testing.T) {
 			Type:         enum.NotificationTypeFinance,
 			Title:        "收款已确认到账",
 		}, "type", int64(enum.NotificationTypeFinance)},
+
+		// biz_order_log.from_status / to_status：DDL 为 tinyint，历史上模型是 string 并
+		// 用 fmt.Sprintf("%v", from) 把枚举转成 "1" 这类数字串，靠 MySQL 隐式转换侥幸入库。
+		// 现改为 int，此处锁定其绑定值必须是整型。
+		{"biz_order_log.from_status", &model.OrderLog{
+			OrderID:    1,
+			Action:     "change_status",
+			FromStatus: int(enum.OrderStatusPendingDeposit),
+			ToStatus:   int(enum.OrderStatusPendingShoot),
+		}, "from_status", int64(enum.OrderStatusPendingDeposit)},
+
+		{"biz_order_log.to_status", &model.OrderLog{
+			OrderID:    1,
+			Action:     "change_status",
+			FromStatus: int(enum.OrderStatusPendingDeposit),
+			ToStatus:   int(enum.OrderStatusPendingShoot),
+		}, "to_status", int64(enum.OrderStatusPendingShoot)},
 	}
 
 	for _, c := range cases {

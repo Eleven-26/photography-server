@@ -95,8 +95,8 @@ type OrderLog struct {
 	TenantBase
 	OrderID      int64  `gorm:"column:order_id;index;comment:订单ID" json:"order_id"`
 	Action       string `gorm:"column:action;size:50;comment:操作动作" json:"action"`
-	FromStatus   string `gorm:"column:from_status;size:20;comment:原状态" json:"from_status"`
-	ToStatus     string `gorm:"column:to_status;size:20;comment:新状态" json:"to_status"`
+	FromStatus   int    `gorm:"column:from_status;type:tinyint;comment:原状态" json:"from_status"`
+	ToStatus     int    `gorm:"column:to_status;type:tinyint;comment:新状态" json:"to_status"`
 	Content      string `gorm:"column:content;size:500;comment:操作内容" json:"content"`
 	OperatorID   int64  `gorm:"column:operator_id;comment:操作人ID" json:"operator_id"`
 	OperatorName string `gorm:"column:operator_name;size:50;comment:操作人" json:"operator_name"`

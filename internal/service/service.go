@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"reflect"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -167,11 +167,30 @@ func orderLog(orderID int64, action string, from, to interface{}, content string
 		},
 		OrderID:      orderID,
 		Action:       action,
-		FromStatus:   fmt.Sprintf("%v", from),
-		ToStatus:     fmt.Sprintf("%v", to),
+		FromStatus:   toTinyint(from),
+		ToStatus:     toTinyint(to),
 		Content:      content,
 		OperatorID:   op.UserID,
 		OperatorName: op.Username,
+	}
+}
+
+// toTinyint 把订单日志的状态入参归一化为 int，对齐 biz_order_log.from_status / to_status 的
+// tinyint 列（以 DDL 为准）。入参历史上是 interface{}，实际只传 int / enum.OrderStatus /
+// enum.RefundStatus（该两列「一列两域」：订单状态与退款状态共用，故不收紧为单一枚举）。
+// 非整型输入返回 0，避免向 tinyint 列写入不可转换的值触发 ERROR 1366。
+func toTinyint(v interface{}) int {
+	if v == nil {
+		return 0
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return int(rv.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return int(rv.Uint())
+	default:
+		return 0
 	}
 }
 

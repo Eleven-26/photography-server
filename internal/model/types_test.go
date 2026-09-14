@@ -13,7 +13,9 @@ import (
 //
 //	Incorrect integer value: '\xE5\x9B\xBE\xE7\x89\x87' for column 'file_type' at row 1
 //
-// 此处锁定这三个字段必须是「整型枚举 + tinyint 列」，防止再次回退为字符串。
+// 此处锁定这些字段必须是「整型枚举 + tinyint 列」，防止再次回退为字符串。
+// （补充 2026-09-14 第二轮：biz_order_log.from_status / to_status 亦为 tinyint，
+// 原模型是 string 靠 MySQL 隐式转换侥幸工作，已按「以 DDL 为准」收紧为 int。）
 func TestEnumColumnsAreInt(t *testing.T) {
 	cases := []struct {
 		model  interface{}
@@ -24,6 +26,8 @@ func TestEnumColumnsAreInt(t *testing.T) {
 		{DeliveryItem{}, "FileType", "file_type"},
 		{DeliveryItem{}, "Kind", "kind"},
 		{SysNotification{}, "Type", "type"},
+		{OrderLog{}, "FromStatus", "from_status"},
+		{OrderLog{}, "ToStatus", "to_status"},
 	}
 	for _, c := range cases {
 		f, ok := reflect.TypeOf(c.model).FieldByName(c.field)
