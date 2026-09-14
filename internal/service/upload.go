@@ -15,10 +15,10 @@ import (
 )
 
 type UploadResult struct {
-	URL      string `json:"url"`
-	FileName string `json:"file_name"`
-	FileType string `json:"file_type"`
-	Size     int64  `json:"size"`
+	URL      string          `json:"url"`
+	FileName string          `json:"file_name"`
+	FileType enum.UploadType `json:"file_type"` // 1-图片 2-视频 3-文件（与 biz_upload.file_type 同口径）
+	Size     int64           `json:"size"`
 }
 
 // UploadFile 保存上传文件到本地 uploads 目录并记录到 biz_upload
@@ -56,7 +56,7 @@ func (s *Service) UploadFile(ctx context.Context, op Operator, storeID int64, bi
 		StoreID:  storeID,
 		BizType:  bizType,
 		BizID:    bizID,
-		FileType: enum.UploadTypeName(fileType),
+		FileType: fileType,
 		FileName: fileName,
 		FileURL:  url,
 		FilePath: path,
@@ -66,7 +66,7 @@ func (s *Service) UploadFile(ctx context.Context, op Operator, storeID int64, bi
 	if err := s.UploadRepo.Create(ctx, &u); err != nil {
 		return nil, err
 	}
-	return &UploadResult{URL: url, FileName: fileName, FileType: enum.UploadTypeName(fileType), Size: int64(len(data))}, nil
+	return &UploadResult{URL: url, FileName: fileName, FileType: fileType, Size: int64(len(data))}, nil
 }
 
 // sanitizeExt 从客户端文件名提取扩展名：仅取 filepath.Base 的最后一段，
@@ -108,4 +108,15 @@ func detectFileType(ext string) enum.UploadType {
 		return enum.UploadTypeVideo
 	}
 	return enum.UploadTypeFile
+}
+
+// detectFileTypeByURL 按已保存文件的 URL 反推类型，供交付链路使用
+// （file_type 不接受客户端上报，避免字符串脏值写进 tinyint 列）。
+// URL 形如 /uploads/200601/<32位hex>.<ext>，可能带 query/fragment，先剥离再取扩展名。
+func detectFileTypeByURL(rawURL string) enum.UploadType {
+	u := rawURL
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		u = u[:i]
+	}
+	return detectFileType(sanitizeExt(u))
 }

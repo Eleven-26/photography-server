@@ -89,7 +89,7 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 		logger.Warnf("ClientRescheduleApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
 	}
 	// 站内通知：改期申请待审批（失败不阻断申请）
-	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, "order", "改期申请待审批",
+	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, enum.NotificationTypeOrder, "改期申请待审批",
 		fmt.Sprintf("%s 申请将订单 %s 改期至 %s %s，请尽快处理", cu.Name, o.Code, req.NewDate, req.NewTime),
 		"order", orderID)
 	return &rs, nil
@@ -173,7 +173,7 @@ func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID
 		logger.Warnf("ClientRefundApply: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
 	}
 	// 站内通知：退款申请待审批（失败不阻断申请）
-	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, "finance", "退款申请待审批",
+	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, enum.NotificationTypeFinance, "退款申请待审批",
 		fmt.Sprintf("%s 申请退款 ¥%.2f（订单 %s），请尽快处理", cu.Name, rf.Amount, o.Code),
 		"refund", orderID)
 	return &rf, nil
@@ -591,7 +591,7 @@ func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, re
 	if err := s.OrderRepo.CreatePayment(ctx, &p); err != nil {
 		return nil, err
 	}
-	s.NotifyStaff(ctx, clientOperator(cu), 0, "finance", "改期调度费待核验",
+	s.NotifyStaff(ctx, clientOperator(cu), 0, enum.NotificationTypeFinance, "改期调度费待核验",
 		fmt.Sprintf("客户已提交改期单 %s 的调度费凭证（%.2f 元），请核验", rs.Code, rs.FeeAmount),
 		"payment", p.ID)
 	return &p, nil
@@ -634,7 +634,7 @@ func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUs
 	// 需求直接影响拍前准备，必须留订单日志并提醒负责人
 	op := clientOperator(cu)
 	_ = s.writeOrderLog(ctx, orderID, "update_requirement", o.Status, o.Status, "客户修改拍摄需求", op)
-	s.NotifyStaff(ctx, op, o.OwnerID, "order", "客户修改了拍摄需求",
+	s.NotifyStaff(ctx, op, o.OwnerID, enum.NotificationTypeOrder, "客户修改了拍摄需求",
 		"订单 "+o.Code+" 的拍摄需求已由客户更新，请核对拍前准备", "order", o.ID)
 	return nil
 }

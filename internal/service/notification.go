@@ -46,21 +46,21 @@ func (s *Service) MarkAllClientNotificationsRead(ctx context.Context, cu *Client
 }
 
 // PushNotification 发送员工站内通知（供业务联动调用）
-func (s *Service) PushNotification(ctx context.Context, op Operator, receiverID int64, ntype, title, content, bizType string, bizID int64) error {
+func (s *Service) PushNotification(ctx context.Context, op Operator, receiverID int64, ntype enum.NotificationType, title, content, bizType string, bizID int64) error {
 	return s.pushNotification(ctx, op, enum.NotificationReceiverStaff, receiverID, ntype, title, content, bizType, bizID)
 }
 
 // NotifyClient 向客户推送站内通知（receiverID = crm_customer.id）。
 // 与 NotifyStaff 同一约定：失败只记日志、绝不阻断主业务——
 // 「预约已确认」这类通知发不出去，不能让确认动作本身失败。
-func (s *Service) NotifyClient(ctx context.Context, op Operator, customerID int64, ntype, title, content, bizType string, bizID int64) {
+func (s *Service) NotifyClient(ctx context.Context, op Operator, customerID int64, ntype enum.NotificationType, title, content, bizType string, bizID int64) {
 	if err := s.pushNotification(ctx, op, enum.NotificationReceiverCustomer, customerID, ntype, title, content, bizType, bizID); err != nil {
 		logger.Warnf("NotifyClient: 写入通知失败, customerID=%d, bizType=%s, bizID=%d, err=%v", customerID, bizType, bizID, err)
 	}
 }
 
 // pushNotification 落库统一入口：receiverID 为 0 表示无接收人，直接跳过（不写孤儿通知）
-func (s *Service) pushNotification(ctx context.Context, op Operator, receiverType int, receiverID int64, ntype, title, content, bizType string, bizID int64) error {
+func (s *Service) pushNotification(ctx context.Context, op Operator, receiverType int, receiverID int64, ntype enum.NotificationType, title, content, bizType string, bizID int64) error {
 	if receiverID == 0 {
 		return nil
 	}
@@ -84,7 +84,7 @@ func (s *Service) pushNotification(ctx context.Context, op Operator, receiverTyp
 // receiverID > 0 时只发给该员工（如订单负责人）；否则广播给公司内全部启用员工
 // （客户自助预约等场景订单尚无负责人，不广播就等于没人收到）。
 // 通知失败只记日志，绝不阻断主业务（客户预约/退款申请必须成功）。
-func (s *Service) NotifyStaff(ctx context.Context, op Operator, receiverID int64, ntype, title, content, bizType string, bizID int64) {
+func (s *Service) NotifyStaff(ctx context.Context, op Operator, receiverID int64, ntype enum.NotificationType, title, content, bizType string, bizID int64) {
 	receivers := make([]int64, 0, 8)
 	if receiverID > 0 {
 		receivers = append(receivers, receiverID)

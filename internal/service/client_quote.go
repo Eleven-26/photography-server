@@ -73,7 +73,7 @@ func (s *Service) ClientQuoteAccept(ctx context.Context, cu *ClientUser, quoteID
 			"updated_by": cu.CustomerID,
 		})
 	}
-	s.NotifyStaff(ctx, clientOperator(cu), q.OwnerID, "order", "客户已接受报价",
+	s.NotifyStaff(ctx, clientOperator(cu), q.OwnerID, enum.NotificationTypeOrder, "客户已接受报价",
 		fmt.Sprintf("报价单 %s（%.2f 元）已被客户接受，请安排后续下单", q.Code, q.TotalPrice),
 		"quote", q.ID)
 	return nil
@@ -114,7 +114,7 @@ func (s *Service) ClientQuoteModify(ctx context.Context, cu *ClientUser, quoteID
 	_ = s.LeadRepo.Update(ctx, cu.CompanyID, q.LeadID, map[string]interface{}{
 		"last_follow_at": now.Format("2006-01-02 15:04:05"),
 	})
-	s.NotifyStaff(ctx, clientOperator(cu), q.OwnerID, "order", "客户对报价提出修改",
+	s.NotifyStaff(ctx, clientOperator(cu), q.OwnerID, enum.NotificationTypeOrder, "客户对报价提出修改",
 		fmt.Sprintf("客户对报价单 %s 提出修改意见，请在沟通记录中查看并调整", q.Code),
 		"quote", q.ID)
 	return nil

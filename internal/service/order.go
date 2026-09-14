@@ -243,7 +243,7 @@ func (s *Service) ChangeOrderStatus(ctx context.Context, op Operator, id int64, 
 	// 4. 事务提交后再通知客户：通知失败不能影响已生效的状态流转。
 	// 「待确认 → 待拍摄」= 工作室确认了客户的预约，是客户最关心的一个节点。
 	if fromStatus == enum.OrderStatusPendingConfirm && to == enum.OrderStatusPendingShoot {
-		s.NotifyClient(ctx, op, customerID, "order", "预约已确认",
+		s.NotifyClient(ctx, op, customerID, enum.NotificationTypeOrder, "预约已确认",
 			"订单 "+orderCode+" 已确认，请按约定时间到店拍摄", "order", id)
 	}
 	return nil

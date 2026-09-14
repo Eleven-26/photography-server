@@ -175,7 +175,7 @@ func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req d
 		return nil, err
 	}
 	// 站内通知：预约单尚无负责人，广播给工作室全员（失败不影响下单）
-	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, "order", "新预约待确认",
+	s.NotifyStaff(ctx, clientOperator(cu), o.OwnerID, enum.NotificationTypeOrder, "新预约待确认",
 		fmt.Sprintf("%s 提交了「%s」预约（%s %s），请及时确认档期", cu.Name, pkg.Name, req.ShootDate, req.ShootTime),
 		"order", o.ID)
 	return &o, nil

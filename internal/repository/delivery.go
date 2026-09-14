@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"gorm.io/gorm"
+	"photography-server/internal/enum"
 	"photography-server/internal/model"
 )
 
@@ -105,7 +106,7 @@ func (r *DeliveryRepo) CreateItem(ctx context.Context, item *model.DeliveryItem)
 	return r.conn().WithContext(ctx).Create(item).Error
 }
 
-func (r *DeliveryRepo) UpdateItemKind(ctx context.Context, companyID, itemID int64, kind string) error {
+func (r *DeliveryRepo) UpdateItemKind(ctx context.Context, companyID, itemID int64, kind enum.DeliveryItemKind) error {
 	return r.tenant(companyID).WithContext(ctx).Model(&model.DeliveryItem{}).Where("id = ?", itemID).Update("kind", kind).Error
 }
 

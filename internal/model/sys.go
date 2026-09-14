@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"photography-server/internal/enum"
+)
 
 // SysCompany 公司/工作室
 type SysCompany struct {
@@ -98,15 +102,18 @@ func (SysOperationLog) TableName() string { return "sys_operation_log" }
 // SysNotification 站内通知
 type SysNotification struct {
 	TenantBase
-	ReceiverID   int64   `gorm:"column:receiver_id;index;comment:接收人ID" json:"receiver_id"`
-	ReceiverType int     `gorm:"column:receiver_type;type:tinyint;default:1;comment:接收人类型 1-员工 2-客户" json:"receiver_type"`
-	Type         string  `gorm:"column:type;size:20;comment:类型 order-订单 finance-财务 system-系统" json:"type"`
-	Title        string  `gorm:"column:title;size:100;comment:标题" json:"title"`
-	Content      string  `gorm:"column:content;size:500;comment:内容" json:"content"`
-	BizType      string  `gorm:"column:biz_type;size:20;comment:业务类型 order-订单 refund-退款" json:"biz_type"`
-	BizID        int64   `gorm:"column:biz_id;comment:业务ID" json:"biz_id"`
-	IsRead       int     `gorm:"column:is_read;type:tinyint;default:0;comment:是否已读 0-未读 1-已读" json:"is_read"`
-	ReadAt       *string `gorm:"column:read_at;comment:已读时间" json:"read_at"`
+	ReceiverID   int64 `gorm:"column:receiver_id;index;comment:接收人ID" json:"receiver_id"`
+	ReceiverType int   `gorm:"column:receiver_type;type:tinyint;default:1;comment:接收人类型 1-员工 2-客户" json:"receiver_type"`
+	// Type 与 DDL 一致为 tinyint（1-订单 2-财务 3-系统）：
+	// 历史实现用 string 承载并列的 "order"/"finance" 字面量，严格模式下每次写通知
+	// 都会被 MySQL 拒收（Incorrect integer value），且失败只 Warnf —— 站内通知实际从未落库。
+	Type    enum.NotificationType `gorm:"column:type;type:tinyint;comment:类型 1-订单 2-财务 3-系统" json:"type"`
+	Title   string                `gorm:"column:title;size:100;comment:标题" json:"title"`
+	Content string                `gorm:"column:content;size:500;comment:内容" json:"content"`
+	BizType string                `gorm:"column:biz_type;size:20;comment:业务类型 order-订单 refund-退款" json:"biz_type"`
+	BizID   int64                 `gorm:"column:biz_id;comment:业务ID" json:"biz_id"`
+	IsRead  int                   `gorm:"column:is_read;type:tinyint;default:0;comment:是否已读 0-未读 1-已读" json:"is_read"`
+	ReadAt  *string               `gorm:"column:read_at;comment:已读时间" json:"read_at"`
 }
 
 func (SysNotification) TableName() string { return "sys_notification" }

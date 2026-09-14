@@ -65,6 +65,18 @@ func miniappEndpoint(mw *middleware.Middlewares) endpoint.Endpoint {
 //	  ⚠️ 权限口径：`order:reschedule` 已授 photographer/manager/admin，但 **`order:cancel` 目前
 //	  只授 manager/admin**（见 docs/sql 角色种子）。若要让摄影师/销售也能在移动端取消订单，
 //	  需另行授权；这涉及业务风险，未擅自改动。
+//
+// 2026-09-14 决策（第三批）：**补开账号自助 + 客户建档 + 收款方式**。
+// 起因：小程序存在 pages/me/profile、pages/me/account、pages/customer/create、pages/me/pay-settings
+// 四个页面，但此前端点白名单未放行，页面只能挂"演示"占位 —— 属前后端未闭合。
+//   - /user/profile、/user/change-password、/user/logout：**免权限点**（routes 表即如此，自助类）。
+//     账号操作是"登录者本人"的能力，与角色无关；不放行等于改密码都要管理员授权（设计缺陷）。
+//   - /customer/create：挂 PC 同一权限点 customer:create，员工端与 PC **同权**（同一张 sys_role_permission）。
+//   - /settings/payment-method/*：list 归 settings:view、增删改归 settings:update，与 PC 同权。
+//
+// 仍**不开放**：/quote/*（报价是管理端专属销售动作，小程序暂无报价页）、
+// /package/*、/asset/*（员工端套餐/作品管理后端亦无对应能力，见前端页面的"即将开放"处理）、
+// /role:*、/store:*、/calendar/lock、/finance/export。
 var staffInclude = []string{
 	// 订单（复用 PC 端同一 handler 与 service）
 	"/order/list",
@@ -100,11 +112,25 @@ var staffInclude = []string{
 	// 客户档案
 	"/customer/list",
 	"/customer/detail/:id",
+	// 客户建档（小程序 customer/create 页；权限点沿用 PC 的 customer:create —— 需该权限的角色才放行）
+	"/customer/create",
 	// 通知（员工本人通知；service 按 receiver_type=1 + 操作人 UserID 隔离）
 	"/notification/list",
 	"/notification/unread-count",
 	"/notification/read/:id",
 	"/notification/read-all",
+	// 账号自助（**免权限点**，与 PC 同源）：「我的 → 个人资料 / 账号与安全」需读本人资料、修改密码、退出登录。
+	// 这三条在 routes 表本就无权限点（自助类，操作对象是登录者本人账号，见 routes/user.go 顶部注释），
+	// 员工端放行不会扩大角色能力边界 —— 任何登录员工都必须能用，否则改密码要管理员授权。
+	"/user/profile",
+	"/user/change-password",
+	"/user/logout",
+	// 收款方式（小程序「收款设置」页；list 归 settings:view、增删改归 settings:update，与 PC 同权）
+	// 资金不经平台，收款账户是工作室级配置，员工在有 settings 权限时可在移动端维护。
+	"/settings/payment-method/list",
+	"/settings/payment-method/create",
+	"/settings/payment-method/update/:id",
+	"/settings/payment-method/delete/:id",
 }
 
 // staffEndpoint 员工端（挂 /wechat/staff，员工认证 + 操作日志）。

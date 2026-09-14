@@ -110,6 +110,30 @@ func DeliveryStageName(stage DeliveryStage) string {
 	return "未知"
 }
 
+// DeliveryItemKind 交付明细用途（biz_delivery_item.kind，tinyint）
+// 口径由调用接口决定：上传样片恒为 Sample，上传精修成品恒为 Retouched，
+// 客户选片时把已选样片置为 Selected —— 不接受客户端自报，避免脏值入库。
+type DeliveryItemKind int
+
+const (
+	DeliveryItemKindSample    DeliveryItemKind = 1 // 样片
+	DeliveryItemKindSelected  DeliveryItemKind = 2 // 已选
+	DeliveryItemKindRetouched DeliveryItemKind = 3 // 精修成品
+)
+
+var deliveryItemKindName = map[DeliveryItemKind]string{
+	DeliveryItemKindSample:    "样片",
+	DeliveryItemKindSelected:  "已选",
+	DeliveryItemKindRetouched: "精修成品",
+}
+
+func DeliveryItemKindName(kind DeliveryItemKind) string {
+	if name, ok := deliveryItemKindName[kind]; ok {
+		return name
+	}
+	return "未知"
+}
+
 // DeliveryFeedbackStatus 客户修图反馈处理状态（biz_delivery_item.feedback_status）
 const (
 	FeedbackNone    = 0 // 无反馈

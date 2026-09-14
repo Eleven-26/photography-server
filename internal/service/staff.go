@@ -9,6 +9,7 @@ import (
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/logger"
 	"photography-server/internal/presentation/dto"
 )
 
@@ -110,7 +111,7 @@ func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, resched
 		if err := s.writeOrderLog(ctx, rs.OrderID, "reschedule_rejected", o.Status, o.Status, "改期申请被拒绝: "+remark, op); err != nil {
 			return err
 		}
-		s.NotifyClient(ctx, op, rs.CustomerID, "order", "改期申请未通过",
+		s.NotifyClient(ctx, op, rs.CustomerID, enum.NotificationTypeOrder, "改期申请未通过",
 			"改期申请未通过："+remark, "reschedule", rs.ID)
 		return nil
 	}
@@ -141,7 +142,7 @@ func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, resched
 		"改期已同意: "+rs.OriginalDate+" → "+rs.NewDate+" "+rs.NewTime, op); err != nil {
 		return err
 	}
-	s.NotifyClient(ctx, op, rs.CustomerID, "order", "改期申请已通过",
+	s.NotifyClient(ctx, op, rs.CustomerID, enum.NotificationTypeOrder, "改期申请已通过",
 		"拍摄时间已调整为 "+rs.NewDate+" "+rs.NewTime, "reschedule", rs.ID)
 	return nil
 }
@@ -390,18 +391,79 @@ func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID in
 	return s.ReviewRepo.Update(ctx, op.CompanyID, reviewID, updates)
 }
 
-// StudioSetting 工作室设置（PC / 员工端共用，不存在时自动建默认行）
+// StudioSetting 工作室设置（PC / 员工端共用，不存在时自动建默认行）。
+//
+// 预约主页短链标识（homepage_slug）为空时按公司 ID 派生补写并落库：
+// 分享链接需 slug 与 share.homepage_base_url **同时具备**才拼得出
+// （见 dto.NewStaffStudioSettingResp），slug 为空则员工端「我的预约主页」拿到空串、
+// 无从分享。自动兜底保证开箱即用；管理员仍可在 PC「设置」页改成更好记的标识
+// （已有值不再覆盖）。
 func (s *Service) StudioSetting(ctx context.Context, op Operator) (*model.StudioSetting, error) {
-	return s.StudioSettingRepo.GetOrCreate(ctx, op.CompanyID)
+	st, err := s.StudioSettingRepo.GetOrCreate(ctx, op.CompanyID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(st.HomepageSlug) != "" {
+		return st, nil
+	}
+	slug := DefaultHomepageSlug(op.CompanyID)
+	if uerr := s.StudioSettingRepo.Update(ctx, op.CompanyID, map[string]interface{}{
+		"homepage_slug": slug,
+	}); uerr != nil {
+		// 补写失败不阻断读取：本次返回未带 slug 的设置，下次读取再补
+		logger.Warnf("StudioSetting: 自动补写 homepage_slug 失败, companyID=%d, err=%v", op.CompanyID, uerr)
+		return st, nil
+	}
+	st.HomepageSlug = slug
+	return st, nil
 }
 
-// UpdateStudioSetting 工作室设置更新（updates 由 controller 按「指针非 nil 才更新」组装）
+// DefaultHomepageSlug 按公司 ID 派生默认预约主页短链标识（如 studio-12）。
+// 公司 ID 全局唯一，派生值在租户间天然不冲突；用于 slug 未设置时的兜底，
+// 避免「域名已配、链接却因缺 slug 而为空」的死角。
+func DefaultHomepageSlug(companyID int64) string {
+	return fmt.Sprintf("studio-%d", companyID)
+}
+
+// UpdateStudioSetting 工作室设置更新（updates 由 controller 按「指针非 nil 才更新」组装）。
+//
+// homepage_slug 会被写进对外分享的链接（见 dto.NewStaffStudioSettingResp），
+// 故在此收敛格式：统一小写、去空白，并校验字符集与长度。
 func (s *Service) UpdateStudioSetting(ctx context.Context, op Operator, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return nil
 	}
+	if v, ok := updates["homepage_slug"]; ok {
+		slug, err := NormalizeHomepageSlug(fmt.Sprint(v))
+		if err != nil {
+			return err
+		}
+		updates["homepage_slug"] = slug
+	}
 	updates["updated_by"] = op.UserID
 	return s.StudioSettingRepo.Update(ctx, op.CompanyID, updates)
+}
+
+// NormalizeHomepageSlug 收敛预约主页短链标识（去空白 + 转小写）并校验格式。
+// 只允许小写字母、数字、连字符，且首字符不能是连字符；长度上限取列宽 varchar(50)。
+// 空串直接放行（controller 仅在非空时才放入 updates，此处保持零值语义）。
+func NormalizeHomepageSlug(raw string) (string, error) {
+	slug := strings.ToLower(strings.TrimSpace(raw))
+	if slug == "" {
+		return "", nil
+	}
+	if len(slug) > 50 {
+		return "", errs.BadRequest("主页标识不能超过 50 个字符")
+	}
+	for i, ch := range slug {
+		isLower := ch >= 'a' && ch <= 'z'
+		isDigit := ch >= '0' && ch <= '9'
+		if isLower || isDigit || (ch == '-' && i > 0) {
+			continue
+		}
+		return "", errs.BadRequest("主页标识只能包含小写字母、数字和连字符，且不能以连字符开头")
+	}
+	return slug, nil
 }
 
 // StaffCustomRequests 定制需求列表（待处理优先）

@@ -1,5 +1,7 @@
 package model
 
+import "photography-server/internal/enum"
+
 // PaymentMethod 收款方式
 type PaymentMethod struct {
 	TenantBase
@@ -17,15 +19,17 @@ func (PaymentMethod) TableName() string { return "biz_payment_method" }
 // Upload 上传文件记录
 type Upload struct {
 	TenantBase
-	StoreID  int64  `gorm:"column:store_id;index;comment:所属门店ID" json:"store_id"`
-	BizType  string `gorm:"column:biz_type;size:50;comment:业务类型(订单/交付/作品等)" json:"biz_type"`
-	BizID    int64  `gorm:"column:biz_id;comment:业务ID" json:"biz_id"`
-	FileType string `gorm:"column:file_type;size:10;comment:文件类型 image-图片 video-视频 file-文件" json:"file_type"`
-	FileName string `gorm:"column:file_name;size:200;comment:原始文件名" json:"file_name"`
-	FileURL  string `gorm:"column:file_url;size:500;not null;comment:文件访问地址" json:"file_url"`
-	FilePath string `gorm:"column:file_path;size:500;comment:服务器存储路径" json:"file_path"`
-	Size     int64  `gorm:"column:size;comment:文件大小(字节)" json:"size"`
-	UploadBy int64  `gorm:"column:upload_by;comment:上传人ID" json:"upload_by"`
+	StoreID int64  `gorm:"column:store_id;index;comment:所属门店ID" json:"store_id"`
+	BizType string `gorm:"column:biz_type;size:50;comment:业务类型(订单/交付/作品等)" json:"biz_type"`
+	BizID   int64  `gorm:"column:biz_id;comment:业务ID" json:"biz_id"`
+	// FileType 与 DDL 一致为 tinyint（1-图片 2-视频 3-文件）：
+	// 存中文名/字符串码会被 MySQL 严格模式拒收（Incorrect integer value）。
+	FileType enum.UploadType `gorm:"column:file_type;type:tinyint;comment:文件类型 1-图片 2-视频 3-文件" json:"file_type"`
+	FileName string          `gorm:"column:file_name;size:200;comment:原始文件名" json:"file_name"`
+	FileURL  string          `gorm:"column:file_url;size:500;not null;comment:文件访问地址" json:"file_url"`
+	FilePath string          `gorm:"column:file_path;size:500;comment:服务器存储路径" json:"file_path"`
+	Size     int64           `gorm:"column:size;comment:文件大小(字节)" json:"size"`
+	UploadBy int64           `gorm:"column:upload_by;comment:上传人ID" json:"upload_by"`
 }
 
 func (Upload) TableName() string { return "biz_upload" }

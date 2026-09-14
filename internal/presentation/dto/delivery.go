@@ -3,10 +3,11 @@ package dto
 // ======================== 请求 ========================
 
 // DeliveryItemReq 交付项
+// 注：file_type / kind 不接受客户端上报 —— file_type 由服务端按 URL 后缀推导，
+// kind 由调用接口决定（upload-samples → 1 样片，upload-retouched → 3 精修成品，
+// 客户选片 → 2 已选）。客户端多传这两个字段不会报错，但会被忽略。
 type DeliveryItemReq struct {
 	URL      string `json:"url" binding:"required"` // 文件URL
-	FileType string `json:"file_type"`              // 文件类型: image/video
-	Kind     string `json:"kind"`                   // 种类: sample/original/retouched
 	Filename string `json:"filename"`               // 文件名
 	Size     int64  `json:"size"`                   // 文件大小（字节）
 }

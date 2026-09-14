@@ -165,10 +165,10 @@ func (s *Service) AuditRefund(ctx context.Context, op Operator, id int64, approv
 	}
 	// 事务提交后再通知客户审核结果：通知失败不能回滚已生效的审核
 	if approved {
-		s.NotifyClient(ctx, op, rf.CustomerID, "finance", "退款申请已通过",
+		s.NotifyClient(ctx, op, rf.CustomerID, enum.NotificationTypeFinance, "退款申请已通过",
 			fmt.Sprintf("退款单 %s（%.2f 元）已通过审核，请留意到账", rf.Code, rf.Amount), "refund", rf.ID)
 	} else {
-		s.NotifyClient(ctx, op, rf.CustomerID, "finance", "退款申请未通过",
+		s.NotifyClient(ctx, op, rf.CustomerID, enum.NotificationTypeFinance, "退款申请未通过",
 			"退款单 "+rf.Code+" 未通过审核："+remark, "refund", rf.ID)
 	}
 	return nil

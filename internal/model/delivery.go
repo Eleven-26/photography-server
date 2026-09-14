@@ -33,20 +33,22 @@ func (Delivery) TableName() string { return "biz_delivery" }
 // DeliveryItem 交付明细（样片/精修文件）
 type DeliveryItem struct {
 	TenantBase
-	DeliveryID       int64   `gorm:"column:delivery_id;index;comment:交付单ID" json:"delivery_id"`
-	OrderID          int64   `gorm:"column:order_id;index;comment:订单ID" json:"order_id"`
-	URL              string  `gorm:"column:url;size:500;not null;comment:文件地址" json:"url"`
-	FileType         string  `gorm:"column:file_type;size:10;comment:类型 image-图片 video-视频" json:"file_type"`
-	Kind             string  `gorm:"column:kind;size:20;comment:用途 sample-样片 selected-已选 retouched-精修成品" json:"kind"`
-	Filename         string  `gorm:"column:filename;size:200;comment:原始文件名" json:"filename"`
-	Size             int64   `gorm:"column:size;comment:文件大小(字节)" json:"size"`
-	IsSelected       int     `gorm:"column:is_selected;type:tinyint;default:0;comment:客户是否选中 0-否 1-是" json:"is_selected"`
-	FeedbackContent  string  `gorm:"column:feedback_content;size:500;comment:客户修图反馈内容" json:"feedback_content"`
-	FeedbackTypes    string  `gorm:"column:feedback_types;size:100;comment:反馈修改类型(逗号分隔)" json:"feedback_types"`
-	FeedbackPriority string  `gorm:"column:feedback_priority;size:10;comment:反馈优先级 normal-important-urgent" json:"feedback_priority"`
-	FeedbackStatus   int     `gorm:"column:feedback_status;type:tinyint;default:0;comment:反馈状态 0-无 1-待处理 2-已处理" json:"feedback_status"`
-	HandledAt        *string `gorm:"column:handled_at;comment:反馈处理时间" json:"handled_at"`
-	HandleRemark     string  `gorm:"column:handle_remark;size:200;comment:处理备注(如确认加项)" json:"handle_remark"`
+	DeliveryID int64  `gorm:"column:delivery_id;index;comment:交付单ID" json:"delivery_id"`
+	OrderID    int64  `gorm:"column:order_id;index;comment:订单ID" json:"order_id"`
+	URL        string `gorm:"column:url;size:500;not null;comment:文件地址" json:"url"`
+	// FileType / Kind 与 DDL 一致为 tinyint（FileType: 1-图片 2-视频 3-文件；
+	// Kind: 1-样片 2-已选 3-精修成品），存字符串会被严格模式拒收。
+	FileType         enum.UploadType       `gorm:"column:file_type;type:tinyint;comment:类型 1-图片 2-视频 3-文件" json:"file_type"`
+	Kind             enum.DeliveryItemKind `gorm:"column:kind;type:tinyint;comment:用途 1-样片 2-已选 3-精修成品" json:"kind"`
+	Filename         string                `gorm:"column:filename;size:200;comment:原始文件名" json:"filename"`
+	Size             int64                 `gorm:"column:size;comment:文件大小(字节)" json:"size"`
+	IsSelected       int                   `gorm:"column:is_selected;type:tinyint;default:0;comment:客户是否选中 0-否 1-是" json:"is_selected"`
+	FeedbackContent  string                `gorm:"column:feedback_content;size:500;comment:客户修图反馈内容" json:"feedback_content"`
+	FeedbackTypes    string                `gorm:"column:feedback_types;size:100;comment:反馈修改类型(逗号分隔)" json:"feedback_types"`
+	FeedbackPriority string                `gorm:"column:feedback_priority;size:10;comment:反馈优先级 normal-important-urgent" json:"feedback_priority"`
+	FeedbackStatus   int                   `gorm:"column:feedback_status;type:tinyint;default:0;comment:反馈状态 0-无 1-待处理 2-已处理" json:"feedback_status"`
+	HandledAt        *string               `gorm:"column:handled_at;comment:反馈处理时间" json:"handled_at"`
+	HandleRemark     string                `gorm:"column:handle_remark;size:200;comment:处理备注(如确认加项)" json:"handle_remark"`
 }
 
 func (DeliveryItem) TableName() string { return "biz_delivery_item" }

@@ -148,10 +148,10 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 	}
 	// 5. 事务提交后再通知客户：到账确认是客户最关心的资金节点（通知失败不回滚已生效的核验）
 	if p.Type == rescheduleFeePaymentType {
-		s.NotifyClient(ctx, op, p.CustomerID, "finance", "改期调度费已确认",
+		s.NotifyClient(ctx, op, p.CustomerID, enum.NotificationTypeFinance, "改期调度费已确认",
 			fmt.Sprintf("调度费 %.2f 元已核验到账", p.Amount), "payment", p.ID)
 	} else {
-		s.NotifyClient(ctx, op, p.CustomerID, "finance", "收款已确认到账",
+		s.NotifyClient(ctx, op, p.CustomerID, enum.NotificationTypeFinance, "收款已确认到账",
 			fmt.Sprintf("已确认到账 %.2f 元", p.Amount), "payment", p.ID)
 	}
 	return nil

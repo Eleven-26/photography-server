@@ -185,7 +185,7 @@ func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, ord
 		fmt.Sprintf("客户登记%s %.2f 元（待核验）", paymentTypeName(req.Type), amount), op); err != nil {
 		logger.Warnf("ClientRegisterPayment: writeOrderLog failed, orderID=%d, err=%v", orderID, err)
 	}
-	s.NotifyStaff(ctx, op, o.OwnerID, "finance", "客户已登记付款",
+	s.NotifyStaff(ctx, op, o.OwnerID, enum.NotificationTypeFinance, "客户已登记付款",
 		fmt.Sprintf("客户为订单 %s 登记%s ¥%.2f，请核对到账后确认", o.Code, paymentTypeName(req.Type), amount),
 		"payment", p.ID)
 	return &p, nil

@@ -56,7 +56,7 @@ func (s *Service) CreateDeliveryTask(ctx context.Context, op Operator, req dto.D
 		return nil, err
 	}
 	if req.OperatorID > 0 {
-		s.NotifyStaff(ctx, op, req.OperatorID, "delivery",
+		s.NotifyStaff(ctx, op, req.OperatorID, enum.NotificationTypeOrder,
 			"新的交付任务",
 			"订单 "+o.Code+" 已指派给你，请及时处理",
 			"delivery", d.ID)
@@ -75,7 +75,7 @@ func (s *Service) RemindDeliveryOperator(ctx context.Context, op Operator, deliv
 	if err != nil {
 		return errs.NotFound("交付单不存在")
 	}
-	s.NotifyStaff(ctx, op, d.OperatorID, "delivery",
+	s.NotifyStaff(ctx, op, d.OperatorID, enum.NotificationTypeOrder,
 		"交付任务提醒",
 		"交付单 "+d.Code+"（客户 "+d.CustomerName+"）请尽快跟进",
 		"delivery", d.ID)
@@ -104,8 +104,8 @@ func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int
 			DeliveryID: deliveryID,
 			OrderID:    d.OrderID,
 			URL:        item.URL,
-			FileType:   item.FileType,
-			Kind:       "sample",
+			FileType:   detectFileTypeByURL(item.URL),
+			Kind:       enum.DeliveryItemKindSample,
 			Filename:   item.Filename,
 			Size:       item.Size,
 		}
@@ -121,7 +121,7 @@ func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int
 		return err
 	}
 	// 选片是有截止时间的客户待办，样片就绪必须通知到客户本人
-	s.NotifyClient(ctx, op, d.CustomerID, "order", "样片已上传，可开始选片",
+	s.NotifyClient(ctx, op, d.CustomerID, enum.NotificationTypeOrder, "样片已上传，可开始选片",
 		"交付单 "+d.Code+" 的样片已上传，请在选片截止前完成选片", "delivery", d.ID)
 	return nil
 }
@@ -136,7 +136,7 @@ func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int6
 	}
 
 	for _, itemID := range req.ItemIDs {
-		s.DeliveryRepo.UpdateItemKind(ctx, op.CompanyID, itemID, "selected")
+		s.DeliveryRepo.UpdateItemKind(ctx, op.CompanyID, itemID, enum.DeliveryItemKindSelected)
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -162,8 +162,8 @@ func (s *Service) UploadRetouched(ctx context.Context, op Operator, deliveryID i
 			DeliveryID: deliveryID,
 			OrderID:    d.OrderID,
 			URL:        item.URL,
-			FileType:   item.FileType,
-			Kind:       "retouched",
+			FileType:   detectFileTypeByURL(item.URL),
+			Kind:       enum.DeliveryItemKindRetouched,
 			Filename:   item.Filename,
 			Size:       item.Size,
 		}
@@ -194,7 +194,7 @@ func (s *Service) ConfirmDelivered(ctx context.Context, op Operator, deliveryID 
 	}); err != nil {
 		return err
 	}
-	s.NotifyClient(ctx, op, d.CustomerID, "order", "成片已交付",
+	s.NotifyClient(ctx, op, d.CustomerID, enum.NotificationTypeOrder, "成片已交付",
 		"交付单 "+d.Code+" 的成片已交付，请及时下载保存", "delivery", d.ID)
 	return nil
 }

@@ -22,7 +22,7 @@ INSERT INTO `sys_role` (`company_id`,`code`,`name`,`status`,`data_scope`,`remark
 (1, 'sales', '销售', 1, 2, '线索与客户跟进', 1, 1);
 
 -- 角色权限（RBAC 默认绑定；权限点清单见 internal/domain/perm.go）
--- 各角色权限点数：admin 70 / manager 53 / photographer 27 / sales 32
+-- 各角色权限点数：admin 70 / manager 53 / photographer 28 / sales 32
 -- 用 JOIN code 生成 role_id，不写死 ID，保证与增量脚本结果一致
 INSERT INTO `sys_role_permission` (`company_id`, `role_id`, `permission`)
 SELECT r.company_id,
@@ -316,6 +316,9 @@ FROM `sys_role` r
     SELECT 'photographer' AS code, 'calendar:update' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'settings:view' AS permission
+    UNION ALL
+    -- settings:update：摄影师在员工端「我的预约主页」维护主页标识（homepage_slug）
+    SELECT 'photographer' AS code, 'settings:update' AS permission
     UNION ALL
     SELECT 'photographer' AS code, 'notification:view' AS permission
     UNION ALL
