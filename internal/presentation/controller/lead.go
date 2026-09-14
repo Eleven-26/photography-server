@@ -55,7 +55,7 @@ func (h *Controller) LeadCreate(c *gin.Context) {
 
 func (h *Controller) LeadUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -114,7 +114,7 @@ func (h *Controller) LeadConvert(c *gin.Context) {
 
 func (h *Controller) QuoteCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "lead_id")
+	id, err := bind.BodyID(c, "lead_id")
 	if err != nil {
 		response.Fail(c, err)
 		return

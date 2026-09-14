@@ -23,7 +23,7 @@ func userRoleStore(ctl *controller.Controller) []Route {
 		{Path: "/user/logout", Handler: ctl.Logout},
 		{Path: "/user/list", Perm: domain.PermUserView, Handler: ctl.UserList},
 		{Path: "/user/create", Perm: domain.PermUserCreate, Handler: ctl.UserCreate},
-		{Path: "/user/update/:id", Perm: domain.PermUserUpdate, Handler: ctl.UserUpdate},
+		{Path: "/user/update", Perm: domain.PermUserUpdate, Handler: ctl.UserUpdate},
 		{Path: "/user/delete/:id", Perm: domain.PermUserDelete, Handler: ctl.UserDelete},
 		{Path: "/user/reset-password/:id", Perm: domain.PermUserResetPwd, Handler: ctl.UserResetPassword},
 
@@ -31,7 +31,7 @@ func userRoleStore(ctl *controller.Controller) []Route {
 		// 二者随接口一同挂载权限点，避免 B1-1 上线到 B1-2 挂载之间出现可被任意登录员工改权限的安全空窗）
 		{Path: "/role/list", Perm: domain.PermRoleView, Handler: ctl.RoleList},
 		{Path: "/role/create", Perm: domain.PermRoleCreate, Handler: ctl.RoleCreate},
-		{Path: "/role/update/:id", Perm: domain.PermRoleUpdate, Handler: ctl.RoleUpdate},
+		{Path: "/role/update", Perm: domain.PermRoleUpdate, Handler: ctl.RoleUpdate},
 		{Path: "/role/delete/:id", Perm: domain.PermRoleDelete, Handler: ctl.RoleDelete},
 		{Path: "/role/catalog", Perm: domain.PermRoleView, Handler: ctl.RoleCatalog},
 		{Path: "/role/permissions/:id", Perm: domain.PermRoleView, Handler: ctl.RolePerms},
@@ -40,7 +40,7 @@ func userRoleStore(ctl *controller.Controller) []Route {
 		// 门店
 		{Path: "/store/list", Perm: domain.PermStoreView, Handler: ctl.StoreList},
 		{Path: "/store/create", Perm: domain.PermStoreCreate, Handler: ctl.StoreCreate},
-		{Path: "/store/update/:id", Perm: domain.PermStoreUpdate, Handler: ctl.StoreUpdate},
+		{Path: "/store/update", Perm: domain.PermStoreUpdate, Handler: ctl.StoreUpdate},
 		{Path: "/store/delete/:id", Perm: domain.PermStoreDelete, Handler: ctl.StoreDelete},
 
 		// 通用上传

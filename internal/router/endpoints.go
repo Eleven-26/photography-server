@@ -103,11 +103,11 @@ var staffInclude = []string{
 	"/order/reschedule/apply/:order_id",
 	// 订单加项（同事务重算订单金额）
 	"/order/addon/list/:order_id",
-	"/order/addon/create/:order_id",
-	"/order/addon/update/:id",
+	"/order/addon/create",
+	"/order/addon/update",
 	"/order/addon/delete/:id",
 	// 收款（登记；核验见下方 Extra 的 payment/confirm）
-	"/payment/create/:order_id",
+	"/payment/create",
 	"/payment/list/:order_id",
 	"/payment/confirm/:id",
 	// 交付（读 + 上传样片/成品；创建与确认走 Extra / 未开放）
@@ -147,24 +147,24 @@ var staffInclude = []string{
 	// 资金不经平台，收款账户是工作室级配置，员工在有 settings 权限时可在移动端维护。
 	"/settings/payment-method/list",
 	"/settings/payment-method/create",
-	"/settings/payment-method/update/:id",
+	"/settings/payment-method/update",
 	"/settings/payment-method/delete/:id",
 	// 套餐（小程序「我的 → 套餐管理 / 套餐编辑」；权限点沿用 PC，与 PC 同权）
 	"/package/list",
 	"/package/detail/:id",
 	"/package/create",
-	"/package/update/:id",
+	"/package/update",
 	"/package/status/:id",
 	"/package/delete/:id",
 	// 作品集（小程序「我的 → 作品管理 / 上传作品」；status 归 asset:audit，见上方第四批说明）
 	"/asset/list",
 	"/asset/detail/:id",
 	"/asset/create",
-	"/asset/update/:id",
+	"/asset/update",
 	"/asset/status/:id",
 	"/asset/delete/:id",
 	// 报价（小程序「线索 → 创建报价」；:lead_id 为线索 ID）
-	"/quote/create/:lead_id",
+	"/quote/create",
 	"/quote/list/:lead_id",
 	"/quote/status/:id",
 }
@@ -201,7 +201,7 @@ func staffExtra(wc *wechat.Controller, ctl *controller.Controller) []routes.Rout
 		// 改任一侧都是破坏性变更（两个前端分别依赖各自字段名）。
 		{Path: "/refund/audit/:id", Perm: domain.PermRefundAudit, Handler: wc.RefundAudit},
 		// 创建交付单：员工端只接 order_id（不传 stage），PC 接完整 DeliveryCreateReq。
-		{Path: "/delivery/create/:order_id", Perm: domain.PermDeliveryCreate, Handler: wc.DeliveryCreate},
+		{Path: "/delivery/create", Perm: domain.PermDeliveryCreate, Handler: wc.DeliveryCreate},
 
 		// —— 3. 移动端真独有 ——
 		{Path: "/overview", Perm: domain.PermDashboardView, Handler: wc.Overview},

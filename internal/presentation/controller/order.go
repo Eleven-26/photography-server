@@ -57,7 +57,7 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 
 func (h *Controller) OrderUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -134,7 +134,7 @@ func (h *Controller) OrderLogs(c *gin.Context) {
 
 func (h *Controller) PaymentCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "order_id")
+	id, err := bind.BodyID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -283,7 +283,7 @@ func (h *Controller) OrderAddonList(c *gin.Context) {
 
 func (h *Controller) OrderAddonCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := bind.PathID(c, "order_id")
+	orderID, err := bind.BodyID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -303,7 +303,7 @@ func (h *Controller) OrderAddonCreate(c *gin.Context) {
 
 func (h *Controller) OrderAddonUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

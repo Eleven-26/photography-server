@@ -16,14 +16,14 @@ func orderFlow(ctl *controller.Controller) []Route {
 		{Path: "/order/create", Perm: domain.PermOrderCreate, Handler: ctl.OrderCreate},
 		{Path: "/order/list", Perm: domain.PermOrderView, Handler: ctl.OrderList},
 		{Path: "/order/detail/:id", Perm: domain.PermOrderView, Handler: ctl.OrderDetail},
-		{Path: "/order/update/:id", Perm: domain.PermOrderUpdate, Handler: ctl.OrderUpdate},
+		{Path: "/order/update", Perm: domain.PermOrderUpdate, Handler: ctl.OrderUpdate},
 		{Path: "/order/status/:id", Perm: domain.PermOrderStatus, Handler: ctl.OrderStatus},
 		{Path: "/order/cancel/:id", Perm: domain.PermOrderCancel, Handler: ctl.OrderCancel},
 		{Path: "/order/logs/:id", Perm: domain.PermOrderView, Handler: ctl.OrderLogs},
 
 		{Path: "/order/addon/list/:order_id", Perm: domain.PermOrderView, Handler: ctl.OrderAddonList},
-		{Path: "/order/addon/create/:order_id", Perm: domain.PermOrderUpdate, Handler: ctl.OrderAddonCreate},
-		{Path: "/order/addon/update/:id", Perm: domain.PermOrderUpdate, Handler: ctl.OrderAddonUpdate},
+		{Path: "/order/addon/create", Perm: domain.PermOrderUpdate, Handler: ctl.OrderAddonCreate},
+		{Path: "/order/addon/update", Perm: domain.PermOrderUpdate, Handler: ctl.OrderAddonUpdate},
 		{Path: "/order/addon/delete/:id", Perm: domain.PermOrderUpdate, Handler: ctl.OrderAddonDelete},
 
 		{Path: "/order/reschedule/list/:order_id", Perm: domain.PermOrderView, Handler: ctl.OrderRescheduleList},

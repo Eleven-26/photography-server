@@ -122,7 +122,7 @@ func (h *Controller) Overview(c *gin.Context) {
 // DeliveryCreate 创建交付单
 func (h *Controller) DeliveryCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := bind.PathID(c, "order_id")
+	orderID, err := bind.BodyID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return

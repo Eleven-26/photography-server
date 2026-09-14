@@ -14,7 +14,7 @@ import (
 // 故摄影师可上传/编辑自己的作品，但无权决定是否公开——需店长审核。
 func paymentRefundDelivery(ctl *controller.Controller) []Route {
 	return []Route{
-		{Path: "/payment/create/:order_id", Perm: domain.PermPaymentCreate, Handler: ctl.PaymentCreate},
+		{Path: "/payment/create", Perm: domain.PermPaymentCreate, Handler: ctl.PaymentCreate},
 		{Path: "/payment/list/:order_id", Perm: domain.PermPaymentView, Handler: ctl.PaymentList},
 		{Path: "/payment/confirm/:id", Perm: domain.PermPaymentConfirm, Handler: ctl.PaymentConfirm},
 		{Path: "/payment/delete/:id", Perm: domain.PermPaymentDelete, Handler: ctl.PaymentDelete},
@@ -29,7 +29,7 @@ func paymentRefundDelivery(ctl *controller.Controller) []Route {
 		//     （service 内部走 DeliveryRepo.GetByID）
 		// 2026-09-14 PC 把 order_id 传给 upload-retouched，触发 40400「交付单不存在」。
 		{Path: "/delivery/list", Perm: domain.PermDeliveryView, Handler: ctl.DeliveryList},
-		{Path: "/delivery/create/:order_id", Perm: domain.PermDeliveryCreate, Handler: ctl.DeliveryCreate},
+		{Path: "/delivery/create", Perm: domain.PermDeliveryCreate, Handler: ctl.DeliveryCreate},
 		{Path: "/delivery/remind/:id", Perm: domain.PermDeliveryUpdate, Handler: ctl.DeliveryRemind},
 		{Path: "/delivery/detail/:id", Perm: domain.PermDeliveryView, Handler: ctl.DeliveryDetail},
 		{Path: "/delivery/items/:id", Perm: domain.PermDeliveryView, Handler: ctl.DeliveryItems},
@@ -41,7 +41,7 @@ func paymentRefundDelivery(ctl *controller.Controller) []Route {
 		{Path: "/asset/list", Perm: domain.PermAssetView, Handler: ctl.AssetList},
 		{Path: "/asset/detail/:id", Perm: domain.PermAssetView, Handler: ctl.AssetDetail},
 		{Path: "/asset/create", Perm: domain.PermAssetUpload, Handler: ctl.AssetCreate},
-		{Path: "/asset/update/:id", Perm: domain.PermAssetUpdate, Handler: ctl.AssetUpdate},
+		{Path: "/asset/update", Perm: domain.PermAssetUpdate, Handler: ctl.AssetUpdate},
 		{Path: "/asset/status/:id", Perm: domain.PermAssetAudit, Handler: ctl.AssetStatus},
 		{Path: "/asset/delete/:id", Perm: domain.PermAssetDelete, Handler: ctl.AssetDelete},
 	}

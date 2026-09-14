@@ -11,7 +11,7 @@ func catalog(ctl *controller.Controller) []Route {
 		{Path: "/package/list", Perm: domain.PermPackageView, Handler: ctl.PackageList},
 		{Path: "/package/detail/:id", Perm: domain.PermPackageView, Handler: ctl.PackageDetail},
 		{Path: "/package/create", Perm: domain.PermPackageCreate, Handler: ctl.PackageCreate},
-		{Path: "/package/update/:id", Perm: domain.PermPackageUpdate, Handler: ctl.PackageUpdate},
+		{Path: "/package/update", Perm: domain.PermPackageUpdate, Handler: ctl.PackageUpdate},
 		{Path: "/package/status/:id", Perm: domain.PermPackagePublish, Handler: ctl.PackageStatus},
 		{Path: "/package/delete/:id", Perm: domain.PermPackageDelete, Handler: ctl.PackageDelete},
 	}

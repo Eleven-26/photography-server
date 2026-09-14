@@ -52,7 +52,7 @@ func (h *Controller) CustomerCreate(c *gin.Context) {
 
 func (h *Controller) CustomerUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

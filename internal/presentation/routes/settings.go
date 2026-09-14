@@ -22,7 +22,7 @@ func settingsMisc(ctl *controller.Controller) []Route {
 		{Path: "/settings/company/update", Perm: domain.PermSettingsUpdate, Handler: ctl.CompanyUpdate},
 		{Path: "/settings/payment-method/list", Perm: domain.PermSettingsView, Handler: ctl.PaymentMethodList},
 		{Path: "/settings/payment-method/create", Perm: domain.PermSettingsUpdate, Handler: ctl.PaymentMethodCreate},
-		{Path: "/settings/payment-method/update/:id", Perm: domain.PermSettingsUpdate, Handler: ctl.PaymentMethodUpdate},
+		{Path: "/settings/payment-method/update", Perm: domain.PermSettingsUpdate, Handler: ctl.PaymentMethodUpdate},
 		{Path: "/settings/payment-method/delete/:id", Perm: domain.PermSettingsUpdate, Handler: ctl.PaymentMethodDelete},
 		{Path: "/settings/operation-log/list", Perm: domain.PermLogView, Handler: ctl.OperationLogList},
 		{Path: "/settings/studio/get", Perm: domain.PermSettingsView, Handler: ctl.StudioGet},

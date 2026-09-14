@@ -55,6 +55,23 @@ func PathID(c *gin.Context, name string) (int64, error) {
 	return id, nil
 }
 
+// BodyID 从 POST body 取主键并校验为正整数。
+//
+// 契约（2026-09-14 统一）：**create / update 的资源主键一律走 POST body，不再拼进 URL**。
+// 与本项目「POST 参数一律从 JSON body 取、不读 query」的总约定（见 pkg/params）保持一致：
+// 这样主键和其余字段同源同路，前端无需区分"哪些参数进路径、哪些进 body"。
+//
+// name 是 body 里的字段名，通常为 "id"；下单/交付等从属关系用 "order_id"、报价用 "lead_id"。
+// 取值依赖 params.Middleware() 预解析的 body 参数表（已在 router.New 全局注册），
+// 因此可在 BindJSON 之前或之后调用，二者互不影响。
+func BodyID(c *gin.Context, name string) (int64, error) {
+	id := params.Int64(c, name)
+	if id <= 0 {
+		return 0, errs.BadRequest("参数错误")
+	}
+	return id, nil
+}
+
 // ParamStr 取字符串参数：统一从 POST body 取（预解析见 pkg/params），不读 query。
 func ParamStr(c *gin.Context, key string) string { return params.Str(c, key) }
 

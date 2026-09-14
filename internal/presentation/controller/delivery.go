@@ -12,7 +12,7 @@ import (
 // DeliveryCreate 新建交付任务 body: DeliveryCreateReq（路径 :order_id 优先于 body.order_id）
 func (h *Controller) DeliveryCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	orderID, err := bind.PathID(c, "order_id")
+	orderID, err := bind.BodyID(c, "order_id")
 	if err != nil {
 		response.Fail(c, err)
 		return

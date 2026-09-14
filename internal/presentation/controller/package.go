@@ -54,7 +54,7 @@ func (h *Controller) PackageCreate(c *gin.Context) {
 
 func (h *Controller) PackageUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

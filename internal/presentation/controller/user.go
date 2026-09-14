@@ -38,7 +38,7 @@ func (h *Controller) UserCreate(c *gin.Context) {
 
 func (h *Controller) UserUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -114,7 +114,7 @@ func (h *Controller) RoleCreate(c *gin.Context) {
 
 func (h *Controller) RoleUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -212,7 +212,7 @@ func (h *Controller) StoreCreate(c *gin.Context) {
 
 func (h *Controller) StoreUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
+	id, err := bind.BodyID(c, "id")
 	if err != nil {
 		response.Fail(c, err)
 		return

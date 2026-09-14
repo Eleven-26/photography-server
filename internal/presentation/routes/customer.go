@@ -12,7 +12,7 @@ func customerLeadQuote(ctl *controller.Controller) []Route {
 		{Path: "/customer/list", Perm: domain.PermCustomerView, Handler: ctl.CustomerList},
 		{Path: "/customer/detail/:id", Perm: domain.PermCustomerView, Handler: ctl.CustomerDetail},
 		{Path: "/customer/create", Perm: domain.PermCustomerCreate, Handler: ctl.CustomerCreate},
-		{Path: "/customer/update/:id", Perm: domain.PermCustomerUpdate, Handler: ctl.CustomerUpdate},
+		{Path: "/customer/update", Perm: domain.PermCustomerUpdate, Handler: ctl.CustomerUpdate},
 		{Path: "/customer/delete/:id", Perm: domain.PermCustomerDelete, Handler: ctl.CustomerDelete},
 		{Path: "/customer/stats", Perm: domain.PermCustomerView, Handler: ctl.CustomerStats},
 		{Path: "/customer/orders/:id", Perm: domain.PermCustomerView, Handler: ctl.CustomerOrders},
@@ -22,7 +22,7 @@ func customerLeadQuote(ctl *controller.Controller) []Route {
 		{Path: "/lead/list", Perm: domain.PermLeadView, Handler: ctl.LeadList},
 		{Path: "/lead/detail/:id", Perm: domain.PermLeadView, Handler: ctl.LeadDetail},
 		{Path: "/lead/create", Perm: domain.PermLeadCreate, Handler: ctl.LeadCreate},
-		{Path: "/lead/update/:id", Perm: domain.PermLeadUpdate, Handler: ctl.LeadUpdate},
+		{Path: "/lead/update", Perm: domain.PermLeadUpdate, Handler: ctl.LeadUpdate},
 		{Path: "/lead/delete/:id", Perm: domain.PermLeadDelete, Handler: ctl.LeadDelete},
 		{Path: "/lead/follow/:id", Perm: domain.PermLeadUpdate, Handler: ctl.LeadFollow},
 		{Path: "/lead/convert/:id", Perm: domain.PermLeadConvert, Handler: ctl.LeadConvert},
@@ -33,7 +33,7 @@ func customerLeadQuote(ctl *controller.Controller) []Route {
 
 		// 报价（status 为接受/拒绝/成交/撤回的状态流转，归 quote:update；
 		// 报价无独立审批接口，quote:audit 已随 2026-09-11 权限点清理移除）
-		{Path: "/quote/create/:lead_id", Perm: domain.PermQuoteCreate, Handler: ctl.QuoteCreate},
+		{Path: "/quote/create", Perm: domain.PermQuoteCreate, Handler: ctl.QuoteCreate},
 		{Path: "/quote/list/:lead_id", Perm: domain.PermQuoteView, Handler: ctl.QuoteList},
 		{Path: "/quote/status/:id", Perm: domain.PermQuoteUpdate, Handler: ctl.QuoteStatus},
 	}
