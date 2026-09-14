@@ -117,3 +117,20 @@ type SysNotification struct {
 }
 
 func (SysNotification) TableName() string { return "sys_notification" }
+
+// SysFeedback 员工意见反馈（小程序「我的 → 意见反馈」提交）。
+// 自助类数据：user_id 即提交人（sys_user.id），按 company_id 隔离租户。
+// 处理动作（status/remark/handled_at）在管理后台维护，员工端只写不改。
+type SysFeedback struct {
+	TenantBase
+	UserID    int64   `gorm:"column:user_id;index;comment:提交人ID(员工, sys_user.id)" json:"user_id"`
+	Type      string  `gorm:"column:type;size:20;comment:问题类型" json:"type"`
+	Status    int     `gorm:"column:status;type:tinyint;default:1;comment:处理状态 1-待处理 2-已处理" json:"status"`
+	Content   string  `gorm:"column:content;size:1000;comment:问题描述" json:"content"`
+	Images    string  `gorm:"column:images;size:1000;comment:截图URL(逗号分隔)" json:"images"`
+	Contact   string  `gorm:"column:contact;size:100;comment:联系方式" json:"contact"`
+	HandledAt *string `gorm:"column:handled_at;comment:处理时间" json:"handled_at"`
+	Remark    string  `gorm:"column:remark;size:500;comment:处理备注" json:"remark"`
+}
+
+func (SysFeedback) TableName() string { return "sys_feedback" }

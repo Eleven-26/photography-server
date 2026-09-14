@@ -229,5 +229,22 @@ func staffExtra(wc *wechat.Controller, ctl *controller.Controller) []routes.Rout
 		// 个人中心：设备管理（操作对象是登录者本人设备，属自助类 → 免挂权限点）
 		{Path: "/device/list", Handler: wc.DeviceList},
 		{Path: "/device/remove/:id", Handler: wc.DeviceRemove},
+
+		// —— 4. 第六批（2026-09-14）：B 类页面补建 ——
+		// 起因：小程序还有 5 个页面找不到后端落点，只能用演示数据 ——
+		//   pages/schedule/manage（发起改期）、pages/me/phone（换手机号）、
+		//   pages/me/notify-settings、pages/me/order-settings、pages/me/feedback。
+		// 处理口径：
+		//   · 通知开关 / 新单确认方式 → **不新增路由**，落在 biz_studio_setting 新列
+		//     （notify_settings / confirm_mode），复用既有 /studio/get|update，
+		//     PC「设置」页与员工端同源，无需新权限点。
+		//   · 其余三条为本端独有能力，挂 Extra（免权限点：操作对象是登录者本人）。
+		// 交付「发送最终确认」：:id 为**交付单 ID**；PC 无此动作，故不入公共路由表。
+		{Path: "/delivery/send-final/:id", Perm: domain.PermDeliveryUpdate, Handler: wc.DeliverySendFinal},
+		// 换绑手机号：验证码发往当前手机号，scene=change_mobile 与登录场景隔离
+		{Path: "/user/mobile-code", Handler: wc.StaffMobileCode},
+		{Path: "/user/change-mobile", Handler: wc.StaffChangeMobile},
+		// 意见反馈：仅提交（流转在管理后台）
+		{Path: "/feedback/submit", Handler: wc.FeedbackSubmit},
 	}
 }

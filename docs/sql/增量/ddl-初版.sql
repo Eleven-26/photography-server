@@ -1,7 +1,7 @@
 -- =====================================================================
 -- SLOT 摄影工作室管理系统 数据库初始化脚本 (DDL · 全量)
 -- 库名：photography   字符集：utf8   排序规则：utf8_general_ci
--- 用途：新建环境 / 新租户部署时一次性初始化（30 张表的最新结构）
+-- 用途：新建环境 / 新租户部署时一次性初始化（31 张表的最新结构）
 --
 -- 【维护约定 · 重要】
 --   1) 项目尚未上线：本文件即「第一版」全量基线，结构以本文件为唯一准。
@@ -229,6 +229,32 @@ CREATE TABLE `sys_notification`
     KEY             `idx_notice_deleted` (`deleted`),
     KEY             `idx_notice_receiver_type` (`receiver_type`,`receiver_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='站内通知';
+
+-- 员工意见反馈（小程序「我的 → 意见反馈」；自助提交，操作对象是提交人本人，免权限点）
+DROP TABLE IF EXISTS `sys_feedback`;
+CREATE TABLE `sys_feedback`
+(
+    `id`         bigint        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `company_id` bigint        NOT NULL DEFAULT '0' COMMENT '公司ID',
+    `user_id`    bigint        NOT NULL DEFAULT '0' COMMENT '提交人ID(员工)',
+    `type`       varchar(20)            DEFAULT NULL COMMENT '问题类型 bug-功能异常 advice-改进建议 other-其他',
+    `status`     tinyint       NOT NULL DEFAULT '1' COMMENT '处理状态 1-待处理 2-已处理',
+    `content`    varchar(1000)          DEFAULT NULL COMMENT '问题描述',
+    `images`     varchar(1000)          DEFAULT NULL COMMENT '截图URL(逗号分隔,最多3张)',
+    `contact`    varchar(100)           DEFAULT NULL COMMENT '联系方式(选填)',
+    `handled_at` datetime               DEFAULT NULL COMMENT '处理时间',
+    `remark`     varchar(500)           DEFAULT NULL COMMENT '处理备注',
+    `created_by` bigint        NOT NULL DEFAULT '0' COMMENT '创建人',
+    `created_at` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_by` bigint        NOT NULL DEFAULT '0' COMMENT '修改人',
+    `updated_at` datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `deleted`    bigint        NOT NULL DEFAULT '0' COMMENT '是否删除 0-否 1-是',
+    PRIMARY KEY (`id`),
+    KEY          `idx_feedback_company` (`company_id`),
+    KEY          `idx_feedback_user` (`user_id`),
+    KEY          `idx_feedback_status` (`status`),
+    KEY          `idx_feedback_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='员工意见反馈';
 
 -- ---------------------------------------------------------------------
 -- 二、客户与线索（CRM + 客户互动）
@@ -963,6 +989,8 @@ CREATE TABLE `biz_studio_setting`
     `faq`                   text COMMENT '常见问题(JSON数组: [{q,a}])',
     `service_flow`          text COMMENT '服务流程(JSON数组)',
     `intro`                 varchar(1000)          DEFAULT NULL COMMENT '工作室简介',
+    `notify_settings`       text COMMENT '通知提醒开关(JSON: {schedule,order,remind,message} 布尔值)',
+    `confirm_mode`          varchar(10)   NOT NULL DEFAULT 'manual' COMMENT '新单确认方式 manual-手动确认 auto-自动确认',
     `created_by`            bigint        NOT NULL DEFAULT '0' COMMENT '创建人',
     `created_at`            datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_by`            bigint        NOT NULL DEFAULT '0' COMMENT '修改人',

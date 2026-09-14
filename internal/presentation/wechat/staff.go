@@ -439,3 +439,71 @@ func (h *Controller) FeedbackHandle(c *gin.Context) {
 	}
 	response.OKNil(c)
 }
+
+// ---------------------------------------------------------------------
+// 交付：发送最终确认（员工端独有）
+// ---------------------------------------------------------------------
+
+// DeliverySendFinal 发送最终确认（:id 为**交付单 ID**，与 delivery/confirm 同口径）。
+// PC 交付工作台没有这个动作，属移动端独有，故不进公共路由表。
+func (h *Controller) DeliverySendFinal(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	id, err := bind.PathID(c, "id")
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.SendFinalToCustomer(c.Request.Context(), op, id); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 账号自助：换绑手机号（免权限点，与 /user/* 同属"操作本人账号"）
+// ---------------------------------------------------------------------
+
+// StaffMobileCode 发送换绑验证码（发往**当前绑定手机号**，scene=change_mobile）
+func (h *Controller) StaffMobileCode(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	if err := h.Svc.SendStaffMobileCode(c.Request.Context(), op); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// StaffChangeMobile 校验验证码并换绑本人手机号（body: {code, new_mobile}）
+func (h *Controller) StaffChangeMobile(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	var req dto.StaffChangeMobileReq
+	if err := bind.BindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.ChangeStaffMobile(c.Request.Context(), op, req.Code, req.NewMobile); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}
+
+// ---------------------------------------------------------------------
+// 意见反馈（免权限点：提交人本人）
+// ---------------------------------------------------------------------
+
+// FeedbackSubmit 提交意见反馈（body: dto.FeedbackSubmitReq）
+func (h *Controller) FeedbackSubmit(c *gin.Context) {
+	op := middleware.GetOperator(c)
+	var req dto.FeedbackSubmitReq
+	if err := bind.BindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	if err := h.Svc.SubmitFeedback(c.Request.Context(), op, req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OKNil(c)
+}

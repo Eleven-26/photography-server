@@ -131,9 +131,14 @@ func (SlotTemplate) TableName() string { return "biz_slot_template" }
 // StudioSetting 工作室设置（预约主页/接单规则/改期政策）
 type StudioSetting struct {
 	Base
-	CompanyID           int64   `gorm:"column:company_id;uniqueIndex:uk_studio_setting_company,priority:1;comment:公司ID" json:"company_id"`
-	Slogan              string  `gorm:"column:slogan;size:200;comment:宣传语" json:"slogan"`
-	Intro               string  `gorm:"column:intro;size:1000;comment:工作室简介" json:"intro"`
+	CompanyID int64  `gorm:"column:company_id;uniqueIndex:uk_studio_setting_company,priority:1;comment:公司ID" json:"company_id"`
+	Slogan    string `gorm:"column:slogan;size:200;comment:宣传语" json:"slogan"`
+	Intro     string `gorm:"column:intro;size:1000;comment:工作室简介" json:"intro"`
+	// NotifySettings 通知提醒开关（JSON：{"schedule":bool,"order":bool,"remind":bool,"message":bool}）。
+	// 存 JSON 串而非 4 个布尔列：开关数量会随产品迭代增减，加一项不必改表。
+	NotifySettings string `gorm:"column:notify_settings;type:text;comment:通知提醒开关(JSON)" json:"notify_settings"`
+	// ConfirmMode 新单确认方式：manual-手动确认（员工逐单确认档期） / auto-自动确认。
+	ConfirmMode         string  `gorm:"column:confirm_mode;size:10;not null;default:manual;comment:新单确认方式 manual/auto" json:"confirm_mode"`
 	HomepageSlug        string  `gorm:"column:homepage_slug;size:50;comment:预约主页短链标识" json:"homepage_slug"`
 	AcceptNew           int     `gorm:"column:accept_new;type:tinyint;not null;default:1;comment:接收新预约 0-暂停 1-接收" json:"accept_new"`
 	LockMinutes         int     `gorm:"column:lock_minutes;not null;default:15;comment:下单临时锁定时长(分钟)" json:"lock_minutes"`

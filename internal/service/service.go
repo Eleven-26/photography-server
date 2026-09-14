@@ -51,6 +51,7 @@ type Service struct {
 	SlotTemplateRepo  *repository.SlotTemplateRepo
 	StudioSettingRepo *repository.StudioSettingRepo
 	DeviceRepo        *repository.DeviceRepo
+	FeedbackRepo      *repository.FeedbackRepo
 }
 
 // New 构造业务服务。依赖（上传目录 / JWT 参数 / Redis 客户端）由组合根注入，
@@ -83,6 +84,7 @@ func New(uploadDir, jwtSecret, jwtIssuer string, rdb *redis.Client) *Service {
 		SlotTemplateRepo:  repository.NewSlotTemplateRepo(),
 		StudioSettingRepo: repository.NewStudioSettingRepo(),
 		DeviceRepo:        repository.NewDeviceRepo(),
+		FeedbackRepo:      repository.NewFeedbackRepo(),
 	}
 }
 

@@ -28,6 +28,9 @@ var permExempt = map[string]bool{
 	"/upload/file":          true, // 通用上传能力，被收款凭证/作品/交付等多条链路共用
 	"/device/list":          true, // 员工端：本人登录设备
 	"/device/remove/:id":    true,
+	"/user/mobile-code":     true, // 员工端：换绑手机号（操作对象是登录者本人）
+	"/user/change-mobile":   true,
+	"/feedback/submit":      true, // 员工端：意见反馈（提交人本人）
 }
 
 // staffRouteCountBaseline 员工端路由数基线：
@@ -37,8 +40,13 @@ var permExempt = map[string]bool{
 // 以及同日第四批补开的 15 条：套餐 /package/* 6 条、作品集 /asset/* 6 条、报价 /quote/* 3 条，
 // 同日第五批补开的 2 条：/delivery/select/:id（选片结果页）、/customer/orders/:id（客户档案订单列表））
 // + 6（异路径别名）+ 2（真实端差异）+ 18（移动端独有）= 80。
+//
+// 2026-09-14 第六批（B 类页面补建）**全部走 Extra**，Include 不变：
+//
+//	/delivery/send-final/:id、/user/mobile-code、/user/change-mobile、/feedback/submit → +4 = 84。
+//
 // 有意增减员工端暴露面时须同步更新此基线——它防的是"悄悄多挂 / 漏挂"。
-const staffRouteCountBaseline = 80
+const staffRouteCountBaseline = 84
 
 // commonRouteCountBaseline 管理端业务路由数基线（PC 与小程序共用）。
 const commonRouteCountBaseline = 108

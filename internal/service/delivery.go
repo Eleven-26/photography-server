@@ -178,6 +178,32 @@ func (s *Service) UploadRetouched(ctx context.Context, op Operator, deliveryID i
 	})
 }
 
+// SendFinalToCustomer 发送最终确认：记录 sent_final_at 并通知客户去看成片。
+//
+// 前置条件 stage == 4（待确认交付）—— 即精修成品已上传完毕（见 UploadRetouched）。
+// 在阶段 1~3 调用等于让客户看半成品，确认按钮失去意义，故直接拒绝。
+//
+// 与 ConfirmDelivered 的分工：本方法只"请客户确认"（仍是 stage 4）；
+// 客户确认后由 ConfirmDelivered 落 stage 5 并开放下载。
+func (s *Service) SendFinalToCustomer(ctx context.Context, op Operator, deliveryID int64) error {
+	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
+	if err != nil {
+		return errs.NotFound(errs.ErrDeliveryNotFound)
+	}
+	if d.Stage != enum.DeliveryStagePendingConfirm {
+		return errs.BadRequest(errs.ErrDeliveryStageInvalid)
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if err := s.DeliveryRepo.Update(ctx, op.CompanyID, deliveryID, map[string]interface{}{
+		"sent_final_at": now,
+	}); err != nil {
+		return err
+	}
+	s.NotifyClient(ctx, op, d.CustomerID, enum.NotificationTypeOrder, "成片待确认",
+		"交付单 "+d.Code+" 的精修成片已上传，请确认后开放高清下载", "delivery", d.ID)
+	return nil
+}
+
 func (s *Service) ConfirmDelivered(ctx context.Context, op Operator, deliveryID int64) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {

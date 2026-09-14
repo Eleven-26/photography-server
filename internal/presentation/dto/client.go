@@ -216,6 +216,8 @@ type StaffStudioSettingReq struct {
 	RetainDays          *int     `json:"retain_days"`           // 未选原片保留天数
 	Faq                 string   `json:"faq"`                   // 常见问题(JSON)
 	ServiceFlow         string   `json:"service_flow"`          // 服务流程(JSON)
+	NotifySettings      string   `json:"notify_settings"`       // 通知提醒开关(JSON，见 model.StudioSetting)
+	ConfirmMode         string   `json:"confirm_mode"`          // 新单确认方式 manual-手动确认 auto-自动确认
 }
 
 // ToUpdates 组装更新字段：指针非 nil 才更新（支持把数值改为 0）
@@ -257,7 +259,31 @@ func (req StaffStudioSettingReq) ToUpdates() map[string]interface{} {
 	if req.ServiceFlow != "" {
 		updates["service_flow"] = req.ServiceFlow
 	}
+	// 通知开关是 JSON 串：恒为非空（前端总是整串提交），故沿用「非空才更新」口径
+	if req.NotifySettings != "" {
+		updates["notify_settings"] = req.NotifySettings
+	}
+	if req.ConfirmMode != "" {
+		updates["confirm_mode"] = req.ConfirmMode
+	}
 	return updates
+}
+
+// FeedbackSubmitReq 员工提交意见反馈（小程序「我的 → 意见反馈」）。
+// 路由免权限点：操作对象是提交人本人，不属角色能力边界。
+type FeedbackSubmitReq struct {
+	Type    string   `json:"type"`    // 问题类型 bug-功能异常 advice-改进建议 other-其他（空按 other）
+	Content string   `json:"content"` // 问题描述（必填，<=1000 字）
+	Images  []string `json:"images"`  // 截图 URL（选填，最多 3 张，服务端截断）
+	Contact string   `json:"contact"` // 联系方式（选填）
+}
+
+// StaffChangeMobileReq 员工换绑手机号。
+// 验证码发往**当前绑定手机号**（先证明是账号持有人，再落新号），
+// 场景 change_mobile 与登录场景 login 隔离，登录验证码不能拿来换绑。
+type StaffChangeMobileReq struct {
+	Code      string `json:"code" binding:"required"`       // 短信验证码（发往当前手机号）
+	NewMobile string `json:"new_mobile" binding:"required"` // 新手机号
 }
 
 // StaffStudioSettingResp 工作室设置读取响应。

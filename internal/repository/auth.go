@@ -65,3 +65,10 @@ func (r *AuthRepo) UpdateLoginInfo(ctx context.Context, userID int64, ip string)
 func (r *AuthRepo) UpdatePassword(ctx context.Context, userID int64, hash string) error {
 	return r.conn().WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).Update("password", hash).Error
 }
+
+// UpdateMobile 更新员工手机号（员工自助换绑；占用校验由 service 负责）。
+// 不过滤 company_id：操作对象由 op.UserID 唯一确定，且换绑是"本人改本人"。
+func (r *AuthRepo) UpdateMobile(ctx context.Context, userID int64, mobile string) error {
+	return r.conn().WithContext(ctx).Model(&model.SysUser{}).Where("id = ?", userID).
+		Updates(map[string]interface{}{"mobile": mobile, "updated_by": userID}).Error
+}
