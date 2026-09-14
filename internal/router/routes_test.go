@@ -45,11 +45,15 @@ var permExempt = map[string]bool{
 //
 //	/delivery/send-final/:id、/user/mobile-code、/user/change-mobile、/feedback/submit → +4 = 84。
 //
+// 2026-09-14 第七批：定制需求 /custom-request/{list,respond/:id} 自 Extra **上提到 Include**，
+// 与 PC 管理端共用同一 Handler（消除同路径两端各自实现的契约漂移）→ Include +2 / Extra -2，总数仍 84。
+//
 // 有意增减员工端暴露面时须同步更新此基线——它防的是"悄悄多挂 / 漏挂"。
 const staffRouteCountBaseline = 84
 
 // commonRouteCountBaseline 管理端业务路由数基线（PC 与小程序共用）。
-const commonRouteCountBaseline = 108
+// 2026-09-14：新增定制需求 3 条（list / respond / convert）→ 111。
+const commonRouteCountBaseline = 111
 
 // staffAliases 员工端异路径别名 → 公共路由表对应路径。
 // 别名路径的 Handler 必须与公共实现是同一函数，否则就是又抄了一遍。

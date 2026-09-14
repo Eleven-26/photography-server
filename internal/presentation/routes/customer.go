@@ -17,6 +17,13 @@ func customerLeadQuote(ctl *controller.Controller) []Route {
 		{Path: "/customer/stats", Perm: domain.PermCustomerView, Handler: ctl.CustomerStats},
 		{Path: "/customer/orders/:id", Perm: domain.PermCustomerView, Handler: ctl.CustomerOrders},
 
+		// 定制需求（H5 提交 → 后台列表 / 响应 / 转订单）。
+		// 权限点复用既有 request:view / request:handle（已在 sys_role_permission 分配给 manager/sales/photographer）。
+		// 员工端复用同一 Handler（见 router/endpoints.go 的 staffInclude），杜绝同路径两端契约漂移。
+		{Path: "/custom-request/list", Perm: domain.PermRequestView, Handler: ctl.CustomRequestList},
+		{Path: "/custom-request/respond/:id", Perm: domain.PermRequestHandle, Handler: ctl.CustomRequestRespond},
+		{Path: "/custom-request/convert/:id", Perm: domain.PermRequestHandle, Handler: ctl.CustomRequestConvert},
+
 		// 线索（沟通记录与 AI 简报读接口归 lead:view，写入归 lead:update；
 		// 变更归属人属"分配"语义，路由级无法区分，由 service 层追加 lead:assign 校验）
 		{Path: "/lead/list", Perm: domain.PermLeadView, Handler: ctl.LeadList},

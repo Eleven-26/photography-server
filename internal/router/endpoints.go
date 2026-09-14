@@ -132,6 +132,11 @@ var staffInclude = []string{
 	"/customer/orders/:id",
 	// 客户建档（小程序 customer/create 页；权限点沿用 PC 的 customer:create —— 需该权限的角色才放行）
 	"/customer/create",
+	// 定制需求（小程序「定制需求」列表 + 响应）。
+	// 2026-09-14 起复用 PC 管理端同一 Handler（原先在 Extra 用 wc.* 独立实现）——
+	// 同一 Path 两端各自实现过一次契约漂移的亏，这里直接共用。
+	"/custom-request/list",
+	"/custom-request/respond/:id",
 	// 通知（员工本人通知；service 按 receiver_type=1 + 操作人 UserID 隔离）
 	"/notification/list",
 	"/notification/unread-count",
@@ -214,9 +219,6 @@ func staffExtra(wc *wechat.Controller, ctl *controller.Controller) []routes.Rout
 		{Path: "/brief/list/:lead_id", Perm: domain.PermLeadView, Handler: wc.BriefList},
 		{Path: "/brief/send/:id", Perm: domain.PermLeadUpdate, Handler: wc.BriefSend},
 		{Path: "/brief/confirm/:id", Perm: domain.PermLeadUpdate, Handler: wc.BriefConfirm},
-		// 定制需求
-		{Path: "/custom-request/list", Perm: domain.PermRequestView, Handler: wc.StaffCustomRequestList},
-		{Path: "/custom-request/respond/:id", Perm: domain.PermRequestHandle, Handler: wc.CustomRequestRespond},
 		// 评价
 		{Path: "/review/list", Perm: domain.PermReviewView, Handler: wc.ReviewList},
 		{Path: "/review/reply/:id", Perm: domain.PermReviewReply, Handler: wc.ReviewReply},

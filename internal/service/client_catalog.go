@@ -156,6 +156,17 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 		m.Name = req.Name
 		m.Mobile = req.Mobile
 	}
+	// 客户主体对齐：游客提交（或已登录但未绑定客户档案）时，按手机号在客户表查档，
+	// 查不到则自动建档 —— 否则需求只带姓名手机号，后续转订单/交付/通知挂不到客户身上。
+	if m.CustomerID == 0 {
+		c, err := s.FindOrCreateCustomerByMobile(ctx, companyID, m.Name, m.Mobile, "定制需求")
+		if err != nil {
+			return nil, err
+		}
+		if c != nil {
+			m.CustomerID = c.ID
+		}
+	}
 	if err := s.CustomRequestRepo.Create(ctx, &m); err != nil {
 		return nil, err
 	}

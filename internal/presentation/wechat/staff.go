@@ -275,41 +275,9 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 }
 
 // ---------------------------------------------------------------------
-// 定制需求 / 档期模板 / 评价 / 设置 / 设备
+// 档期模板 / 评价 / 设置 / 设备
+// （定制需求已上提至公共路由表，与 PC 共用 Handler，见 routes/customer.go）
 // ---------------------------------------------------------------------
-
-// CustomRequestList 定制需求列表
-func (h *Controller) StaffCustomRequestList(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	page, pageSize := bind.Pager(c)
-	status := params.Int(c, "status")
-	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize, status)
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.PageOK(c, list, total, page, pageSize)
-}
-
-// CustomRequestRespond 响应定制需求
-func (h *Controller) CustomRequestRespond(c *gin.Context) {
-	op := middleware.GetOperator(c)
-	id, err := bind.PathID(c, "id")
-	if err != nil {
-		response.Fail(c, err)
-		return
-	}
-	var req dto.StaffCustomRequestRespondReq
-	if err := bind.BindJSON(c, &req); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	if err := h.Svc.StaffCustomRequestRespond(c.Request.Context(), op, id, req.Response); err != nil {
-		response.Fail(c, err)
-		return
-	}
-	response.OKNil(c)
-}
 
 // ReviewList 评价列表
 func (h *Controller) ReviewList(c *gin.Context) {
