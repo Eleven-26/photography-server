@@ -2,14 +2,18 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/presentation/dto"
+	"photography-server/internal/repository"
 )
 
 func (s *Service) ListLeads(ctx context.Context, op Operator, page, pageSize int, keyword, status string, ownerID int64) ([]model.Lead, int64, error) {
@@ -43,7 +47,21 @@ func (s *Service) CreateLead(ctx context.Context, op Operator, req dto.LeadCreat
 		OwnerID:     orDefaultInt64(req.OwnerID, op.UserID),
 		Status:      enum.LeadStatusPending,
 	}
-	if err := s.LeadRepo.Create(ctx, &l); err != nil {
+	// 建档与建线索放在同一事务：按手机号在客户表查档，没有则以线索姓名/来源建档。
+	// 手机号为空时不建档，CustomerID 保持 0（无手机号无法去重），
+	// 待「转客户 / 转订单」时由用户补全手机号再建。
+	err := repository.Tx(func(tx *gorm.DB) error {
+		c, cerr := s.findOrCreateCustomerByMobile(ctx, s.CustomerRepo.WithTx(tx),
+			op.CompanyID, req.Name, req.Mobile, orDefault(req.Source, CustomerSourceLead))
+		if cerr != nil {
+			return cerr
+		}
+		if c != nil {
+			l.CustomerID = c.ID
+		}
+		return s.LeadRepo.WithTx(tx).Create(ctx, &l)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &l, nil
@@ -96,34 +114,56 @@ func (s *Service) FollowLead(ctx context.Context, op Operator, id int64, req dto
 	})
 }
 
+// ConvertLeadToCustomer 线索转客户。
+//
+// 幂等：线索已关联客户（新增线索时自动建档，或此前已转过一次）直接复用并返回，
+// 不再重复建档 —— crm_customer.mobile 只有普通索引、无唯一约束，
+// 重复转只会在客户表留下同名同号的两条记录，后续按手机号查档就只剩一条能被命中。
 func (s *Service) ConvertLeadToCustomer(ctx context.Context, op Operator, leadID int64) (*model.Customer, error) {
 	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
 	}
 
-	c := model.Customer{
-		TenantBase: model.TenantBase{
-			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
-			CompanyID: op.CompanyID,
-		},
-		Code:    domain.GenCode("CU"),
-		StoreID: l.StoreID,
-		Name:    l.Name,
-		Mobile:  l.Mobile,
-		Source:  l.Source,
-		Status:  enum.CustomerStatusPotential,
-	}
-	if err := s.CustomerRepo.Create(ctx, &c); err != nil {
+	var c *model.Customer
+	err = repository.Tx(func(tx *gorm.DB) error {
+		if l.CustomerID > 0 {
+			existing, gerr := s.CustomerRepo.WithTx(tx).GetByID(ctx, op.CompanyID, l.CustomerID)
+			switch {
+			case gerr == nil:
+				c = existing
+				// 客户已存在 ≠ 线索已推进：仍要落「已成交」，
+				// 否则重复转客户只会拿回客户，线索状态永远停在待回复。
+				return s.LeadRepo.WithTx(tx).Update(ctx, op.CompanyID, leadID, map[string]interface{}{
+					"status": enum.LeadStatusConfirmed,
+				})
+			case errors.Is(gerr, gorm.ErrRecordNotFound):
+				// 客户已被删除，继续走下面的建档兜底
+			default:
+				return errs.Internal("")
+			}
+		}
+
+		created, cerr := s.findOrCreateCustomerByMobile(ctx, s.CustomerRepo.WithTx(tx),
+			op.CompanyID, l.Name, l.Mobile, orDefault(l.Source, CustomerSourceLead))
+		if cerr != nil {
+			return cerr
+		}
+		if created == nil {
+			// 手机号为空：不建无手机号的客户（宁缺毋滥），引导先补全手机号
+			return errs.BadRequest("线索缺少手机号，无法建立客户，请先补全手机号")
+		}
+		c = created
+
+		return s.LeadRepo.WithTx(tx).Update(ctx, op.CompanyID, leadID, map[string]interface{}{
+			"customer_id": c.ID,
+			"status":      enum.LeadStatusConfirmed,
+		})
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	s.LeadRepo.Update(ctx, op.CompanyID, leadID, map[string]interface{}{
-		"customer_id": c.ID,
-		"status":      enum.LeadStatusConfirmed,
-	})
-
-	return &c, nil
+	return c, nil
 }
 
 func (s *Service) CreateQuote(ctx context.Context, op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
