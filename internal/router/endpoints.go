@@ -74,9 +74,23 @@ func miniappEndpoint(mw *middleware.Middlewares) endpoint.Endpoint {
 //   - /customer/create：挂 PC 同一权限点 customer:create，员工端与 PC **同权**（同一张 sys_role_permission）。
 //   - /settings/payment-method/*：list 归 settings:view、增删改归 settings:update，与 PC 同权。
 //
-// 仍**不开放**：/quote/*（报价是管理端专属销售动作，小程序暂无报价页）、
-// /package/*、/asset/*（员工端套餐/作品管理后端亦无对应能力，见前端页面的"即将开放"处理）、
-// /role:*、/store:*、/calendar/lock、/finance/export。
+// 2026-09-14 决策（第四批）：**补开套餐 / 作品集 / 报价**。
+// 起因：小程序确有 pages/me/packages（套餐列表）、pages/me/package-edit（套餐编辑）、
+// pages/me/works（作品列表）、pages/me/works-edit、pages/me/works-upload（作品上传/编辑）、
+// pages/quote/create（基于线索创建报价）六个页面，此前白名单未放行，页面只能挂演示占位。
+// 与第三批同一性质：属前后端未闭合，不是"员工端不该有这些能力"。
+//
+// 口径：**员工端与 PC 同权**（同 Path、同 Handler、同一张 sys_role_permission）。
+// 放行路由**不等于**授予能力——能否操作由登录员工的角色权限点决定，与 PC 完全一致：
+//   - package:view/create/update/publish/delete
+//   - asset:view/upload/update/audit/delete
+//   - quote:view/create/update
+//
+// 其中 /asset/status/:id 归 asset:audit（发布审核）、/package/status/:id 归 package:publish（上下架）：
+// 摄影师通常无这两个权限点，放行只是让"有权限的人"在移动端也能操作，不改变审核边界。
+//
+// 仍**不开放**：/role:*、/store:*、/calendar/lock、/finance/export、
+// /asset/upload-* 之外的平台级能力（详见各 routes 文件）。
 var staffInclude = []string{
 	// 订单（复用 PC 端同一 handler 与 service）
 	"/order/list",
@@ -131,6 +145,24 @@ var staffInclude = []string{
 	"/settings/payment-method/create",
 	"/settings/payment-method/update/:id",
 	"/settings/payment-method/delete/:id",
+	// 套餐（小程序「我的 → 套餐管理 / 套餐编辑」；权限点沿用 PC，与 PC 同权）
+	"/package/list",
+	"/package/detail/:id",
+	"/package/create",
+	"/package/update/:id",
+	"/package/status/:id",
+	"/package/delete/:id",
+	// 作品集（小程序「我的 → 作品管理 / 上传作品」；status 归 asset:audit，见上方第四批说明）
+	"/asset/list",
+	"/asset/detail/:id",
+	"/asset/create",
+	"/asset/update/:id",
+	"/asset/status/:id",
+	"/asset/delete/:id",
+	// 报价（小程序「线索 → 创建报价」；:lead_id 为线索 ID）
+	"/quote/create/:lead_id",
+	"/quote/list/:lead_id",
+	"/quote/status/:id",
 }
 
 // staffEndpoint 员工端（挂 /wechat/staff，员工认证 + 操作日志）。
