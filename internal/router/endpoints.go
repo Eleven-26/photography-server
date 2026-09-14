@@ -116,6 +116,8 @@ var staffInclude = []string{
 	"/delivery/items/:id",
 	"/delivery/upload-samples/:id",
 	"/delivery/upload-retouched/:id",
+	// 选片确认（小程序「选片结果」页；:id 为 order_id，权限点 delivery:update 与 PC 一致）
+	"/delivery/select/:id",
 	// 退款（查看；审核见 Extra —— 契约字段与 PC 不同）
 	"/refund/list/:order_id",
 	// 线索（读 + 沟通）
