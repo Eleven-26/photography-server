@@ -132,11 +132,22 @@ func genSmsCode() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
-// CustomerSmsLogin 客户手机号验证码登录（H5/小程序共用）。
+// CustomerSmsLogin 客户手机号登录（H5/小程序共用）。
 // 手机号已存在则直接登录；不存在自动创建客户档案（来源=预约主页）。
-func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile, code, openid string) (*model.Customer, string, error) {
-	if err := s.verifySmsCode(ctx, "login", mobile, code); err != nil {
-		return nil, "", err
+//
+// requireCode 控制是否校验短信验证码：**仅开发环境传 false**
+// （判据见 h5.Controller.loginRequireSmsCode，白名单式，test/prod 恒为 true）。
+//
+// 注意：免验证码时手机号成为唯一凭据，故格式校验必须在**服务层**兜住 ——
+// handler 的 binding:"required" 只保证"非空"，挡不住 "123" 这类脏值把垃圾客户档建进 crm_customer。
+func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile, code, openid string, requireCode bool) (*model.Customer, string, error) {
+	if !domain.IsMobile(mobile) {
+		return nil, "", errs.BadRequest("手机号格式错误")
+	}
+	if requireCode {
+		if err := s.verifySmsCode(ctx, "login", mobile, code); err != nil {
+			return nil, "", err
+		}
 	}
 	c, err := s.CustomerRepo.GetByMobile(ctx, companyID, mobile)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

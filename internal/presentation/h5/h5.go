@@ -73,6 +73,8 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/payment-method/list", h.PaymentMethods)
 	// 评价
 	g.POST("/review/create/:order_id", h.ReviewCreate)
+	// 我的评价（客户中心 → 我的评价；只读，按令牌内 customer_id 锁定归属）
+	g.POST("/review/list", h.ReviewList)
 	// 选片与交付
 	g.POST("/delivery/detail/:id", h.DeliveryDetail)
 	g.POST("/delivery/items/:id", h.DeliveryItems)
@@ -82,6 +84,11 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	g.POST("/delivery/feedback/:item_id", h.FeedbackSubmit)
 	// 定制需求
 	g.POST("/custom-request/list", h.CustomRequestList)
+	// 客户中心（H5 CC01）：个人资料读写。
+	// 字段白名单见 dto.ClientProfileUpdateReq —— crm_customer 与员工端共用一张表，
+	// remark / tags / level / source / status 属工作室内部信息，不在客户端可改范围。
+	g.POST("/customer/profile", h.CustomerProfile)
+	g.POST("/customer/profile/update", h.CustomerProfileUpdate)
 	// 报价（报告 H1）：列表 / 详情 / 接受 / 提出修改
 	g.POST("/quote/list", h.QuoteList)
 	g.POST("/quote/detail/:id", h.QuoteDetail)
@@ -177,7 +184,7 @@ func (h *Controller) Login(c *gin.Context) {
 	var req struct {
 		Slug   string `json:"slug"` // 预约主页短链标识（也可放 query/头）
 		Mobile string `json:"mobile" binding:"required"`
-		Code   string `json:"code" binding:"required"`
+		Code   string `json:"code"` // 短信验证码；开发环境免验证码时可为空（见 loginRequireSmsCode）
 		OpenID string `json:"openid"`
 	}
 	if err := bind.BindJSON(c, &req); err != nil {
@@ -201,7 +208,7 @@ func (h *Controller) Login(c *gin.Context) {
 		response.Fail(c, errs.BadRequest("预约主页不存在或未配置短链标识，请联系工作室"))
 		return
 	}
-	customer, token, err := h.Svc.CustomerSmsLogin(c.Request.Context(), companyID, req.Mobile, req.Code, req.OpenID)
+	customer, token, err := h.Svc.CustomerSmsLogin(c.Request.Context(), companyID, req.Mobile, req.Code, req.OpenID, h.loginRequireSmsCode())
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -210,6 +217,24 @@ func (h *Controller) Login(c *gin.Context) {
 		"token":    token,
 		"customer": customer,
 	})
+}
+
+// loginRequireSmsCode 登录是否必须短信验证码。
+//
+// 仅本地开发环境（dev / docker.dev）放行「免验证码登录」：短信通道尚未接入，
+// 验证码只打到服务端日志，联调时逐个去日志捞不现实。
+//
+// 为什么不做成配置项：免验证码 == 「知道手机号即可登录该客户账号」，而客户账号能读
+// 自己的订单、交付样片、评价与个人资料。这种开关一旦可配，就有被误配到生产的风险
+// （且误配后没有任何报错，直到有人发现能拿别人手机号登录），故写成**白名单判断**：
+// 只有显式跑在 dev / docker.dev 才放开，test / prod 及一切未知 profile 一律强制校验。
+// 若将来确有其它环境需要，改这个 switch —— 不要在配置里开一个自由开关。
+func (h *Controller) loginRequireSmsCode() bool {
+	switch h.Cfg.App.Profile {
+	case "dev", "docker.dev":
+		return false
+	}
+	return true
 }
 
 // PackageList 套餐列表（已上架）
@@ -574,6 +599,47 @@ func (h *Controller) ReviewCreate(c *gin.Context) {
 		return
 	}
 	response.OK(c, rv)
+}
+
+// ReviewList 我的评价（客户中心 → 我的评价，只读；不分页的业务集合，同改期/退款列表口径）
+func (h *Controller) ReviewList(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	list, err := h.Svc.ClientReviews(c.Request.Context(), cu)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// CustomerProfile 我的资料（客户中心 → 个人信息）
+func (h *Controller) CustomerProfile(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	p, err := h.Svc.ClientProfile(c.Request.Context(), cu)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, p)
+}
+
+// CustomerProfileUpdate 客户自助修改资料。
+// 这里刻意用**严格** BindJSON（而非别处可选 body 的 `_ = c.ShouldBindJSON`）：
+// 请求体畸形时必须报错——若静默当成「没有字段要改」，会返回成功但什么都没保存，
+// 客户端显示「已保存」而库里没变，正是最难排查的一类假故障（同封面保存那次的教训）。
+func (h *Controller) CustomerProfileUpdate(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	var req dto.ClientProfileUpdateReq
+	if err := bind.BindJSON(c, &req); err != nil {
+		response.Fail(c, err)
+		return
+	}
+	p, err := h.Svc.ClientUpdateProfile(c.Request.Context(), cu, req)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, p)
 }
 
 // DeliveryDetail 交付单与明细（选片页/成片页）。:id 为 **order_id**（与 PC 端同语义）。

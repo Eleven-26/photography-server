@@ -83,6 +83,64 @@ type ClientCustomRequestReq struct {
 	Images       string  `json:"images"`        // 参考图片(逗号分隔)
 }
 
+// ClientProfileResp 客户个人资料（客户中心 → 个人信息 / 定制需求带入）。
+// 白名单下发：crm_customer 是员工端与客户端**共用**的一张表，其中 remark（工作室内部备注）、
+// tags / level / source（运营标记）、status（潜在/活跃/流失）属工作室内部信息，不下发给客户本人。
+type ClientProfileResp struct {
+	ID          int64  `json:"id"`
+	Code        string `json:"code"`         // 客户编号 CU-xxx
+	Name        string `json:"name"`         // 姓名
+	Mobile      string `json:"mobile"`       // 手机号（登录凭据：只读展示，换绑走短信验证）
+	Wechat      string `json:"wechat"`       // 微信号
+	Gender      string `json:"gender"`       // 性别 male-男 female-女 unknown-未知
+	Birthday    string `json:"birthday"`     // 生日 2006-01-02（空表示未填）
+	Avatar      string `json:"avatar"`       // 头像地址（客户端暂不支持上传，见 H5 D1 决策）
+	PreferStyle string `json:"prefer_style"` // 偏好风格：提交定制需求时自动带入
+	PreferScene string `json:"prefer_scene"` // 常用场景：同上
+	OrderCount  int64  `json:"order_count"`  // 累计订单数（冗余统计列）
+}
+
+// NewClientProfileResp 由 crm_customer 行映射为客户端可见资料（白名单字段，逐字段显式赋值）
+func NewClientProfileResp(c *model.Customer) *ClientProfileResp {
+	if c == nil {
+		return nil
+	}
+	birthday := ""
+	if c.Birthday != nil {
+		birthday = *c.Birthday
+	}
+	return &ClientProfileResp{
+		ID:          c.ID,
+		Code:        c.Code,
+		Name:        c.Name,
+		Mobile:      c.Mobile,
+		Wechat:      c.Wechat,
+		Gender:      c.Gender,
+		Birthday:    birthday,
+		Avatar:      c.Avatar,
+		PreferStyle: c.PreferStyle,
+		PreferScene: c.PreferScene,
+		OrderCount:  c.OrderCount,
+	}
+}
+
+// ClientProfileUpdateReq 客户自助修改资料。
+//
+// 两点设计约束：
+//  1. 全部用**指针**：nil = 未提交（保持原值），显式空串 = 清空。
+//     若用普通 string，语义退化为「非空才更新」，客户永远清不掉自己填错的偏好
+//     （与员工端 StaffStudioSettingReq.CoverURL 同一坑）。
+//  2. 不含 mobile：手机号是登录凭据（验证码按手机号匹配客户），换绑必须走短信验证。
+//     员工端换绑见 service.UpdateCustomerMobile。
+type ClientProfileUpdateReq struct {
+	Name        *string `json:"name"`         // 姓名（可改，不可置空）
+	Wechat      *string `json:"wechat"`       // 微信号
+	Gender      *string `json:"gender"`       // 性别 male/female/unknown
+	Birthday    *string `json:"birthday"`     // 生日 2006-01-02（""=清空）
+	PreferStyle *string `json:"prefer_style"` // 偏好风格（""=清空）
+	PreferScene *string `json:"prefer_scene"` // 常用场景（""=清空）
+}
+
 // ClientSmsCodeReq 客户端发送验证码
 type ClientSmsCodeReq struct {
 	Mobile string `json:"mobile" binding:"required"` // 手机号

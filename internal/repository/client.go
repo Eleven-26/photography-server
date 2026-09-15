@@ -97,6 +97,32 @@ func (r *ReviewRepo) GetByOrderID(ctx context.Context, companyID, orderID int64)
 	return &m, nil
 }
 
+// ReviewListItem 评价 + 订单快照（客户端「客户中心 → 我的评价」用）。
+// 订单编号/套餐名/拍摄日期取自订单表，客户不必为每条评价再回查一次订单详情。
+// 与 DeliveryListItem 同款做法（见 repository/delivery.go）。
+type ReviewListItem struct {
+	model.OrderReview
+	OrderCode   string `json:"order_code" gorm:"column:order_code"`
+	PackageName string `json:"package_name" gorm:"column:package_name"`
+	ShootDate   string `json:"shoot_date" gorm:"column:shoot_date"`
+}
+
+// ListByCustomer 按客户查自己的评价（不分页：单个客户的评价量级有限，页面整屏展示）。
+// 归属由 customer_id 锁定，调用方传的必是令牌内的 CustomerID。
+// 注：这里用 Table + 别名手写租户/软删条件 —— Repo.tenant() 生成的裸
+// `company_id = ?` 在 JOIN 下会因列名歧义报错（同 DeliveryRepo.List）。
+func (r *ReviewRepo) ListByCustomer(ctx context.Context, companyID, customerID int64) ([]ReviewListItem, error) {
+	var list []ReviewListItem
+	err := r.conn().WithContext(ctx).
+		Table("biz_order_review AS v").
+		Joins("LEFT JOIN biz_order AS o ON o.id = v.order_id AND o.company_id = v.company_id").
+		Where("v.company_id = ? AND v.customer_id = ? AND v.deleted = 0", companyID, customerID).
+		Select("v.*, COALESCE(o.code,'') AS order_code, COALESCE(o.package_name,'') AS package_name, COALESCE(o.shoot_date,'') AS shoot_date").
+		Order("v.id DESC").
+		Scan(&list).Error
+	return list, err
+}
+
 func (r *ReviewRepo) List(ctx context.Context, companyID int64, page, pageSize int, minRating int) ([]model.OrderReview, int64, error) {
 	// 评价表无 store_id，数据权限经「可见订单」传递
 	q := r.scopedFromOrder(r.tenant(companyID).WithContext(ctx), ctx, companyID)
