@@ -167,7 +167,14 @@ func (r *CustomRequestRepo) GetByID(ctx context.Context, companyID, id int64) (*
 	return &m, nil
 }
 
-func (r *CustomRequestRepo) List(ctx context.Context, companyID int64, page, pageSize int, status int, customerID int64) ([]model.CustomRequest, int64, error) {
+// List 定制需求分页列表（客户侧「我的定制需求」与管理端/员工端共用）。
+//
+// 过滤项取 0 即该项不过滤：status（0=全部）、customerID（客户侧链路）、
+// photographerID（管理端「按指定摄影师」筛选，2026-09-15 随 photographer_id 列一起加）。
+//
+// ⚠️ customerID 与 photographerID 都是 int64 且相邻：调用时务必按位传参，传反了不会编译报错，
+// 只会静默查出错误数据（这也是本方法用位置参数的最后一次扩展 —— 再加筛选维度时应改为 filter 结构体）。
+func (r *CustomRequestRepo) List(ctx context.Context, companyID int64, page, pageSize, status int, customerID, photographerID int64) ([]model.CustomRequest, int64, error) {
 	q := r.tenant(companyID).WithContext(ctx)
 	// 数据权限：独立接单 + 公共池（store_id=0 对员工可见可认领）。
 	// H5 客户侧链路（customerID > 0）无操作人上下文，applyScope 零值放行，行为不变。
@@ -177,6 +184,9 @@ func (r *CustomRequestRepo) List(ctx context.Context, companyID int64, page, pag
 	}
 	if customerID > 0 {
 		q = q.Where("customer_id = ?", customerID)
+	}
+	if photographerID > 0 {
+		q = q.Where("photographer_id = ?", photographerID)
 	}
 	var total int64
 	if err := q.Model(&model.CustomRequest{}).Count(&total).Error; err != nil {

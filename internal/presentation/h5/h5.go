@@ -89,6 +89,9 @@ func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
 	// remark / tags / level / source / status 属工作室内部信息，不在客户端可改范围。
 	g.POST("/customer/profile", h.CustomerProfile)
 	g.POST("/customer/profile/update", h.CustomerProfileUpdate)
+	// 定制需求页「选择门店 → 选择摄影师」的候选（仅客户历史服务过的门店/摄影师，
+	// 外加本次分享链接的分享人；见 service.ClientPhotographerOptions）
+	g.POST("/customer/photographer-options", h.PhotographerOptions)
 	// 报价（报告 H1）：列表 / 详情 / 接受 / 提出修改
 	g.POST("/quote/list", h.QuoteList)
 	g.POST("/quote/detail/:id", h.QuoteDetail)
@@ -304,7 +307,9 @@ func (h *Controller) SlotList(c *gin.Context) {
 	response.OK(c, slots)
 }
 
-// CustomRequestSubmit 提交定制需求（游客/登录均可）
+// CustomRequestSubmit 提交定制需求（游客/登录均可）。
+// 摄影师归属（2026-09-15 补齐）：body.photographer_id（客户在 H5 定制需求页的显式选择）优先，
+// 分享链接的 staff_id 兜底 —— 两者都缺则落门店/公共池，见 service.ClientSubmitCustomRequest。
 func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 	var req dto.ClientCustomRequestReq
 	if err := bind.BindJSON(c, &req); err != nil {
@@ -325,7 +330,7 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 			return
 		}
 	}
-	m, err := h.Svc.ClientSubmitCustomRequest(c.Request.Context(), companyID, cu, req)
+	m, err := h.Svc.ClientSubmitCustomRequest(c.Request.Context(), companyID, cu, req, staffFrom(c))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -640,6 +645,21 @@ func (h *Controller) CustomerProfileUpdate(c *gin.Context) {
 		return
 	}
 	response.OK(c, p)
+}
+
+// PhotographerOptions 定制需求页「选择门店 → 选择摄影师」的候选（客户中心 → 定制需求）。
+//
+// 候选 = 该客户**曾下过单或提过定制需求**的门店与摄影师，外加本次分享链接带入的分享人
+// （见 service.ClientPhotographerOptions）。无候选（新客户且非分享进入）时返回空数组，
+// 前端不展示选择器，需求仍可提交、由工作室后续指派。
+func (h *Controller) PhotographerOptions(c *gin.Context) {
+	cu := middleware.GetClientUser(c)
+	opts, err := h.Svc.ClientPhotographerOptions(c.Request.Context(), cu, staffFrom(c))
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, opts)
 }
 
 // DeliveryDetail 交付单与明细（选片页/成片页）。:id 为 **order_id**（与 PC 端同语义）。

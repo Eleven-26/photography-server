@@ -34,7 +34,7 @@ func (s *Service) StaffOverview(ctx context.Context, op Operator) (*dto.StaffOve
 			return t, e
 		}, &ov.PendingReschedule},
 		{func() (int64, error) {
-			_, t, e := s.CustomRequestRepo.List(ctx, op.CompanyID, 1, 1, int(enum.CustomRequestPending), 0)
+			_, t, e := s.CustomRequestRepo.List(ctx, op.CompanyID, 1, 1, int(enum.CustomRequestPending), 0, 0)
 			return t, e
 		}, &ov.PendingCustomRequest},
 	}
@@ -466,9 +466,11 @@ func NormalizeHomepageSlug(raw string) (string, error) {
 	return slug, nil
 }
 
-// StaffCustomRequests 定制需求列表（待处理优先）
-func (s *Service) StaffCustomRequests(ctx context.Context, op Operator, page, pageSize, status int) ([]model.CustomRequest, int64, error) {
-	return s.CustomRequestRepo.List(ctx, op.CompanyID, page, pageSize, status, 0)
+// StaffCustomRequests 定制需求列表（待处理优先）。
+// photographerID > 0 时只出「指定了该摄影师」的需求（管理端/员工端按摄影师筛选）；
+// 0 = 不筛选。
+func (s *Service) StaffCustomRequests(ctx context.Context, op Operator, page, pageSize, status int, photographerID int64) ([]model.CustomRequest, int64, error) {
+	return s.CustomRequestRepo.List(ctx, op.CompanyID, page, pageSize, status, 0, photographerID)
 }
 
 // StaffCustomRequestRespond 响应定制需求（转化线索由既有 ConvertLeadToCustomer 承接）

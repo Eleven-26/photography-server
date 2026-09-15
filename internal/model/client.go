@@ -49,7 +49,14 @@ type CustomRequest struct {
 	TenantBase
 	// StoreID 所属门店（0 = 公共池未归属）：独立接单模式下按店过滤；
 	// H5 提交页未参数化前新数据落公共池，由员工响应认领
-	StoreID      int64                    `gorm:"column:store_id;index;comment:所属门店ID(0=公共池未归属)" json:"store_id"`
+	StoreID int64 `gorm:"column:store_id;index;comment:所属门店ID(0=公共池未归属)" json:"store_id"`
+	// PhotographerID 指定摄影师（0 = 未指定）：客户在 H5 定制需求页从「历史服务过的门店/摄影师」
+	// 中选定，或由分享链接 staff_id 带入（h5.go → CustomRequestSubmit）。与 StoreID 同为**归属键**，
+	// 指定摄影师时按该摄影师所属门店落店，PC / 员工端「定制需求」可据此显示与筛选。
+	PhotographerID int64 `gorm:"column:photographer_id;index;comment:指定摄影师ID(0=未指定，由门店/工作室认领)" json:"photographer_id"`
+	// Photographer 摄影师姓名**快照**（同 biz_order.photographer）：列表展示无需回表 join sys_user，
+	// 且员工改名后历史需求仍保留当时的服务摄影师。
+	Photographer string                   `gorm:"column:photographer;size:50;comment:指定摄影师姓名(快照)" json:"photographer"`
 	CustomerID   int64                    `gorm:"column:customer_id;index;comment:客户ID(登录提交时有值)" json:"customer_id"`
 	Name         string                   `gorm:"column:name;size:50;comment:称呼" json:"name"`
 	Mobile       string                   `gorm:"column:mobile;size:20;comment:联系电话" json:"mobile"`

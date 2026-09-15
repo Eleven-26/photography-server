@@ -110,8 +110,16 @@ func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string,
 	return slots, nil
 }
 
-// ClientSubmitCustomRequest 提交定制需求（登录或游客均可提交）
-func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64, cu *ClientUser, req dto.ClientCustomRequestReq) (*model.CustomRequest, error) {
+// ClientSubmitCustomRequest 提交定制需求（登录或游客均可提交）。
+//
+// 摄影师归属（2026-09-15 补齐，此前该链路是断的）：
+//   - req.PhotographerID = 客户在 H5 定制需求页「选择门店 → 选择摄影师」里的**显式选择**；
+//   - staffID = 分享链接带入的分享人（?staff_id= / X-Staff-Id 头，见 h5.go → staffFrom）。
+//
+// 显式选择优先，分享链接兜底 —— 客户从个人中心进来（URL 无 staff_id）也能指定摄影师，
+// 而不是只能靠链接归属。两者都缺失时落 store_id 对应门店或公共池（store_id=0），
+// 由工作室后续指派/认领。
+func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64, cu *ClientUser, req dto.ClientCustomRequestReq, staffID int64) (*model.CustomRequest, error) {
 	if req.ProjectType == "" {
 		return nil, errs.BadRequest("请选择拍摄类型")
 	}
@@ -148,6 +156,30 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 		}
 		m.StoreID = req.StoreID
 	}
+	// 摄影师归属：显式选择优先，分享链接带入兜底。
+	// 校验「存在 + 属于当前机构 + 启用中」：已停用的员工不能再被指定（接不了单）；
+	// 跨租户 ID 会被 tenant 过滤掉而查不到，与「不存在」归为同一文案，不泄露他租户信息。
+	pid := req.PhotographerID
+	if pid <= 0 {
+		pid = staffID
+	}
+	if pid > 0 {
+		u, err := s.UserRepo.GetByID(ctx, companyID, pid)
+		if err != nil || u == nil || u.Status != 1 {
+			return nil, errs.BadRequest("所选摄影师不存在或已停用")
+		}
+		// 门店与摄影师必须自洽：前端两级联动保证一致，后端不信任客户端 ——
+		// 两者都给且不同，说明请求被改造过，直接拒绝而不是静默取其一（同门店归属的既定口径：
+		// 不静默降级，否则会出现"客户以为指定了 A 店摄影师、A 店却看不到"）。
+		if m.StoreID > 0 && u.StoreID > 0 && m.StoreID != u.StoreID {
+			return nil, errs.BadRequest("所选摄影师不属于该门店")
+		}
+		m.PhotographerID = u.ID
+		m.Photographer = u.Nickname
+		if m.StoreID == 0 {
+			m.StoreID = u.StoreID // 只选了摄影师：按该摄影师所属门店落店
+		}
+	}
 	if cu != nil {
 		m.CustomerID = cu.CustomerID
 		m.Name = orDefault(req.Name, cu.Name)
@@ -175,7 +207,8 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 
 // ClientCustomRequests 我的定制需求列表（登录客户）
 func (s *Service) ClientCustomRequests(ctx context.Context, cu *ClientUser, page, pageSize int) ([]model.CustomRequest, int64, error) {
-	return s.CustomRequestRepo.List(ctx, cu.CompanyID, page, pageSize, 0, cu.CustomerID)
+	// 末位 photographerID=0：客户侧不按摄影师过滤（那是管理端筛选维度）
+	return s.CustomRequestRepo.List(ctx, cu.CompanyID, page, pageSize, 0, cu.CustomerID, 0)
 }
 
 // clientReschedulePolicy 从工作室设置读取改期政策（缺省用 domain 内置默认值）

@@ -71,16 +71,40 @@ type ClientFeedbackReq struct {
 
 // ClientCustomRequestReq 定制需求提交
 type ClientCustomRequestReq struct {
-	Name         string  `json:"name"`          // 称呼（游客提交时必填）
-	Mobile       string  `json:"mobile"`        // 联系电话（游客提交时必填）
-	StoreID      int64   `json:"store_id"`      // 目标门店（可选；0=公共池。H5 提交页按门店参数化后传入）
-	ProjectType  string  `json:"project_type"`  // 拍摄类型
-	ExpectedDate string  `json:"expected_date"` // 期望拍摄日期
-	Location     string  `json:"location"`      // 期望拍摄地点
-	BudgetMin    float64 `json:"budget_min"`    // 预算下限
-	BudgetMax    float64 `json:"budget_max"`    // 预算上限
-	Detail       string  `json:"detail"`        // 详细需求
-	Images       string  `json:"images"`        // 参考图片(逗号分隔)
+	Name    string `json:"name"`     // 称呼（游客提交时必填）
+	Mobile  string `json:"mobile"`   // 联系电话（游客提交时必填）
+	StoreID int64  `json:"store_id"` // 目标门店（可选；0=公共池。H5 定制需求页「选择门店」时传入）
+	// PhotographerID 客户指定的摄影师（0 = 未指定）。
+	// 与链接参数 staff_id（h5.go → staffFrom）是**同一语义的两个来源**：本字段是客户在
+	// H5 页面上的显式选择，优先；缺省（0）时才回落到分享链接带入的 staff_id。
+	// 这样「非分享链接进入」（URL 无 staff_id）的客户也能指定摄影师，而不是无从归属。
+	PhotographerID int64   `json:"photographer_id"`
+	ProjectType    string  `json:"project_type"`  // 拍摄类型
+	ExpectedDate   string  `json:"expected_date"` // 期望拍摄日期
+	Location       string  `json:"location"`      // 期望拍摄地点
+	BudgetMin      float64 `json:"budget_min"`    // 预算下限
+	BudgetMax      float64 `json:"budget_max"`    // 预算上限
+	Detail         string  `json:"detail"`        // 详细需求
+	Images         string  `json:"images"`        // 参考图片(逗号分隔)
+}
+
+// ClientPhotographerOption 摄影师候选（H5 定制需求页「选择摄影师」）。
+// 来源见 repository.CustomerStaffPair：客户曾下过单或提过定制需求的摄影师。
+type ClientPhotographerOption struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`   // 姓名/昵称（sys_user.nickname）
+	Avatar string `json:"avatar"` // 头像地址（可能为空）
+}
+
+// ClientStoreOption 门店候选（H5 定制需求页「选择门店」），含该门店下客户可选的摄影师。
+//
+// StoreID = 0 是**占位组**：候选摄影师未分配门店（sys_user.store_id = 0）时归到这里，
+// 此时 StoreName 为空串，前端应显示为「未指定门店」而不是留白。
+// 前端联动约定：候选只有 1 个门店时不必展示门店选择（自动选中），直接展示摄影师选择。
+type ClientStoreOption struct {
+	StoreID       int64                      `json:"store_id"`
+	StoreName     string                     `json:"store_name"`
+	Photographers []ClientPhotographerOption `json:"photographers"`
 }
 
 // ClientProfileResp 客户个人资料（客户中心 → 个人信息 / 定制需求带入）。

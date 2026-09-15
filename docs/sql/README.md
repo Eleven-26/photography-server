@@ -19,13 +19,13 @@
 
 ```
 docs/sql/
-├── ddl.sql                  # 【全量】建表结构（31 张表、604 列）
+├── ddl.sql                  # 【全量】建表结构（31 张表、606 列）
 ├── dml.sql                  # 【全量】初始化数据（公司/门店/角色/角色权限/管理员/收款方式/示例业务数据）
 ├── verify_consistency.sh    # 全量 vs 增量链 一致性校验（依赖本地 mysql-dev 容器）
 ├── 增量/
 │   ├── ddl-初版.sql          # 增量链起点 = 第一版 ddl 快照（已冻结，不含后续 upgrade 的改动）
 │   ├── dml-初版.sql          # 增量链起点 = 第一版 dml 快照（已冻结）
-│   └── upgrade_*_YYYYMMDD.sql  # 逐次追加的结构 / 数据增量（当前 1 个）
+│   └── upgrade_*_YYYYMMDD.sql  # 逐次追加的结构 / 数据增量（当前 2 个）
 └── README.md                # 本文件
 ```
 
@@ -136,7 +136,7 @@ bash docs/sql/verify_consistency.sh   # 跑完自动清理临时库
 |---|---|
 | 阶段 | **未上线**（`ddl.sql` + `dml.sql` 即最新结构 / 数据；结构变更走增量链） |
 | 全量表数 | 31 |
-| 全量列数 | 604 |
-| 增量目录 | `增量/` 内 2 个初版（**已冻结**，链起点）+ **1 个 upgrade** |
-| 最近变更 | 2026-09-15 `biz_studio_setting` 新增 `cover_url`（分享封面图：预约主页 / 分享页顶部大图），列数 603 → 604。**首次按「先写增量、再合并全量」流程落地**：新增 `增量/upgrade_studio_setting_cover_url_20260915.sql`（`ALTER TABLE ... ADD COLUMN ... AFTER \`slogan\``）+ 合并进 `ddl.sql`；`增量/ddl-初版.sql` 自本次起冻结（撤下该列，作为链起点）。<br>2026-09-13 字段顺序重排（当时 30 张表 / 586 列）：重要字段前置、审计字段沉底；`dml.sql` 的 9 条 INSERT 列清单同步重排；旧初版与 6 个历史 upgrade 一并作废，改以重排后的全量作为新初版 |
-| 最近校验 | 2026-09-15 **真实建库校验通过** —— `bash docs/sql/verify_consistency.sh`：增量链 = `ddl-初版.sql` + `upgrade_studio_setting_cover_url_20260915.sql`，导入零错误；比对 `information_schema` 三项全部一致（列 604=604、索引 187=187、表 31=31）。列比对含 `ORDINAL_POSITION`，故字段顺序亦在校验范围内已通过。<br>2026-09-13 静态校验通过 —— 586 列**逐字符零改动**（纯行搬迁）、非列行（`(` / 索引 / 约束）序列逐字节不变、`dml.sql` 每条 INSERT 值多重集不变。清空旧增量前已静态证明「旧增量链 30 张表字段集合 == `ddl.sql`」零差异。**未做真实建库验证**（当时 Docker daemon 未运行） |
+| 全量列数 | 606 |
+| 增量目录 | `增量/` 内 2 个初版（**已冻结**，链起点）+ **2 个 upgrade** |
+| 最近变更 | 2026-09-15 `biz_custom_request` 新增 `photographer_id` / `photographer` 列 + `idx_custom_req_photographer` 索引（定制需求的「指定摄影师」归属：客户在 H5 定制需求页选择，或由分享链接 staff_id 带入），列数 604 → 606、索引 187 → 188；该表因新字段名更长（`photographer_id` 17 字符 > `expected_date` 15）按第五节第 1 条**整表重新对齐**列宽 16 → 18。<br>2026-09-15 `biz_studio_setting` 新增 `cover_url`（分享封面图：预约主页 / 分享页顶部大图），列数 603 → 604。**首次按「先写增量、再合并全量」流程落地**：新增 `增量/upgrade_studio_setting_cover_url_20260915.sql`（`ALTER TABLE ... ADD COLUMN ... AFTER \`slogan\``）+ 合并进 `ddl.sql`；`增量/ddl-初版.sql` 自本次起冻结（撤下该列，作为链起点）。<br>2026-09-13 字段顺序重排（当时 30 张表 / 586 列）：重要字段前置、审计字段沉底；`dml.sql` 的 9 条 INSERT 列清单同步重排；旧初版与 6 个历史 upgrade 一并作废，改以重排后的全量作为新初版 |
+| 最近校验 | 2026-09-15 **真实建库校验通过**（定制需求「指定摄影师」列）—— 增量链 = `ddl-初版.sql` + `upgrade_custom_request_photographer_20260915.sql` + `upgrade_studio_setting_cover_url_20260915.sql`，导入零错误；比对 `information_schema` 三项全部一致（列 606=606、索引 188=188、表 31=31）。列比对含 `ORDINAL_POSITION`，故新列位置与整表重排后的字段顺序亦在校验范围内。<br>2026-09-15 **真实建库校验通过** —— `bash docs/sql/verify_consistency.sh`：增量链 = `ddl-初版.sql` + `upgrade_studio_setting_cover_url_20260915.sql`，导入零错误；比对 `information_schema` 三项全部一致（列 604=604、索引 187=187、表 31=31）。列比对含 `ORDINAL_POSITION`，故字段顺序亦在校验范围内已通过。<br>2026-09-13 静态校验通过 —— 586 列**逐字符零改动**（纯行搬迁）、非列行（`(` / 索引 / 约束）序列逐字节不变、`dml.sql` 每条 INSERT 值多重集不变。清空旧增量前已静态证明「旧增量链 30 张表字段集合 == `ddl.sql`」零差异。**未做真实建库验证**（当时 Docker daemon 未运行） |

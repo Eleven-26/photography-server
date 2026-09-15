@@ -11,12 +11,14 @@ import (
 
 // CustomRequestList 定制需求列表（管理端）。
 // query: status 1-待处理 2-已响应 3-已关闭；0 或不传 = 全部。
+// query: photographer_id 按「客户指定的摄影师」筛选；0 或不传 = 不过滤。
 // 与员工端 /wechat/staff/custom-request/list 是同一 Handler（endpoints.go 复用本实现），
 // 两端返回结构一致：{list,total,page,page_size}。
 func (h *Controller) CustomRequestList(c *gin.Context) {
 	op := middleware.GetOperator(c)
 	page, pageSize := bind.Pager(c)
-	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize, bind.ParamInt(c, "status"))
+	list, total, err := h.Svc.StaffCustomRequests(c.Request.Context(), op, page, pageSize,
+		bind.ParamInt(c, "status"), bind.ParamInt64(c, "photographer_id"))
 	if err != nil {
 		response.Fail(c, err)
 		return
