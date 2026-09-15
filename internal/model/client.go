@@ -133,7 +133,10 @@ type StudioSetting struct {
 	Base
 	CompanyID int64  `gorm:"column:company_id;uniqueIndex:uk_studio_setting_company,priority:1;comment:公司ID" json:"company_id"`
 	Slogan    string `gorm:"column:slogan;size:200;comment:宣传语" json:"slogan"`
-	Intro     string `gorm:"column:intro;size:1000;comment:工作室简介" json:"intro"`
+	// CoverURL 分享封面图：预约主页（H5 C01 首页）与分享卡片顶部大图。
+	// 对外物料，须落免鉴权 /media 目录（上传时 public=1），否则未登录浏览者看到空白。
+	CoverURL string `gorm:"column:cover_url;size:500;comment:分享封面图(预约主页/分享页顶部大图)" json:"cover_url"`
+	Intro    string `gorm:"column:intro;size:1000;comment:工作室简介" json:"intro"`
 	// NotifySettings 通知提醒开关（JSON：{"schedule":bool,"order":bool,"remind":bool,"message":bool}）。
 	// 存 JSON 串而非 4 个布尔列：开关数量会随产品迭代增减，加一项不必改表。
 	NotifySettings string `gorm:"column:notify_settings;type:text;comment:通知提醒开关(JSON)" json:"notify_settings"`

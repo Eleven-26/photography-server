@@ -206,6 +206,7 @@ type StaffSlotTemplateReq struct {
 type StaffStudioSettingReq struct {
 	Slogan              string   `json:"slogan"`                // 宣传语
 	Intro               string   `json:"intro"`                 // 简介
+	CoverURL            *string  `json:"cover_url"`             // 分享封面图(指针：非 nil 才更新，可传 "" 清空)
 	HomepageSlug        string   `json:"homepage_slug"`         // 预约主页短链标识
 	AcceptNew           *int     `json:"accept_new"`            // 接收新预约 0-暂停 1-接收
 	LockMinutes         *int     `json:"lock_minutes"`          // 下单临时锁定时长
@@ -228,6 +229,11 @@ func (req StaffStudioSettingReq) ToUpdates() map[string]interface{} {
 	}
 	if req.Intro != "" {
 		updates["intro"] = req.Intro
+	}
+	// 封面图是对外展示物料：需支持**清空**，故按「指针非 nil」判定而非「非空」——
+	// CoverURL 用 string 时传空串会被当作未提交，客户端将无法移除已设置的封面。
+	if req.CoverURL != nil {
+		updates["cover_url"] = *req.CoverURL
 	}
 	if req.HomepageSlug != "" {
 		updates["homepage_slug"] = req.HomepageSlug

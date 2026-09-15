@@ -4,14 +4,15 @@
 -- 用途：新建环境 / 新租户部署时一次性初始化（31 张表的最新结构）
 --
 -- 【维护约定 · 重要】
---   1) 项目尚未上线：本文件即「第一版」全量基线，结构以本文件为唯一准。
---      原 docs/sql/增量/ 下的脚本已于 2026-09-13 清空（未上线，无需保留迁移历史）。
---   2) 上线后再恢复增量约定（多人并行改结构时尤其必要）：
---        a. 新改动先写增量脚本到 docs/sql/增量/YYYYMMDD_描述.sql
---        b. 再把同样的改动合并进本文件（保持本文件始终是最新结构）
---        c. 一致性要求：本文件单独执行一次的结果，必须与
---           「增量/ 下所有脚本按日期顺序依次执行」的结果完全一致，
---           每次合并后都要实际验证（建两个临时库分别执行并比对 information_schema）。
+--   1) 结构变更一律**先写增量脚本**，再把同样的改动合并进本文件（本文件始终是最新结构）。
+--        a. 写增量：docs/sql/增量/upgrade_<变更描述>_<YYYYMMDD>.sql（描述用小写英文下划线）
+--        b. 合并全量：按下方【通用约定】的字段顺序规范，写进本文件对应的 CREATE TABLE
+--        c. 增量链起点：docs/sql/增量/ddl-初版.sql（第一版结构快照，**冻结、此后不再改动**）
+--   2) 核心不变量：本文件单独执行一次的结果，必须与
+--      「增量/ddl-初版.sql + 增量/upgrade_*.sql 按文件名日期升序依次执行」的结果完全一致。
+--      每次改动后都要实际验证：bash docs/sql/verify_consistency.sh（建两个临时库比对 information_schema）。
+--   3) 2026-09-13 的历史增量脚本已作废清空（当时以重排后的全量重建了初版基线）；
+--      现行增量链自 2026-09-15 的 upgrade_studio_setting_cover_url_20260915.sql 起算。
 --
 -- 【通用约定】
 --   1) 字段顺序：自上而下按业务权重排列，便于阅读、排障与对接口。
@@ -978,6 +979,7 @@ CREATE TABLE `biz_studio_setting`
     `id`                    bigint        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `company_id`            bigint        NOT NULL DEFAULT '0' COMMENT '公司ID',
     `slogan`                varchar(200)           DEFAULT NULL COMMENT '宣传语',
+    `cover_url`             varchar(500)           DEFAULT NULL COMMENT '分享封面图(预约主页/分享页顶部大图)',
     `homepage_slug`         varchar(50)            DEFAULT NULL COMMENT '预约主页短链标识',
     `accept_new`            tinyint       NOT NULL DEFAULT '1' COMMENT '接收新预约 0-暂停 1-接收',
     `lock_minutes`          int           NOT NULL DEFAULT '15' COMMENT '下单临时锁定时长(分钟)',
