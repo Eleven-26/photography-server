@@ -9,12 +9,19 @@
 # 两通道各自独立：SkyWalking-go(native) 走 OAP:11800 与本服务无关；勿同时开启两通道，
 # 否则同一请求双 span/双上报。
 #
-# 版本事实：ClickHouse 为 Jaeger v2.18.0 起的官方原生存储后端（alpha，ADR-008），
+# 版本事实：ClickHouse 为 Jaeger v2.18.0 起的官方原生存储后端（ADR-008），
 #           不再是旧的三方 grpc-plugin（该插件 API 已废弃）。create_schema: true 时
 #           启动自动建表，无需手写 DDL；数据库本身须已存在（compose 里由
-#           clickhouse 服务 CLICKHOUSE_DB=jaeger 自动创建）。
+#           clickhouse 服务 CLICKHOUSE_DB=jaeger 自动创建）。Jaeger 2.20 官方支持 ClickHouse 26.x。
 #
-# 部署：拷到 compose 根目录 ./jaeger/config.yaml（或改 .env 的 JAEGER_CONFIG_FILE 指向本文件）。
+# ⚠️ 实验特性开关（漏了就起不来）：
+#           ClickHouse 后端默认关闭，必须显式开 feature gate，否则启动即报
+#           「ClickHouse storage is experimental and must be explicitly enabled」并退出。
+#           该开关**只能走命令行**（配置文件里没有这个字段），由 compose 从 .env 的
+#           JAEGER_FEATURE_GATES 注入 --feature-gates。v2.20 仍为 Alpha；v2.23 起转 Stable
+#           并更名为 jaeger.clickhouse（旧 ID storage.clickhouse 保留为兼容别名）。
+#
+# 部署：拷到 compose 根目录 ./volume/jaeger/config.yaml（或改 .env 的 JAEGER_CONFIG_FILE 指向它）。
 # =====================================================================
 
 extensions:

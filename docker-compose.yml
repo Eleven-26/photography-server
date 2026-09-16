@@ -239,7 +239,10 @@ services:
         condition: service_healthy
     volumes:
       - ${JAEGER_CONFIG_FILE:-./volume/jaeger/config.yaml}:/etc/jaeger/config.yaml:ro
-    command: ["--config", "/etc/jaeger/config.yaml"]
+    # ClickHouse 存储是 Jaeger v2 的实验特性，默认关闭且**配置文件里没有对应字段** —— 必须在命令行显式开门，
+    # 否则容器启动即退出：ClickHouse storage is experimental and must be explicitly enabled.
+    # v2.20 该 gate 仍为 Alpha；v2.23 起转 Stable 并更名 jaeger.clickhouse（旧 ID 保留为兼容别名，两者都收）。
+    command: ["--config", "/etc/jaeger/config.yaml", "--feature-gates=${JAEGER_FEATURE_GATES:-storage.clickhouse}"]
     ports:
       - "${JAEGER_OTLP_GRPC_PORT:-4317}:4317"    # 应用 OTLP gRPC 上报入口
       - "${JAEGER_OTLP_HTTP_PORT:-4318}:4318"    # 应用 OTLP HTTP 上报入口
