@@ -1,6 +1,6 @@
 # SLOT 摄影工作室管理系统（后端）
 
-面向摄影工作室的 SaaS 管理系统后端，提供 PC 管理后台、小程序管理后台、APP、H5 四类客户端共用的业务 API（RPC 风格）。
+面向摄影工作室的 SaaS 管理系统后端，为 **PC 管理后台 / 微信小程序（员工端 + 客户区）/ H5 预约站** 提供共用的业务 API（RPC 风格）。
 
 ## 技术栈
 
@@ -13,9 +13,10 @@
 - **任务调度**：XXL-JOB
 - **配置中心/注册中心**：Nacos（**唯一业务配置源，硬依赖**：本地仅留 bootstrap 连接段，业务配置 100% 托管 Nacos 按 data_id 分环境；拉取失败 fail-fast，SDK 本地快照兜底；实例自动注册/摘除）
 - **链路追踪**（两通道各自独立，见「链路追踪」）：① SkyWalking Go agent（skywalking-go 编译期注入，直连 OAP native，Horizon「原生」模式 + 拓扑/指标分析）；② OpenTelemetry SDK → **Jaeger v2.18 + ClickHouse**（官方原生 ClickHouse 存储，Jaeger UI 按 trace_id 精确检索）。OTel 埋点代码为通道②专属（通道①由注入 agent 自动埋点，代码零侵入），切换仅改构建/部署配置
-- **测试**：go-sqlmock（repository 单测，mock MySQL 连接，不依赖真实 DB）
+- **测试**：标准库 `testing`（10 个包 / 23 个测试文件）；repository 单测用 go-sqlmock 注入 mock MySQL，
+  不依赖真实 DB。除业务单测外，另有一类**架构护栏测试**（跨端路由一致性、错误文案禁止内联、契约拼装边界）
 - **其他**：golang-jwt（认证）、viper（多环境配置）
-- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / ES / MongoDB / SkyWalking / Nacos / 后端 / 前端）
+- **部署**：Docker Compose（MySQL / Redis / NATS / XXL-JOB / Elasticsearch / MongoDB / SkyWalking(BanyanDB + Horizon) / Jaeger + ClickHouse / Nacos / 后端 / PC 前端 / H5 / 小程序）
 
 ## 目录结构
 
@@ -23,6 +24,7 @@
 photography-server
 ├── cmd
 │   ├── server              # API 服务入口（配置加载 + 各组件初始化 + 优雅退出）
+│   └── configctl           # 配置密文工具（keygen / encrypt / decrypt / encrypt-file / check）
 ├── config
 │   ├── config.yaml         # Bootstrap（仅 Nacos 连接段，本地唯一配置文件）
 │   ├── config.example.yaml # Bootstrap 模板
@@ -31,35 +33,76 @@ photography-server
 │       ├── photography-server-docker.dev.yaml
 │       └── photography-server-prod.yaml
 ├── docs
-│   ├── 需求文档-摄影工作室管理系统.md
-│   └── sql                 # DDL / DML 建库脚本
+│   ├── rbac                # RBAC 手册（权限点清单 / 运维手册）
+│   ├── sql                 # DDL / DML 建库脚本 + 增量链（按文件名日期升序执行）
+│   └── 容器化部署-2026-09-13.md  # 多端部署说明（三前端 + 后端 + 基础设施）
 ├── internal
+│   ├── app                 # 依赖容器 / 组合根（业务包只依赖它暴露的字段，不 import infrastructure）
 │   ├── common              # 通用常量（响应码 / 分页 / 上传）
-│   ├── config              # 配置加载（多环境合并 + 环境变量展开）
+│   ├── config              # 配置加载（多环境合并 + 字段级密文解密 + 环境变量展开）
+│   ├── contract            # 接口契约（入参/出参结构体；service 与 presentation 共同依赖）
 │   ├── domain              # 领域纯函数（订单状态机 / 退款比例 / 编号生成 / 金额取整）
 │   ├── enum                # 业务枚举（int 状态位）
-│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/Jaeger 通道/Nacos 注册）
-│   ├── middleware          # CORS / JWT 认证 / 请求日志 / Recovery / 操作审计
+│   ├── infrastructure      # 基础设施单例（MySQL/Redis/NATS/ES/MongoDB/XXL-JOB/追踪/Nacos 注册）
+│   ├── job                 # XXL-JOB 任务
+│   ├── middleware          # CORS / 员工认证 / 客户认证 / 请求日志 / Recovery / 操作审计 / 资源鉴权
 │   ├── model               # 数据模型（统一 5 固定字段 + company_id 多租户）
-│   ├── pkg                 # 基础能力包
-│   │   ├── errs            # 错误类型 + 业务错误文案（统一出口）
-│   │   ├── jwtpkg          # JWT 签发 / 校验
-│   │   └── logger          # 日志封装
-│   ├── presentation        # 外围接入层（HTTP / 定时任务 / 消息消费）
-│   │   ├── controller      # HTTP 控制器
-│   │   ├── dto             # 接口入参和出参的结构体
-│   │   ├── job             # XXL-JOB 任务
-│   │   └── mq              # NATS 消费者
+│   ├── mq                  # NATS 消费者
+│   ├── pkg                 # 中立基础能力包（外层与内层都可依赖）
+│   │   ├── authcache       # 鉴权缓存
+│   │   ├── errs            # 错误类型 + 业务错误文案常量（全仓唯一出口）
+│   │   ├── jwtpkg          # JWT 签发 / 校验（员工 / 客户令牌分型）
+│   │   ├── logger          # 日志封装
+│   │   ├── params          # 请求参数取值（写方法只认 body、读方法走 query 的统一语义）
+│   │   └── response        # 统一响应写出原语（OK / PageOK / Fail / File）
+│   ├── presentation        # 外围接入层（HTTP）
+│   │   ├── bind            # 请求绑定与分页辅助（BindJSON / PathID / BodyID / Pager）
+│   │   ├── controller      # PC 与小程序管理端控制器
+│   │   ├── endpoint        # 端装配机制（Endpoint / Mount / MountTable）
+│   │   ├── h5              # H5 预约站控制器
+│   │   ├── routes          # 路由声明式表（Common 管理端 + ClientPublic / ClientAuthed 客户区）
+│   │   └── wechat          # 微信小程序控制器（员工端复用 h5 客户区实现）
 │   ├── repository          # 数据访问层（WithTx 事务透传 + company_id 租户过滤）
-│   ├── response            # 统一响应
-│   ├── router              # 路由（pc/miniapp/app/h5 分组）
+│   ├── router              # 路由装配（端声明 + 中间件 + 静态资源挂载）
 │   └── service             # 业务服务层（只经 repository/domain 访问数据，不直连基础设施）
-├── uploads                 # 上传文件目录（运行时生成）
+├── scripts                 # 运维脚本（Nacos 模板发布等）
+├── uploads                 # 上传文件目录（运行时生成；/uploads 需令牌，/uploads/media 公开）
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
-├── .env.example            # 环境变量模板（复制为 .env 使用）
+└── .env.example            # 环境变量模板（复制为 .env 使用）
 ```
+
+### 分层与依赖方向
+
+```
+cmd/server（组合根）
+  └─> internal/app（依赖容器）──> internal/infrastructure（基础设施单例）
+
+  presentation（controller · h5 · wechat · routes · endpoint · bind）
+  router（路由装配）· job（XXL-JOB 任务）· mq（NATS 消费者）
+        │
+        │  依赖只能朝一个方向：外层 ──> 内层
+        ▼
+  service（业务编排；不持有 DB 句柄，事务走 repository.Tx）
+        │
+        ▼
+  repository（数据访问；company_id 租户过滤）
+        │
+        ▼
+  model · domain · enum（数据模型 / 领域纯函数 / 枚举）
+
+  中立层（各层都可依赖，自身不依赖任何业务包）：
+    internal/contract   接口契约（入参 / 出参结构体）
+    internal/pkg/*      errs · logger · params · response · jwtpkg · authcache
+```
+
+- **依赖单向**：只允许外层依赖内层。`contract`（接口契约，最内层）与 `pkg/*` 是中立层 ——
+  此前 `contract` 位于 `presentation/dto`，被 service 层 26 个文件反向依赖，已归位。
+- 业务包（repository / service / middleware / job / mq / presentation）**一律不 import infrastructure**，
+  只依赖 `app.App` 暴露的字段类型，单测可直接构造 `App{DB: 内存库}` 而无需启动真实中间件。
+- **横向单一实现**（各端只调用、不留副本）：请求绑定 → `presentation/bind`；参数取值 → `pkg/params`；
+  响应写出 → `pkg/response`；错误与文案 → `pkg/errs`。
 
 ## 快速开始（本地）
 
@@ -82,11 +125,12 @@ go run ./cmd/server -c config/config.yaml -p dev
 Makefile 常用命令：
 
 ```bash
-make run      # 本地运行
-make build    # 构建到 bin/
-make test     # 跑测试
-make tidy     # go mod tidy
-make docker-up / docker-down / docker-build
+make run          # 本地运行（需先起 Nacos 并发布 dev 配置）
+make run-dev      # 加载 .env 后以 dev 启动（推荐）
+make build        # 构建到 bin/
+make test         # 跑测试
+make tidy         # go mod tidy
+make docker-up / docker-up-debug / docker-down / docker-build
 ```
 
 ## 配置加载（Nacos 单一配置源）
@@ -102,7 +146,7 @@ make docker-up / docker-down / docker-build
 - 本地运行：`make run-dev`（**推荐**，自动 `source .env` 后以 `-p dev` 启动）；裸 `go run` 不会读 `.env`，Nacos 开鉴权时会因 `nacos.username` 为空报 `401 User not found`
   - 等价手工命令：`set -a && . ./.env && set +a && go run ./cmd/server -c config/config.yaml -p dev`（需先本地起 Nacos 并发布 `photography-server-dev.yaml`）
 
-主要配置段（都在 Nacos 上管理）：`app` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch`。
+主要配置段（都在 Nacos 上管理）：`app` / `share` / `jwt` / `db`(MySQL) / `redis` / `nats` / `mongodb` / `log` / `upload` / `xxljob` / `elasticsearch` / `jaeger`。
 
 ### 敏感配置加密（字段级 `ENCv1:`）
 
@@ -177,7 +221,9 @@ docker compose up -d --build
 | 服务 | 宿主机端口 | 说明 |
 |------|-----------|------|
 | backend | 8080 | Go 后端 API |
-| frontend | 8081 | 前端站点（Nginx 反代 `/api`） |
+| frontend | 8081 | PC 管理后台（Nginx 反代 `/api`） |
+| h5 | 8082 | H5 预约站（uni-app H5 产物） |
+| wechat | 8083 | 微信小程序员工端（uni-app 产物） |
 | mysql | 3306 | 数据库（photography 库） |
 | redis | 6379 | 缓存 |
 | nats | 4222 / 8222 | 消息队列 / 监控 |
@@ -268,10 +314,16 @@ location /api/ {
 
 ## 接口约定
 
-- 统一响应：`{ "code": 0, "msg": "ok", "data": ... }`
-- 认证：请求头 `Authorization: Bearer <token>`
-- 路由风格：`POST /{pc|miniapp|app|h5}/{module}/{action}[/:id]`（业务接口均需 JWT）
-- 完整接口清单见 `docs/需求文档-摄影工作室管理系统.md`
+- 统一响应：`{ "code": 0, "msg": "ok", "data": ..., "trace_id": "..." }`；
+  分页响应的 `data` 固定为 `{ list, total, page, page_size }`（列表页读 `.list`，不是裸数组）
+- 认证：请求头 `Authorization: Bearer <token>`（员工令牌 7 天 / 客户令牌 30 天，`usr_type` 分型）
+- **挂载点 5 个**：PC 管理端（无前缀）/ 小程序管理端 `/miniapp` / H5 预约站 `/h5` /
+  微信客户区 `/wechat` / 员工端 `/wechat/staff`；同 Path 跨端必须是**同一个 Handler**
+- 路由风格：`POST /<prefix>/<module>/<action>`，写方法参数一律 JSON body；
+  **后端自身没有 `/api` 前缀**（该前缀由网关 / vite proxy 剥离，见下节）
+- 完整接口清单以**代码为准**：`internal/presentation/routes/`（声明式路由表：管理端 Common +
+  客户区 ClientPublic / ClientAuthed）+ `internal/router/endpoints.go`（端装配）；
+  各接口所需权限点见 `docs/rbac/权限点手册.md`
 
 ### 调试接口（`/test/*`，仅 dev/test 注册）
 
@@ -291,11 +343,21 @@ location /api/ {
 
 | 包 | 文件 | 覆盖 |
 |---|---|---|
-| `internal/domain` | `domain_test.go` | 订单状态机流转 / 回退边界、退款四档与临界时间、金额取整、编号格式 |
-| `internal/repository` | `order_repo_test.go`、`base_test.go` | 事务 WithTx 提交与回滚、CAS 条件更新、company_id 租户过滤、行锁读（FOR UPDATE）、分页归一化 |
+| `internal/domain` | `domain_test.go`、`reschedule_test.go`、`validate_test.go` | 订单状态机流转 / 回退边界、退款四档与临界时间、金额取整、编号格式、改期与字段校验 |
+| `internal/repository` | `order_repo_test.go`、`base_test.go`、`scope_test.go`、`enum_columns_test.go` | 事务 WithTx 提交与回滚、CAS 条件更新、company_id 租户过滤、行锁读（FOR UPDATE）、分页归一化、数据权限范围、枚举列与 DDL 类型一致 |
+| `internal/service` | `service_test.go`、`customer_lookup_test.go`、`custom_request_test.go`、`staff_test.go`、`upload_test.go` | 客户查档唯一入口（手机号去重建档）、定制需求转单、员工端口径、上传公开/私有分流 |
+| `internal/router` | `routes_test.go`、`media_static_test.go` | 跨端同 Path 必须同一 Handler 指针、客户区路由表完整性、员工端登录出口免鉴权、静态资源挂载 |
+| `internal/pkg/errs` | `messages_test.go`、`errs_test.go` | **禁止内联错误文案**（全仓扫描护栏）、错误码与 HTTP 状态映射 |
+| `internal/pkg/params` | `params_test.go` | 写方法只认 body、读方法走 query、body 回填不破坏 `ShouldBindJSON`、类型容错 |
+| `internal/config` | `cipher_test.go`、`config_test.go`、`env_mapping_test.go` | 字段级 `ENCv1` 加解密、多环境合并、`APP_*` 环境变量映射 |
+| `internal/contract` | `client_test.go` | 分享链接拼装（hash 路由下 query 位置等边界） |
+| `internal/model` | `types_test.go` | 模型类型与 JSON 序列化 |
+| `internal/presentation/h5` | `login_require_code_test.go` | 客户登录接口验证码必填口径 |
 
 - repository 测试经 go-sqlmock 注入 mock MySQL 连接（`newMockRepo` 白盒构造），不依赖真实数据库；
-- 大量静态 mock 数据（如 JSON fixture）按 Go 惯例放各包下 `testdata/`（工具链自动忽略、测试以相对路径读取），无需另建 test 目录；
+- 测试数据（sqlmock 的 `WithArgs` / `NewRows`、fixture 结构体）全部**内联在测试文件**里 —— 无外部 fixture 文件、无 `testdata/` 目录，也没有测试读取磁盘文件；
+- **护栏类测试**（`router/routes_test.go` 的跨端一致性、`pkg/errs/messages_test.go` 的文案扫描）断言的是
+  **架构约定**而非业务行为：它们变红通常意味着违反了约定，请先确认是有意变更、再更新基线。
 - 需真实中间件、不进主链路的集成 / E2E 测试，才建议独立目录 + build tag（如 `test/integration`），当前仓库无此场景。
 
 ## 核心业务规则速览
@@ -307,3 +369,7 @@ location /api/ {
 - 取消订单自动释放档期。
 - 订单状态机 / 退款分档 / 编号生成 / 金额取整等纯业务规则集中在 `internal/domain`（零依赖、可独立单测），service 只做编排。
 - 多租户：数据访问全部收敛在 repository 层并按 `company_id` 过滤；事务以 `repository.Tx` 为唯一入口，service 不持有数据库句柄。
+- 权限：RBAC 权限点（`sys_role_permission`）**叠加**角色数据权限（`sys_role.data_scope`：全部 / 本店 / 本人），
+  在 repository 层做双重过滤（零值或缺少操作人时放行，供内部调用与单测使用）。
+- 文件上传：默认落**需要令牌**的 `/uploads`（订单样片 / 成片 / 凭证）；仅 `/upload/file` 显式传 `public=1`
+  才落**免鉴权**的公开目录 `/media`（作品封面等对外物料）。两者物理隔离，避免分享页浏览者 401。

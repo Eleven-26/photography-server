@@ -14,7 +14,7 @@
 --   补齐后：H5 定制需求页把「客户选中的摄影师」或「分享链接带入的摄影师」随单落库，
 --   PC / 员工端「定制需求」列表可展示并按摄影师筛选。
 --
--- 语义（与 internal/model/client.go、internal/presentation/dto/client.go 对齐）：
+-- 语义（与 internal/model/client.go、internal/contract/client.go 对齐）：
 --   - photographer_id = 0 表示**未指定**：需求落 store_id 对应门店或公共池，由工作室后续指派/认领；
 --     该口径与 biz_order.photographer_id（0=未指派）、本表 store_id（0=公共池）保持一致。
 --   - photographer 是**姓名快照**（同 biz_order.photographer 的做法）：列表展示无需回表 join sys_user，
