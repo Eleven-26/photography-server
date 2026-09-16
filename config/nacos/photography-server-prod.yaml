@@ -36,8 +36,8 @@ jwt:
 db:
   host: mysql # compose 服务名（原 APP_DB_HOST）
   port: 3306
-  user: "ENCv1:2gg1A9k9jGhJLMnzvjHUwQoQr1pX6YsL04f+jR1ey7c=" # 密文；原 APP_DB_USER
-  password: "ENCv1:k40ieJLybr6jdbRy1+UGYD5uToGPMOSq8zEP5vYLaZc=" # 密文；原 APP_DB_PASSWORD
+  user: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s=" # 密文；原 APP_DB_USER
+  password: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s=" # 密文；原 APP_DB_PASSWORD
   name: photography
   charset: utf8mb4
   max_idle_conns: 20

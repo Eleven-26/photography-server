@@ -33,8 +33,8 @@ jwt:
 db:
   host: test-db # APP_DB_HOST 可覆盖
   port: 3306
-  user: "ENCv1:xmV63ATfDAg9xeuViXg0PqfaGWoQrmA8dfB049IrQvE="
-  password: "ENCv1:a/vg6TPIUitfFBdc+XK6Sfh4FIUwU2czCrfKfGdGYGeNB+YY//Q="
+  user: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s="
+  password: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s="
   name: photography
   charset: utf8mb4
   max_idle_conns: 10

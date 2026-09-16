@@ -31,8 +31,8 @@ jwt:
 db:
   host: mysql-dev
   port: 3306
-  user: "ENCv1:7nQ4E38XXUMDmgNp8Y32jz8Npn5lUbWU9d2mrnCUHi0="
-  password: "ENCv1:Ku5giYRwwghv0tSJdDHnAaAq4y/pmGVH+cX8U6HqRqE="
+  user: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s="
+  password: "ENCv1:Z2JZ69yyaVLojoeoaMek4Z9gLJIzbQDUMPbvG8tH/8s="
   name: photography
   charset: utf8mb4
   max_idle_conns: 10
