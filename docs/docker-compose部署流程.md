@@ -26,7 +26,16 @@ cp ./photography-server/config/jaeger.example.yaml ./volume/jaeger/config.yaml
 cp ./photography-server/config/nats.example.conf ./volume/nats/conf/nats.conf
 
 # 2、在prod目录下执行
+# 拉取所有 image 服务的最新镜像
+docker compose pull
+
+# 重新构建所有 build 服务，并启动
 docker compose up -d --build
+
+# 或
+# 指定构建镜像，发代码需指定更新
+docker compose up -d --build backend frontend
+
 ```
 
 ## 服务
