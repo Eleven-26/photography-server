@@ -45,17 +45,17 @@ func (s *Service) redis() *redis.Client {
 // 限流：同一手机号 60s 冷却 + 单日上限，防止短信轰炸与 Redis 内存被打满。
 func (s *Service) SendSmsCode(ctx context.Context, scene, mobile string) error {
 	if len(mobile) != 11 {
-		return errs.BadRequest("手机号格式错误")
+		return errs.BadRequest(errs.ErrMobileFormatInvalid)
 	}
 	rdb := s.redis()
 	if rdb == nil {
-		return errs.Internal("短信服务暂不可用，请稍后再试")
+		return errs.Internal(errs.ErrSmsServiceUnavailable)
 	}
 
 	// 1. 冷却检查：上次发送未满 60s 拒绝
 	cdKey := fmt.Sprintf(smsCdKey, scene, mobile)
 	if n, err := rdb.Exists(ctx, cdKey).Result(); err == nil && n > 0 {
-		return errs.BadRequest("发送过于频繁，请稍后再试")
+		return errs.BadRequest(errs.ErrSmsTooFrequent)
 	}
 	// 2. 当日次数检查（含本次，先占位防并发穿透）
 	dayKey := fmt.Sprintf(smsDayKey, scene, mobile)
@@ -67,7 +67,7 @@ func (s *Service) SendSmsCode(ctx context.Context, scene, mobile string) error {
 		rdb.Expire(ctx, dayKey, 24*time.Hour)
 	}
 	if dayCount > smsDayMax {
-		return errs.BadRequest("今日发送次数已达上限")
+		return errs.BadRequest(errs.ErrSmsDailyLimit)
 	}
 
 	code, err := genSmsCode()
@@ -91,19 +91,19 @@ func (s *Service) SendSmsCode(ctx context.Context, scene, mobile string) error {
 func (s *Service) verifySmsCode(ctx context.Context, scene, mobile, code string) error {
 	rdb := s.redis()
 	if rdb == nil {
-		return errs.Internal("短信服务暂不可用，请稍后再试")
+		return errs.Internal(errs.ErrSmsServiceUnavailable)
 	}
 	// 失败次数上限：超过则作废验证码，防暴力枚举
 	failKey := fmt.Sprintf(smsFailKey, scene, mobile)
 	if n, _ := rdb.Get(ctx, failKey).Int(); n >= smsFailMax {
 		rdb.Del(ctx, fmt.Sprintf(smsCodeKey, scene, mobile))
-		return errs.BadRequest("验证码错误次数过多，请重新获取")
+		return errs.BadRequest(errs.ErrSmsCodeTooManyAttempts)
 	}
 
 	key := fmt.Sprintf(smsCodeKey, scene, mobile)
 	val, err := rdb.GetDel(ctx, key).Result()
 	if errors.Is(err, redis.Nil) {
-		return errs.BadRequest("验证码错误或已过期")
+		return errs.BadRequest(errs.ErrSmsCodeExpired)
 	}
 	if err != nil {
 		return errs.Internal("")
@@ -116,7 +116,7 @@ func (s *Service) verifySmsCode(ctx context.Context, scene, mobile, code string)
 		if n >= smsFailMax {
 			rdb.Del(ctx, key)
 		}
-		return errs.BadRequest("验证码错误或已过期")
+		return errs.BadRequest(errs.ErrSmsCodeExpired)
 	}
 	// 校验通过：清除失败计数（一次性消费已由 GETDEL 保证）
 	rdb.Del(ctx, failKey)
@@ -142,7 +142,7 @@ func genSmsCode() (string, error) {
 // handler 的 binding:"required" 只保证"非空"，挡不住 "123" 这类脏值把垃圾客户档建进 crm_customer。
 func (s *Service) CustomerSmsLogin(ctx context.Context, companyID int64, mobile, code, openid string, requireCode bool) (*model.Customer, string, error) {
 	if !domain.IsMobile(mobile) {
-		return nil, "", errs.BadRequest("手机号格式错误")
+		return nil, "", errs.BadRequest(errs.ErrMobileFormatInvalid)
 	}
 	if requireCode {
 		if err := s.verifySmsCode(ctx, "login", mobile, code); err != nil {
@@ -214,10 +214,10 @@ func (s *Service) StaffSmsLogin(ctx context.Context, mobile, code, deviceName, p
 	}
 	u, err := s.AuthRepo.GetByMobile(ctx, mobile)
 	if err != nil {
-		return nil, errs.NotFound("账号不存在，请联系工作室开通")
+		return nil, errs.NotFound(errs.ErrClientAccountNotFound)
 	}
 	if u.Status != 1 {
-		return nil, errs.Forbidden("账号已被停用")
+		return nil, errs.Forbidden(errs.ErrAccountDisabled)
 	}
 	return s.finishStaffLogin(ctx, u, deviceName, platform, ip)
 }

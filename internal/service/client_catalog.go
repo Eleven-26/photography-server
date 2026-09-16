@@ -52,7 +52,7 @@ func (s *Service) ClientPackageDetail(ctx context.Context, companyID, id int64) 
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if pkg.Status != enum.PackageStatusActive {
-		return nil, errs.BadRequest("套餐已下架")
+		return nil, errs.BadRequest(errs.ErrPackageOffline)
 	}
 	return pkg, nil
 }
@@ -66,15 +66,15 @@ func (s *Service) ClientStudioInfo(ctx context.Context, companyID int64) (*model
 // 返回时段列表 + 是否可约。
 func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string, photographerID int64) ([]dto.ClientSlot, error) {
 	if date == "" {
-		return nil, errs.BadRequest("请选择日期")
+		return nil, errs.BadRequest(errs.ErrDateRequired)
 	}
 	d, err := domain.ParseShootDate(date) // #16：统一本地时区解析
 	if err != nil {
-		return nil, errs.BadRequest("日期格式错误，应为 2006-01-02")
+		return nil, errs.BadRequest(errs.ErrDateFormatInvalid)
 	}
 	// 过去日期不可约
 	if d.Before(time.Now().Truncate(24 * time.Hour)) {
-		return nil, errs.BadRequest("不可选择过去的日期")
+		return nil, errs.BadRequest(errs.ErrDateInPast)
 	}
 
 	templates, err := s.SlotTemplateRepo.List(ctx, companyID, photographerID)
@@ -121,10 +121,10 @@ func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string,
 // 由工作室后续指派/认领。
 func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64, cu *ClientUser, req dto.ClientCustomRequestReq, staffID int64) (*model.CustomRequest, error) {
 	if req.ProjectType == "" {
-		return nil, errs.BadRequest("请选择拍摄类型")
+		return nil, errs.BadRequest(errs.ErrBookingProjectTypeRequired)
 	}
 	if cu == nil && req.Mobile == "" {
-		return nil, errs.BadRequest("请填写联系电话")
+		return nil, errs.BadRequest(errs.ErrBookingMobileRequired)
 	}
 	m := model.CustomRequest{
 		TenantBase:   model.TenantBase{Base: model.Base{CreatedAt: time.Now(), UpdatedAt: time.Now()}, CompanyID: companyID},
@@ -152,7 +152,7 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 			}
 		}
 		if !valid {
-			return nil, errs.BadRequest("门店不存在或不属于当前机构")
+			return nil, errs.BadRequest(errs.ErrBookingStoreInvalid)
 		}
 		m.StoreID = req.StoreID
 	}
@@ -166,13 +166,13 @@ func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64
 	if pid > 0 {
 		u, err := s.UserRepo.GetByID(ctx, companyID, pid)
 		if err != nil || u == nil || u.Status != 1 {
-			return nil, errs.BadRequest("所选摄影师不存在或已停用")
+			return nil, errs.BadRequest(errs.ErrBookingStaffNotAvailable)
 		}
 		// 门店与摄影师必须自洽：前端两级联动保证一致，后端不信任客户端 ——
 		// 两者都给且不同，说明请求被改造过，直接拒绝而不是静默取其一（同门店归属的既定口径：
 		// 不静默降级，否则会出现"客户以为指定了 A 店摄影师、A 店却看不到"）。
 		if m.StoreID > 0 && u.StoreID > 0 && m.StoreID != u.StoreID {
-			return nil, errs.BadRequest("所选摄影师不属于该门店")
+			return nil, errs.BadRequest(errs.ErrBookingStaffNotInStore)
 		}
 		m.PhotographerID = u.ID
 		m.Photographer = u.Nickname

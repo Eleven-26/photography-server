@@ -48,7 +48,7 @@ func (h *Controller) RedisSet(c *gin.Context) {
 		return
 	}
 	if h.App.Redis == nil {
-		response.Fail(c, errs.Internal("redis 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrRedisNotConnected))
 		return
 	}
 	ctx := context.Background()
@@ -73,7 +73,7 @@ func (h *Controller) RedisGet(c *gin.Context) {
 		return
 	}
 	if h.App.Redis == nil {
-		response.Fail(c, errs.Internal("redis 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrRedisNotConnected))
 		return
 	}
 	ctx := context.Background()
@@ -94,7 +94,7 @@ func (h *Controller) RedisDel(c *gin.Context) {
 		return
 	}
 	if h.App.Redis == nil {
-		response.Fail(c, errs.Internal("redis 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrRedisNotConnected))
 		return
 	}
 	ctx := context.Background()
@@ -110,7 +110,7 @@ func (h *Controller) RedisDel(c *gin.Context) {
 // POST /test/redis/ping
 func (h *Controller) RedisPing(c *gin.Context) {
 	if h.App.Redis == nil {
-		response.Fail(c, errs.Internal("redis 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrRedisNotConnected))
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -138,7 +138,7 @@ func (h *Controller) NATSPub(c *gin.Context) {
 		return
 	}
 	if h.App.NatsCli == nil {
-		response.Fail(c, errs.Internal("nats 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrNatsNotConnected))
 		return
 	}
 	if err := h.App.NatsCli.Publish(c.Request.Context(), req.Subject, []byte(req.Msg)); err != nil {
@@ -158,11 +158,11 @@ func (h *Controller) NATSPubPersistent(c *gin.Context) {
 	}
 	client := h.App.NatsCli
 	if client == nil {
-		response.Fail(c, errs.Internal("nats 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrNatsNotConnected))
 		return
 	}
 	if !client.IsJetStreamEnabled() {
-		response.Fail(c, errs.Internal("jetStream 未启用"))
+		response.Fail(c, errs.Internal(errs.ErrJetStreamDisabled))
 		return
 	}
 	subject := "photography." + req.Subject
@@ -189,7 +189,7 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 		return
 	}
 	if h.App.NatsCli == nil {
-		response.Fail(c, errs.Internal("nats 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrNatsNotConnected))
 		return
 	}
 	data, err := h.App.NatsCli.Request(c.Request.Context(), req.Subject, []byte(req.Msg), 3*time.Second)
@@ -205,7 +205,7 @@ func (h *Controller) NATSRequest(c *gin.Context) {
 func (h *Controller) NATSStatus(c *gin.Context) {
 	client := h.App.NatsCli
 	if client == nil {
-		response.Fail(c, errs.Internal("nats 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrNatsNotConnected))
 		return
 	}
 	nc := h.App.NATS
@@ -232,7 +232,7 @@ func (h *Controller) NATSPubPull(c *gin.Context) {
 	}
 	client := h.App.NatsCli
 	if client == nil {
-		response.Fail(c, errs.Internal("nats 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrNatsNotConnected))
 		return
 	}
 	subject := "photography." + req.Subject
@@ -263,7 +263,7 @@ func (h *Controller) Test(c *gin.Context) {
 // POST /test/es/status
 func (h *Controller) ESStatus(c *gin.Context) {
 	if h.App.ES == nil {
-		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrESNotConnected))
 		return
 	}
 	res, err := h.App.ES.Info()
@@ -287,7 +287,7 @@ type esIndexReq struct {
 // POST /test/es/index
 func (h *Controller) ESIndex(c *gin.Context) {
 	if h.App.ES == nil {
-		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrESNotConnected))
 		return
 	}
 	var req esIndexReq
@@ -320,7 +320,7 @@ type esSearchReq struct {
 // 默认对 title/content 做多字段匹配，也可通过 fields 参数指定字段。
 func (h *Controller) ESSearch(c *gin.Context) {
 	if h.App.ES == nil {
-		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrESNotConnected))
 		return
 	}
 	var req esSearchReq
@@ -373,7 +373,7 @@ type esListReq struct {
 // POST /test/es/list
 func (h *Controller) ESList(c *gin.Context) {
 	if h.App.ES == nil {
-		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrESNotConnected))
 		return
 	}
 	var req esListReq
@@ -430,7 +430,7 @@ type esDeleteReq struct {
 // POST /test/es/delete
 func (h *Controller) ESDelete(c *gin.Context) {
 	if h.App.ES == nil {
-		response.Fail(c, errs.Internal("elasticsearch 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrESNotConnected))
 		return
 	}
 	var req esDeleteReq
@@ -456,7 +456,7 @@ func (h *Controller) ESDelete(c *gin.Context) {
 // POST /test/mongo/status
 func (h *Controller) MongoStatus(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -477,7 +477,7 @@ type mongoInsertReq struct {
 // POST /test/mongo/insert
 func (h *Controller) MongoInsert(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoInsertReq
@@ -504,7 +504,7 @@ type mongoInsertManyReq struct {
 // POST /test/mongo/insert-many
 func (h *Controller) MongoInsertMany(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoInsertManyReq
@@ -537,7 +537,7 @@ type mongoFindReq struct {
 // POST /test/mongo/find
 func (h *Controller) MongoFind(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoFindReq
@@ -598,7 +598,7 @@ type mongoFindOneReq struct {
 // POST /test/mongo/find-one
 func (h *Controller) MongoFindOne(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoFindOneReq
@@ -627,7 +627,7 @@ type mongoUpdateReq struct {
 // POST /test/mongo/update
 func (h *Controller) MongoUpdate(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoUpdateReq
@@ -658,7 +658,7 @@ type mongoDeleteReq struct {
 // POST /test/mongo/delete
 func (h *Controller) MongoDelete(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoDeleteReq
@@ -685,7 +685,7 @@ type mongoDeleteIDReq struct {
 // POST /test/mongo/delete-by-id
 func (h *Controller) MongoDeleteByID(c *gin.Context) {
 	if !h.App.MongoConnected() {
-		response.Fail(c, errs.Internal("mongodb 未连接"))
+		response.Fail(c, errs.Internal(errs.ErrMongoNotConnected))
 		return
 	}
 	var req mongoDeleteIDReq
@@ -723,7 +723,7 @@ func currentTraceID(c *gin.Context) string {
 // POST /test/jaeger/status
 func (h *Controller) JaegerStatus(c *gin.Context) {
 	if !h.App.JaegerEnabled() {
-		response.Fail(c, errs.Internal("jaeger 未启用（enable=false 或初始化失败）"))
+		response.Fail(c, errs.Internal(errs.ErrJaegerDisabled))
 		return
 	}
 	response.OK(c, gin.H{
@@ -747,7 +747,7 @@ type jaegerTraceReq struct {
 func (h *Controller) JaegerTrace(c *gin.Context) {
 	tracer := h.App.Tracer
 	if tracer == nil {
-		response.Fail(c, errs.Internal("jaeger 未启用"))
+		response.Fail(c, errs.Internal(errs.ErrJaegerNotEnabled))
 		return
 	}
 	var req jaegerTraceReq

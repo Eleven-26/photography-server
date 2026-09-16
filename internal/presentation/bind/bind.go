@@ -50,7 +50,7 @@ func Pager(c *gin.Context) (int, int) {
 func PathID(c *gin.Context, name string) (int64, error) {
 	id, err := strconv.ParseInt(c.Param(name), 10, 64)
 	if err != nil || id <= 0 {
-		return 0, errs.BadRequest("参数错误")
+		return 0, errs.BadRequest(errs.ErrParamInvalid)
 	}
 	return id, nil
 }
@@ -67,7 +67,7 @@ func PathID(c *gin.Context, name string) (int64, error) {
 func BodyID(c *gin.Context, name string) (int64, error) {
 	id := params.Int64(c, name)
 	if id <= 0 {
-		return 0, errs.BadRequest("参数错误")
+		return 0, errs.BadRequest(errs.ErrParamInvalid)
 	}
 	return id, nil
 }

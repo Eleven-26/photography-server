@@ -82,10 +82,10 @@ func (s *Service) StaffRescheduleList(ctx context.Context, op Operator, page, pa
 func (s *Service) StaffRescheduleAudit(ctx context.Context, op Operator, rescheduleID int64, approved bool, remark string) error {
 	rs, err := s.RescheduleRepo.GetByID(ctx, op.CompanyID, rescheduleID)
 	if err != nil {
-		return errs.NotFound("改期单不存在")
+		return errs.NotFound(errs.ErrRescheduleNotFound)
 	}
 	if rs.Status != enum.RescheduleStatusPending {
-		return errs.BadRequest("该改期单已处理")
+		return errs.BadRequest(errs.ErrRescheduleHandled)
 	}
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, rs.OrderID)
 	if err != nil {
@@ -162,7 +162,7 @@ func (s *Service) StaffLeadMessages(ctx context.Context, op Operator, leadID int
 // StaffSendLeadMessage 工作室发出沟通消息（追问/报价通知/作品分享）
 func (s *Service) StaffSendLeadMessage(ctx context.Context, op Operator, leadID int64, req dto.StaffLeadMessageReq) (*model.LeadMessage, error) {
 	if strings.TrimSpace(req.Content) == "" {
-		return nil, errs.BadRequest("消息内容不能为空")
+		return nil, errs.BadRequest(errs.ErrMessageContentRequired)
 	}
 	if _, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID); err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
@@ -282,10 +282,10 @@ func (s *Service) StaffBriefList(ctx context.Context, op Operator, leadID int64)
 func (s *Service) StaffBriefSend(ctx context.Context, op Operator, itemID int64) error {
 	item, err := s.LeadExtraRepo.GetBriefItem(ctx, op.CompanyID, itemID)
 	if err != nil {
-		return errs.NotFound("简报项不存在")
+		return errs.NotFound(errs.ErrBriefNotFound)
 	}
 	if item.Status != enum.BriefItemPending {
-		return errs.BadRequest("该简报项已处理")
+		return errs.BadRequest(errs.ErrBriefHandled)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	updates := map[string]interface{}{"status": enum.BriefItemSent, "sent_at": now}
@@ -298,10 +298,10 @@ func (s *Service) StaffBriefSend(ctx context.Context, op Operator, itemID int64)
 // StaffBriefConfirm 确认/补充简报项取值（客户回复后录入）
 func (s *Service) StaffBriefConfirm(ctx context.Context, op Operator, itemID int64, value string) error {
 	if _, err := s.LeadExtraRepo.GetBriefItem(ctx, op.CompanyID, itemID); err != nil {
-		return errs.NotFound("简报项不存在")
+		return errs.NotFound(errs.ErrBriefNotFound)
 	}
 	if value == "" {
-		return errs.BadRequest("请填写确认内容")
+		return errs.BadRequest(errs.ErrBriefConfirmRequired)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	return s.LeadExtraRepo.UpdateBriefItem(ctx, op.CompanyID, itemID, map[string]interface{}{
@@ -323,15 +323,15 @@ func (s *Service) SlotTemplates(ctx context.Context, op Operator, photographerID
 // SaveSlotTemplate 新建/更新档期时段模板
 func (s *Service) SaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
 	if req.Weekday < 0 || req.Weekday > 6 {
-		return nil, errs.BadRequest("星期参数错误（0-周日 ... 6-周六）")
+		return nil, errs.BadRequest(errs.ErrWeekdayInvalid)
 	}
 	if req.StartTime == "" || req.EndTime == "" || req.StartTime >= req.EndTime {
-		return nil, errs.BadRequest("时间段无效")
+		return nil, errs.BadRequest(errs.ErrTimeSlotInvalid)
 	}
 	now := time.Now()
 	if id > 0 {
 		if _, err := s.SlotTemplateRepo.GetByID(ctx, op.CompanyID, id); err != nil {
-			return nil, errs.NotFound("模板不存在")
+			return nil, errs.NotFound(errs.ErrSlotTemplateNotFound)
 		}
 		updates := map[string]interface{}{
 			"photographer_id": req.PhotographerID,
@@ -364,7 +364,7 @@ func (s *Service) SaveSlotTemplate(ctx context.Context, op Operator, id int64, r
 // DeleteSlotTemplate 删除档期时段模板
 func (s *Service) DeleteSlotTemplate(ctx context.Context, op Operator, id int64) error {
 	if _, err := s.SlotTemplateRepo.GetByID(ctx, op.CompanyID, id); err != nil {
-		return errs.NotFound("模板不存在")
+		return errs.NotFound(errs.ErrSlotTemplateNotFound)
 	}
 	return s.SlotTemplateRepo.Delete(ctx, op.CompanyID, id)
 }
@@ -381,7 +381,7 @@ func (s *Service) StaffReviewList(ctx context.Context, op Operator, page, pageSi
 // StaffReviewReply 摄影师回复客户评价
 func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID int64, reply string) error {
 	if strings.TrimSpace(reply) == "" {
-		return errs.BadRequest("回复内容不能为空")
+		return errs.BadRequest(errs.ErrReplyContentRequired)
 	}
 	updates := map[string]interface{}{
 		"reply":      reply,
@@ -453,7 +453,7 @@ func NormalizeHomepageSlug(raw string) (string, error) {
 		return "", nil
 	}
 	if len(slug) > 50 {
-		return "", errs.BadRequest("主页标识不能超过 50 个字符")
+		return "", errs.BadRequest(errs.ErrSlugTooLong)
 	}
 	for i, ch := range slug {
 		isLower := ch >= 'a' && ch <= 'z'
@@ -461,7 +461,7 @@ func NormalizeHomepageSlug(raw string) (string, error) {
 		if isLower || isDigit || (ch == '-' && i > 0) {
 			continue
 		}
-		return "", errs.BadRequest("主页标识只能包含小写字母、数字和连字符，且不能以连字符开头")
+		return "", errs.BadRequest(errs.ErrSlugFormatInvalid)
 	}
 	return slug, nil
 }
@@ -477,7 +477,7 @@ func (s *Service) StaffCustomRequests(ctx context.Context, op Operator, page, pa
 func (s *Service) StaffCustomRequestRespond(ctx context.Context, op Operator, id int64, response string) error {
 	req, err := s.CustomRequestRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
-		return errs.NotFound("定制需求不存在")
+		return errs.NotFound(errs.ErrCustomRequestNotFound)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	updates := map[string]interface{}{

@@ -34,7 +34,7 @@ func (s *Service) ListOrderReschedules(ctx context.Context, op Operator, orderID
 // 费用档位、可改期状态、重复申请校验与客户申请链路保持一致，避免两套规则打架。
 func (s *Service) ApplyOrderReschedule(ctx context.Context, op Operator, orderID int64, req dto.RescheduleApplyReq) (*model.OrderReschedule, error) {
 	if req.NewDate == "" || req.NewTime == "" {
-		return nil, errs.BadRequest("请选择新的拍摄日期与时段")
+		return nil, errs.BadRequest(errs.ErrRescheduleDateRequired)
 	}
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, orderID)
 	if err != nil {
@@ -44,11 +44,11 @@ func (s *Service) ApplyOrderReschedule(ctx context.Context, op Operator, orderID
 	case enum.OrderStatusPendingConfirm, enum.OrderStatusPendingDeposit, enum.OrderStatusPendingShoot:
 		// 可改期状态
 	default:
-		return nil, errs.BadRequest("当前订单状态不可改期")
+		return nil, errs.BadRequest(errs.ErrRescheduleOrderStatusInvalid)
 	}
 	// 仅"确实没有待确认改期单"才放行；查询出错直接返回，避免约束在故障期失效
 	if _, err := s.RescheduleRepo.GetPendingByOrder(ctx, op.CompanyID, orderID); err == nil {
-		return nil, errs.BadRequest("已有待确认的改期申请，请先处理")
+		return nil, errs.BadRequest(errs.ErrReschedulePendingStaff)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (s *Service) ApplyOrderReschedule(ctx context.Context, op Operator, orderID
 	}
 	feeType, feeAmt, _ := domain.RescheduleFee(time.Until(origStart), o.TotalAmt, s.clientReschedulePolicy(ctx, op.CompanyID))
 	if feeType == enum.RescheduleFeeForbidden {
-		return nil, errs.BadRequest("距拍摄不足 24 小时，不可改期，请与客户协商")
+		return nil, errs.BadRequest(errs.ErrRescheduleTooLateStaff)
 	}
 
 	now := time.Now()

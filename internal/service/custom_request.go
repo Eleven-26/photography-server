@@ -28,14 +28,14 @@ const orderRemarkMaxRunes = 480
 // 建单成功后把需求标记为「已响应」并写入转单说明，避免同一需求被重复转单。
 func (s *Service) ConvertCustomRequestToOrder(ctx context.Context, op Operator, id int64, req dto.OrderCreateReq) (*model.Order, error) {
 	if req.PackageID <= 0 {
-		return nil, errs.BadRequest("请选择套餐后再转订单")
+		return nil, errs.BadRequest(errs.ErrCustomRequestPackageRequired)
 	}
 	cr, err := s.CustomRequestRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
-		return nil, errs.NotFound("定制需求不存在")
+		return nil, errs.NotFound(errs.ErrCustomRequestNotFound)
 	}
 	if cr.Status == enum.CustomRequestClosed {
-		return nil, errs.BadRequest("定制需求已关闭，不可转订单")
+		return nil, errs.BadRequest(errs.ErrCustomRequestClosed)
 	}
 
 	if req.CustomerID == 0 {

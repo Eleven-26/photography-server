@@ -27,7 +27,7 @@ func clientOperator(cu *ClientUser) Operator {
 // clientOrderOwned 校验订单归属当前登录客户
 func clientOrderOwned(o *model.Order, cu *ClientUser) error {
 	if o.CustomerID != cu.CustomerID {
-		return errs.Forbidden("无权操作该订单")
+		return errs.Forbidden(errs.ErrOrderForbidden)
 	}
 	return nil
 }
@@ -39,10 +39,10 @@ func clientOrderOwned(o *model.Order, cu *ClientUser) error {
 // 命中同租户在职员工时写入订单 photographer_id，实现「谁分享、单算谁的」。
 func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req dto.ClientBookingReq, staffID int64) (*model.Order, error) {
 	if req.PackageID <= 0 {
-		return nil, errs.BadRequest("请选择套餐")
+		return nil, errs.BadRequest(errs.ErrOrderPackageRequired)
 	}
 	if req.ShootDate == "" || req.ShootTime == "" {
-		return nil, errs.BadRequest("请选择拍摄日期与时段")
+		return nil, errs.BadRequest(errs.ErrOrderShootDateRequired)
 	}
 	pkg, err := s.PackageRepo.GetByID(ctx, cu.CompanyID, req.PackageID)
 	if err != nil || pkg.Status != enum.PackageStatusActive {
@@ -55,7 +55,7 @@ func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req d
 		return nil, err
 	}
 	if st.AcceptNew == 0 {
-		return nil, errs.BadRequest("工作室已暂停接单，请稍后再试")
+		return nil, errs.BadRequest(errs.ErrBookingPaused)
 	}
 
 	// 时段占用检查（同日同时段已有锁定档期则拒绝）
@@ -65,7 +65,7 @@ func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req d
 	}
 	for _, b := range blocks {
 		if b.Status != enum.BlockStatusCancelled && (b.TimeRange == req.ShootTime || b.TimeRange == "") {
-			return nil, errs.BadRequest("该时段已被预约，请选择其他时段")
+			return nil, errs.BadRequest(errs.ErrBookingSlotTaken)
 		}
 	}
 
@@ -211,7 +211,7 @@ func (s *Service) ClientCancelBooking(ctx context.Context, cu *ClientUser, order
 		return err
 	}
 	if o.Status != enum.OrderStatusPendingConfirm {
-		return errs.BadRequest("当前状态不可取消，如需取消请联系工作室")
+		return errs.BadRequest(errs.ErrOrderCancelNotAllowed)
 	}
 	err = repository.Tx(func(tx *gorm.DB) error {
 		if err := s.OrderRepo.WithTx(tx).Update(ctx, cu.CompanyID, orderID, map[string]interface{}{

@@ -26,10 +26,10 @@ var paymentTypeSet = map[string]bool{"deposit": true, "final": true, "addon": tr
 //  4. 累计校验在确认收款事务内加行锁再做最终判定（见 ConfirmPayment）。
 func (s *Service) CreatePayment(ctx context.Context, op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
 	if req.Amount <= 0 {
-		return nil, errs.BadRequest("收款金额必须大于 0")
+		return nil, errs.BadRequest(errs.ErrPaymentAmountPositive)
 	}
 	if !paymentTypeSet[req.Type] {
-		return nil, errs.BadRequest("收款类型不合法（deposit/final/addon）")
+		return nil, errs.BadRequest(errs.ErrPaymentTypeInvalid)
 	}
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, orderID)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *Service) CreatePayment(ctx context.Context, op Operator, orderID int64,
 	}
 	// 金额上限：已收 + 本次 <= 订单总额（留 0.5 分舍入余量）
 	if o.PaidAmt+req.Amount > o.TotalAmt+domain.FenEps() {
-		return nil, errs.BadRequest("收款金额超过订单剩余应收")
+		return nil, errs.BadRequest(errs.ErrPaymentExceedRemaining)
 	}
 
 	p := model.OrderPayment{
@@ -89,7 +89,7 @@ func (s *Service) ConfirmPayment(ctx context.Context, op Operator, id int64) err
 
 		// 1.1 收款确认时按最新订单快照二次校验：已收 + 本次不得超额（录入后订单可能被退款/改价）
 		if !isRescheduleFee && o.PaidAmt+p.Amount > o.TotalAmt+domain.FenEps() {
-			return errs.BadRequest("确认后收款将超过订单剩余应收，请核对金额")
+			return errs.BadRequest(errs.ErrPaymentConfirmExceed)
 		}
 
 		// 2. 收款记录置为已确认（CAS：仅当仍为待核验时生效，防并发重复确认）
@@ -170,7 +170,7 @@ func (s *Service) DeletePayment(ctx context.Context, op Operator, id int64) erro
 		return errs.NotFound(errs.ErrPaymentNotFound)
 	}
 	if p.Status == enum.PaymentStatusConfirmed || p.Status == enum.PaymentStatusRefunded {
-		return errs.BadRequest("已确认的收款不可删除，请走退款流程")
+		return errs.BadRequest(errs.ErrPaymentConfirmedDelete)
 	}
 	return repository.Tx(func(tx *gorm.DB) error {
 		if err := s.OrderRepo.WithTx(tx).DeletePayment(ctx, op.CompanyID, id); err != nil {

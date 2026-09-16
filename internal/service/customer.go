@@ -138,7 +138,7 @@ func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*dto.Custo
 func (s *Service) UpdateCustomerMobile(ctx context.Context, op Operator, customerID int64, mobile string) error {
 	mobile = strings.TrimSpace(mobile)
 	if !domain.IsMobile(mobile) {
-		return errs.BadRequest("手机号格式不正确")
+		return errs.BadRequest(errs.ErrMobileFormatWrong)
 	}
 	cur, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, customerID)
 	if err != nil {

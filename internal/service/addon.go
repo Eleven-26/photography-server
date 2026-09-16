@@ -67,7 +67,7 @@ func (s *Service) CreateOrderAddon(ctx context.Context, op Operator, orderID int
 func (s *Service) UpdateOrderAddon(ctx context.Context, op Operator, addonID int64, req dto.OrderAddonReq) (*model.OrderAddon, error) {
 	a, err := s.AddonRepo.GetByID(ctx, op.CompanyID, addonID)
 	if err != nil {
-		return nil, errs.NotFound("加项不存在")
+		return nil, errs.NotFound(errs.ErrAddonNotFound)
 	}
 	o, err := s.ensureOrderEditable(ctx, op.CompanyID, a.OrderID)
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *Service) UpdateOrderAddon(ctx context.Context, op Operator, addonID int
 func (s *Service) DeleteOrderAddon(ctx context.Context, op Operator, addonID int64) error {
 	a, err := s.AddonRepo.GetByID(ctx, op.CompanyID, addonID)
 	if err != nil {
-		return errs.NotFound("加项不存在")
+		return errs.NotFound(errs.ErrAddonNotFound)
 	}
 	o, err := s.ensureOrderEditable(ctx, op.CompanyID, a.OrderID)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *Service) ensureOrderEditable(ctx context.Context, companyID, orderID in
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
-		return nil, errs.BadRequest("订单已完成或已取消，不可修改加项")
+		return nil, errs.BadRequest(errs.ErrOrderClosedAddon)
 	}
 	return o, nil
 }

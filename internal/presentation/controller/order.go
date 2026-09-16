@@ -253,7 +253,7 @@ func (h *Controller) RefundAudit(c *gin.Context) {
 		return
 	}
 	if req.Approved == nil {
-		response.Fail(c, errs.BadRequest("缺少审批结论 approved"))
+		response.Fail(c, errs.BadRequest(errs.ErrApproveConclusionRequired))
 		return
 	}
 	if err := h.Svc.AuditRefund(c.Request.Context(), op, id, *req.Approved, req.Remark); err != nil {
@@ -390,7 +390,7 @@ func (h *Controller) OrderRescheduleAudit(c *gin.Context) {
 		return
 	}
 	if req.Approved == nil {
-		response.Fail(c, errs.BadRequest("缺少审批结论 approved"))
+		response.Fail(c, errs.BadRequest(errs.ErrApproveConclusionRequired))
 		return
 	}
 	if err := h.Svc.StaffRescheduleAudit(c.Request.Context(), op, id, *req.Approved, req.Remark); err != nil {

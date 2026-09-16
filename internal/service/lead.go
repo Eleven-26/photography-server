@@ -151,7 +151,7 @@ func (s *Service) ConvertLeadToCustomer(ctx context.Context, op Operator, leadID
 		}
 		if created == nil {
 			// 手机号为空：不建无手机号的客户（宁缺毋滥），引导先补全手机号
-			return errs.BadRequest("线索缺少手机号，无法建立客户，请先补全手机号")
+			return errs.BadRequest(errs.ErrLeadMobileRequired)
 		}
 		c = created
 
@@ -223,7 +223,7 @@ func (s *Service) UpdateQuoteStatus(ctx context.Context, op Operator, quoteID in
 		return errs.NotFound(errs.ErrQuoteNotFound)
 	}
 	if status == 0 {
-		return errs.BadRequest("报价状态不能为空")
+		return errs.BadRequest(errs.ErrQuoteStatusRequired)
 	}
 	updates := map[string]interface{}{
 		"status":     status,

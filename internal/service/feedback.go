@@ -26,10 +26,10 @@ const (
 func (s *Service) SubmitFeedback(ctx context.Context, op Operator, req dto.FeedbackSubmitReq) error {
 	content := strings.TrimSpace(req.Content)
 	if content == "" {
-		return errs.BadRequest("请填写问题描述")
+		return errs.BadRequest(errs.ErrFeedbackContentRequired)
 	}
 	if len([]rune(content)) > feedbackMaxRunes {
-		return errs.BadRequest("问题描述过长（最多 1000 字）")
+		return errs.BadRequest(errs.ErrFeedbackContentTooLong)
 	}
 	typ := strings.TrimSpace(req.Type)
 	if typ == "" {
@@ -38,7 +38,7 @@ func (s *Service) SubmitFeedback(ctx context.Context, op Operator, req dto.Feedb
 	switch typ {
 	case feedbackTypeBug, feedbackTypeAdvice, feedbackTypeOther:
 	default:
-		return errs.BadRequest("问题类型不合法")
+		return errs.BadRequest(errs.ErrFeedbackTypeInvalid)
 	}
 
 	images := make([]string, 0, feedbackMaxImages)

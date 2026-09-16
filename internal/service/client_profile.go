@@ -38,24 +38,24 @@ func (s *Service) ClientUpdateProfile(ctx context.Context, cu *ClientUser, req d
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" {
-			return nil, errs.BadRequest("姓名不能为空") // 订单/评价的客户姓名会跟着变，空姓名不可读
+			return nil, errs.BadRequest(errs.ErrCustomerNameRequired) // 订单/评价的客户姓名会跟着变，空姓名不可读
 		}
 		if len([]rune(name)) > 50 { // 列宽 varchar(50)
-			return nil, errs.BadRequest("姓名过长")
+			return nil, errs.BadRequest(errs.ErrCustomerNameTooLong)
 		}
 		updates["name"] = name
 	}
 	if req.Wechat != nil {
 		wechat := strings.TrimSpace(*req.Wechat)
 		if len([]rune(wechat)) > 50 {
-			return nil, errs.BadRequest("微信号过长")
+			return nil, errs.BadRequest(errs.ErrCustomerWechatTooLong)
 		}
 		updates["wechat"] = wechat
 	}
 	if req.Gender != nil {
 		gender := strings.TrimSpace(*req.Gender)
 		if !customerGenders[gender] {
-			return nil, errs.BadRequest("性别取值不合法")
+			return nil, errs.BadRequest(errs.ErrCustomerGenderInvalid)
 		}
 		updates["gender"] = gender
 	}
@@ -65,7 +65,7 @@ func (s *Service) ClientUpdateProfile(ctx context.Context, cu *ClientUser, req d
 			// 只收 2006-01-02：生日列是字符串，放开格式会让「2026/1/2」「2026年1月2日」
 			// 混进同一列，PC 端排序与年龄计算全部失效。
 			if _, err := time.Parse("2006-01-02", birthday); err != nil {
-				return nil, errs.BadRequest("生日格式应为 YYYY-MM-DD")
+				return nil, errs.BadRequest(errs.ErrCustomerBirthdayFormatInvalid)
 			}
 		}
 		updates["birthday"] = birthday
@@ -73,14 +73,14 @@ func (s *Service) ClientUpdateProfile(ctx context.Context, cu *ClientUser, req d
 	if req.PreferStyle != nil {
 		style := strings.TrimSpace(*req.PreferStyle)
 		if len([]rune(style)) > 100 { // 列宽 varchar(100)
-			return nil, errs.BadRequest("偏好风格过长")
+			return nil, errs.BadRequest(errs.ErrCustomerPreferStyleTooLong)
 		}
 		updates["prefer_style"] = style
 	}
 	if req.PreferScene != nil {
 		scene := strings.TrimSpace(*req.PreferScene)
 		if len([]rune(scene)) > 100 {
-			return nil, errs.BadRequest("常用场景过长")
+			return nil, errs.BadRequest(errs.ErrCustomerPreferSceneTooLong)
 		}
 		updates["prefer_scene"] = scene
 	}

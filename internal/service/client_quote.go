@@ -85,14 +85,14 @@ func (s *Service) ClientQuoteAccept(ctx context.Context, cu *ClientUser, quoteID
 func (s *Service) ClientQuoteModify(ctx context.Context, cu *ClientUser, quoteID int64, content string) error {
 	content = strings.TrimSpace(content)
 	if content == "" {
-		return errs.BadRequest("修改意见不能为空")
+		return errs.BadRequest(errs.ErrQuoteFeedbackRequired)
 	}
 	q, err := s.getOwnedQuote(ctx, cu, quoteID)
 	if err != nil {
 		return err
 	}
 	if q.LeadID <= 0 {
-		return errs.BadRequest("该报价未关联线索，请联系工作室")
+		return errs.BadRequest(errs.ErrQuoteNoLead)
 	}
 	now := time.Now()
 	m := model.LeadMessage{

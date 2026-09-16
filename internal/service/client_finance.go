@@ -74,7 +74,7 @@ func (s *Service) ClientConfirmRefundReceived(ctx context.Context, cu *ClientUse
 	// 只有"已通过 / 已退款"才可确认收到——申请中/已驳回时确认没有意义，
 	// 且会让 PC 侧误以为款项已结清。
 	if rf.Status != enum.RefundStatusApproved && rf.Status != enum.RefundStatusDone {
-		return errs.BadRequest("退款尚未通过或已驳回，暂不可确认收款")
+		return errs.BadRequest(errs.ErrRefundNotPending)
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	return s.OrderRepo.UpdateRefund(ctx, cu.CompanyID, refundID, map[string]interface{}{
@@ -121,7 +121,7 @@ func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, ord
 		return nil, err
 	}
 	if !paymentTypeSet[req.Type] {
-		return nil, errs.BadRequest("收款类型不合法（deposit/final/addon）")
+		return nil, errs.BadRequest(errs.ErrPaymentTypeInvalid)
 	}
 	if o.Status == enum.OrderStatusCompleted || o.Status == enum.OrderStatusCancelled {
 		return nil, errs.BadRequest(errs.ErrOrderCompleted)
@@ -132,10 +132,10 @@ func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, ord
 		amount = domain.Round2(o.TotalAmt - o.PaidAmt) // 不传 = 按剩余应收
 	}
 	if amount <= 0 {
-		return nil, errs.BadRequest("订单已无待收金额，无需登记")
+		return nil, errs.BadRequest(errs.ErrOrderNoReceivable)
 	}
 	if o.PaidAmt+amount > o.TotalAmt+domain.FenEps() {
-		return nil, errs.BadRequest("登记金额超过订单剩余应收，请核对后重试")
+		return nil, errs.BadRequest(errs.ErrPaymentExceedRemainingRegister)
 	}
 
 	// 收款方式快照 + 渠道校验（方式可为空，表示客户自行线下转账）
@@ -146,11 +146,11 @@ func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, ord
 			return nil, errs.BadRequest(errs.ErrPaymentMethodNotFound)
 		}
 		if m.Status != 1 {
-			return nil, errs.BadRequest("该收款方式已停用，请选择其他方式")
+			return nil, errs.BadRequest(errs.ErrPaymentMethodDisabled)
 		}
 		methodName = m.Name
 		if m.Type == "bank" && strings.TrimSpace(req.Voucher) == "" {
-			return nil, errs.BadRequest("银行转账请上传转账凭证")
+			return nil, errs.BadRequest(errs.ErrBankVoucherRequired)
 		}
 	}
 
@@ -232,7 +232,7 @@ func (s *Service) ClientReadOrderPrep(ctx context.Context, cu *ClientUser, order
 		return nil
 	}
 	if strings.TrimSpace(o.PrepContent) == "" {
-		return errs.BadRequest("该订单暂无拍前准备内容")
+		return errs.BadRequest(errs.ErrOrderNoPreparation)
 	}
 	return s.OrderRepo.Update(ctx, cu.CompanyID, orderID, map[string]interface{}{
 		"prep_read_at": time.Now().Format("2006-01-02 15:04:05"),

@@ -100,12 +100,12 @@ func (s *Service) UpdateAssetFlags(ctx context.Context, op Operator, id int64, r
 		return errs.NotFound(errs.ErrAssetNotFound)
 	}
 	if req.Status == nil && req.Visibility == nil && req.Featured == nil {
-		return errs.BadRequest("未提供任何需要变更的字段")
+		return errs.BadRequest(errs.ErrNoFieldsToUpdate)
 	}
 	updates := map[string]interface{}{"updated_by": op.UserID}
 	if req.Status != nil {
 		if *req.Status != enum.AssetStatusDraft && *req.Status != enum.AssetStatusPublished {
-			return errs.BadRequest("作品状态取值非法")
+			return errs.BadRequest(errs.ErrAssetStatusInvalid)
 		}
 		updates["status"] = *req.Status
 		if *req.Status == enum.AssetStatusPublished && a.PublishedAt == nil {
@@ -114,13 +114,13 @@ func (s *Service) UpdateAssetFlags(ctx context.Context, op Operator, id int64, r
 	}
 	if req.Visibility != nil {
 		if *req.Visibility != enum.AssetVisibilityPublic && *req.Visibility != enum.AssetVisibilityPrivate {
-			return errs.BadRequest("可见性取值非法")
+			return errs.BadRequest(errs.ErrAssetVisibilityInvalid)
 		}
 		updates["visibility"] = *req.Visibility
 	}
 	if req.Featured != nil {
 		if *req.Featured != 0 && *req.Featured != 1 {
-			return errs.BadRequest("精选取值非法")
+			return errs.BadRequest(errs.ErrAssetFeaturedInvalid)
 		}
 		updates["featured"] = *req.Featured
 	}

@@ -25,7 +25,7 @@ func (s *Service) SendStaffMobileCode(ctx context.Context, op Operator) error {
 	}
 	mobile := strings.TrimSpace(u.Mobile)
 	if mobile == "" {
-		return errs.BadRequest("当前账号未绑定手机号，请联系管理员")
+		return errs.BadRequest(errs.ErrStaffMobileUnbound)
 	}
 	return s.SendSmsCode(ctx, smsSceneChangeMobile, mobile)
 }
@@ -38,7 +38,7 @@ func (s *Service) SendStaffMobileCode(ctx context.Context, op Operator) error {
 func (s *Service) ChangeStaffMobile(ctx context.Context, op Operator, code, newMobile string) error {
 	newMobile = strings.TrimSpace(newMobile)
 	if !domain.IsMobile(newMobile) {
-		return errs.BadRequest("手机号格式不正确")
+		return errs.BadRequest(errs.ErrMobileFormatWrong)
 	}
 	u, err := s.AuthRepo.GetByID(ctx, op.CompanyID, op.UserID)
 	if err != nil {
@@ -46,17 +46,17 @@ func (s *Service) ChangeStaffMobile(ctx context.Context, op Operator, code, newM
 	}
 	cur := strings.TrimSpace(u.Mobile)
 	if cur == "" {
-		return errs.BadRequest("当前账号未绑定手机号，请联系管理员")
+		return errs.BadRequest(errs.ErrStaffMobileUnbound)
 	}
 	if cur == newMobile {
-		return errs.BadRequest("新手机号与当前手机号相同")
+		return errs.BadRequest(errs.ErrMobileUnchanged)
 	}
 	if err := s.verifySmsCode(ctx, smsSceneChangeMobile, cur, code); err != nil {
 		return err
 	}
 	// 占用校验：同号多租户时 GetByMobile 取最早注册者，故仅当命中且非本人时拒绝
 	if other, oerr := s.AuthRepo.GetByMobile(ctx, newMobile); oerr == nil && other != nil && other.ID != op.UserID {
-		return errs.Conflict("该手机号已被其他账号使用")
+		return errs.Conflict(errs.ErrMobileTaken)
 	}
 	return s.AuthRepo.UpdateMobile(ctx, op.UserID, newMobile)
 }

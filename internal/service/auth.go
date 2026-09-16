@@ -60,7 +60,7 @@ func (s *Service) verifyPasswordCredential(ctx context.Context, username, passwo
 	if rdb != nil {
 		ipLockKey := "login:ip:" + ip + "_locked"
 		if locked, _ := rdb.Exists(ctx, ipLockKey).Result(); locked > 0 {
-			return nil, errs.BadRequest("登录失败次数过多，请 15 分钟后再试")
+			return nil, errs.BadRequest(errs.ErrLoginTooManyAttempts)
 		}
 	}
 
@@ -68,7 +68,7 @@ func (s *Service) verifyPasswordCredential(ctx context.Context, username, passwo
 	if rdb != nil {
 		userLockKey := "login:user:" + username + "_locked"
 		if locked, _ := rdb.Exists(ctx, userLockKey).Result(); locked > 0 {
-			return nil, errs.BadRequest("账号已被锁定，请 15 分钟后再试")
+			return nil, errs.BadRequest(errs.ErrAccountLocked)
 		}
 	}
 

@@ -20,7 +20,7 @@ func (s *Service) CreateDelivery(ctx context.Context, op Operator, orderID int64
 // 同一订单只允许一张交付单：已存在时直接返回原单，避免重复建单导致选片链路分裂。
 func (s *Service) CreateDeliveryTask(ctx context.Context, op Operator, req dto.DeliveryCreateReq) (*model.Delivery, error) {
 	if req.OrderID <= 0 {
-		return nil, errs.BadRequest("订单ID无效")
+		return nil, errs.BadRequest(errs.ErrOrderIDInvalid)
 	}
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, req.OrderID)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *Service) CreateDeliveryTask(ctx context.Context, op Operator, req dto.D
 
 	stage := enum.DeliveryStage(orDefaultInt64(int64(req.Stage), int64(enum.DeliveryStagePendingSamples)))
 	if stage < enum.DeliveryStagePendingSamples || stage > enum.DeliveryStagePendingConfirm {
-		return nil, errs.BadRequest("交付阶段参数错误")
+		return nil, errs.BadRequest(errs.ErrDeliveryStageParamInvalid)
 	}
 
 	now := time.Now()
@@ -73,7 +73,7 @@ func (s *Service) ListDeliveries(ctx context.Context, op Operator, stage, page, 
 func (s *Service) RemindDeliveryOperator(ctx context.Context, op Operator, deliveryID int64) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
-		return errs.NotFound("交付单不存在")
+		return errs.NotFound(errs.ErrDeliveryNotFound)
 	}
 	s.NotifyStaff(ctx, op, d.OperatorID, enum.NotificationTypeOrder,
 		"交付任务提醒",
@@ -239,10 +239,10 @@ func (s *Service) ListFeedbackItems(ctx context.Context, op Operator, status, pa
 func (s *Service) HandleFeedbackItem(ctx context.Context, op Operator, itemID int64, remark string) error {
 	var item model.DeliveryItem
 	if err := s.DeliveryRepo.FirstItem(ctx, op.CompanyID, itemID, &item); err != nil {
-		return errs.NotFound("交付文件不存在")
+		return errs.NotFound(errs.ErrDeliveryFileNotFound)
 	}
 	if item.FeedbackStatus == enum.FeedbackNone {
-		return errs.BadRequest("该文件没有客户反馈")
+		return errs.BadRequest(errs.ErrDeliveryNoFeedback)
 	}
 	if item.FeedbackStatus == enum.FeedbackHandled {
 		return nil

@@ -149,14 +149,14 @@ func staffFrom(c *gin.Context) int64 {
 func (h *Controller) requireCompany(c *gin.Context) (int64, error) {
 	slug := slugFrom(c)
 	if slug == "" {
-		return 0, errs.BadRequest("缺少工作室标识（slug）")
+		return 0, errs.BadRequest(errs.ErrSlugRequired)
 	}
 	companyID, err := h.Svc.ResolveCompanyBySlug(c.Request.Context(), slug)
 	if err != nil {
 		return 0, errs.Internal("")
 	}
 	if companyID <= 0 {
-		return 0, errs.BadRequest("预约主页不存在或未配置短链标识，请联系工作室")
+		return 0, errs.BadRequest(errs.ErrHomepageNotConfigured)
 	}
 	return companyID, nil
 }
@@ -199,7 +199,7 @@ func (h *Controller) Login(c *gin.Context) {
 		slug = slugFrom(c)
 	}
 	if slug == "" {
-		response.Fail(c, errs.BadRequest("缺少工作室标识（slug）"))
+		response.Fail(c, errs.BadRequest(errs.ErrSlugRequired))
 		return
 	}
 	companyID, err := h.Svc.ResolveCompanyBySlug(c.Request.Context(), slug)
@@ -208,7 +208,7 @@ func (h *Controller) Login(c *gin.Context) {
 		return
 	}
 	if companyID <= 0 {
-		response.Fail(c, errs.BadRequest("预约主页不存在或未配置短链标识，请联系工作室"))
+		response.Fail(c, errs.BadRequest(errs.ErrHomepageNotConfigured))
 		return
 	}
 	customer, token, err := h.Svc.CustomerSmsLogin(c.Request.Context(), companyID, req.Mobile, req.Code, req.OpenID, h.loginRequireSmsCode())

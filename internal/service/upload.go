@@ -74,12 +74,12 @@ func uploadTarget(public bool, month string) (relDir, urlPrefix string) {
 func (s *Service) UploadFile(ctx context.Context, op Operator, fileName string, data []byte, opt UploadOptions) (*UploadResult, error) {
 	ext := sanitizeExt(fileName)
 	if ext == "" {
-		return nil, errs.BadRequest("不支持的文件类型")
+		return nil, errs.BadRequest(errs.ErrFileTypeUnsupported)
 	}
 	fileType := detectFileType(ext)
 	if fileType == enum.UploadTypeFile {
 		// 仅允许图片/视频上传
-		return nil, errs.BadRequest("仅支持图片/视频文件")
+		return nil, errs.BadRequest(errs.ErrUploadInvalidFile)
 	}
 	// 按月份分目录防单目录膨胀；公开物料整体下沉到 media/ 子目录（见 UploadOptions 注释）
 	month := time.Now().Format("200601")

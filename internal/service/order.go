@@ -71,10 +71,10 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
 	}
 	if pkg.Status != enum.PackageStatusActive {
-		return nil, errs.BadRequest("套餐已下架，不可下单")
+		return nil, errs.BadRequest(errs.ErrPackageOfflineOrder)
 	}
 	if req.AddonAmount < 0 {
-		return nil, errs.BadRequest("加选金额不能为负")
+		return nil, errs.BadRequest(errs.ErrAddonAmountNegative)
 	}
 
 	// 客户归属校验 + 快照：客户必须属于当前公司
@@ -83,7 +83,7 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 		cu, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, req.CustomerID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, errs.BadRequest("客户不存在或不属于当前工作室")
+				return nil, errs.BadRequest(errs.ErrCustomerNotInCompany)
 			}
 			return nil, err
 		}

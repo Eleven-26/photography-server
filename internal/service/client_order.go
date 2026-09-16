@@ -35,15 +35,15 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 	case enum.OrderStatusPendingConfirm, enum.OrderStatusPendingDeposit, enum.OrderStatusPendingShoot:
 		// 可改期状态
 	default:
-		return nil, errs.BadRequest("当前订单状态不可改期")
+		return nil, errs.BadRequest(errs.ErrRescheduleOrderStatusInvalid)
 	}
 	if req.NewDate == "" || req.NewTime == "" {
-		return nil, errs.BadRequest("请选择新的拍摄日期与时段")
+		return nil, errs.BadRequest(errs.ErrRescheduleDateRequired)
 	}
 	// #20：仅"确实没有待确认改期单"（ErrRecordNotFound）才放行；
 	// 查询出错（DB 抖动）直接返回，避免约束在故障期失效导致重复改期单
 	if _, err := s.RescheduleRepo.GetPendingByOrder(ctx, cu.CompanyID, orderID); err == nil {
-		return nil, errs.BadRequest("已有待确认的改期申请，请耐心等待")
+		return nil, errs.BadRequest(errs.ErrReschedulePendingClient)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, ord
 	}
 	feeType, feeAmt, _ := domain.RescheduleFee(time.Until(origStart), o.TotalAmt, s.clientReschedulePolicy(ctx, cu.CompanyID))
 	if feeType == enum.RescheduleFeeForbidden {
-		return nil, errs.BadRequest("距拍摄不足24小时，不可改期，请联系工作室")
+		return nil, errs.BadRequest(errs.ErrRescheduleTooLateClient)
 	}
 
 	now := time.Now()
@@ -109,13 +109,13 @@ func hourPart(timeRange string) string {
 func (s *Service) ClientRescheduleCancel(ctx context.Context, cu *ClientUser, rescheduleID int64) error {
 	rs, err := s.RescheduleRepo.GetByID(ctx, cu.CompanyID, rescheduleID)
 	if err != nil {
-		return errs.NotFound("改期单不存在")
+		return errs.NotFound(errs.ErrRescheduleNotFound)
 	}
 	if rs.CustomerID != cu.CustomerID {
-		return errs.Forbidden("无权操作该改期单")
+		return errs.Forbidden(errs.ErrRescheduleForbidden)
 	}
 	if rs.Status != enum.RescheduleStatusPending {
-		return errs.BadRequest("该改期单已处理，不可撤回")
+		return errs.BadRequest(errs.ErrRescheduleHandledWithdraw)
 	}
 	return s.RescheduleRepo.Update(ctx, cu.CompanyID, rescheduleID, map[string]interface{}{
 		"status": enum.RescheduleStatusCancelled,
@@ -189,14 +189,14 @@ func (s *Service) ClientReviewCreate(ctx context.Context, cu *ClientUser, orderI
 		return nil, err
 	}
 	if o.Status != enum.OrderStatusCompleted {
-		return nil, errs.BadRequest("订单完成后方可评价")
+		return nil, errs.BadRequest(errs.ErrReviewOrderNotComplete)
 	}
 	if req.Rating < 1 || req.Rating > 5 {
-		return nil, errs.BadRequest("评分需在 1-5 之间")
+		return nil, errs.BadRequest(errs.ErrReviewRatingInvalid)
 	}
 	// #20：仅"确实未评价过"（ErrRecordNotFound）才放行，查询出错直接返回
 	if _, err := s.ReviewRepo.GetByOrderID(ctx, cu.CompanyID, orderID); err == nil {
-		return nil, errs.BadRequest("该订单已评价过")
+		return nil, errs.BadRequest(errs.ErrReviewExists)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -265,12 +265,12 @@ func (s *Service) ClientSelectPhotos(ctx context.Context, cu *ClientUser, delive
 	// #23：加片费一旦确认已进入订单尾款，选片即锁定——防止"确认后改选变少"造成
 	// 订单金额与选择结果脱钩（改选不冲销已入账金额）。如需调整请联系工作室处理。
 	if d.ExtraConfirmed == 1 {
-		return errs.BadRequest("已确认加片费用，选片已锁定；如需调整请联系工作室")
+		return errs.BadRequest(errs.ErrExtraLocked)
 	}
 	if d.SelectDeadline != nil && *d.SelectDeadline != "" {
 		if deadline, err := time.ParseInLocation("2006-01-02 15:04:05", *d.SelectDeadline, time.Local); err == nil {
 			if time.Now().After(deadline) {
-				return errs.BadRequest("选片已截止，如需调整请联系工作室")
+				return errs.BadRequest(errs.ErrSelectionClosed)
 			}
 		}
 	}
@@ -350,7 +350,7 @@ func (s *Service) ClientConfirmExtra(ctx context.Context, cu *ClientUser, delive
 			if d2.ExtraConfirmed == 1 {
 				return nil
 			}
-			return errs.Conflict("加片确认状态异常，请刷新后重试")
+			return errs.Conflict(errs.ErrExtraStatusInvalid)
 		}
 		// 2. 加片费进订单尾款（addon_amount 累加，final_amt/total_amt 同步）
 		if err := s.OrderRepo.WithTx(tx).Update(ctx, cu.CompanyID, o.ID, map[string]interface{}{
@@ -379,7 +379,7 @@ func (s *Service) ClientConfirmDelivery(ctx context.Context, cu *ClientUser, del
 		return err
 	}
 	if d.Stage != enum.DeliveryStagePendingConfirm {
-		return errs.BadRequest("当前阶段不可确认成片")
+		return errs.BadRequest(errs.ErrConfirmStageInvalid)
 	}
 	now := time.Now()
 	nowStr := now.Format("2006-01-02 15:04:05")
@@ -409,7 +409,7 @@ func (s *Service) ClientConfirmDelivery(ctx context.Context, cu *ClientUser, del
 func (s *Service) ClientFeedbackSubmit(ctx context.Context, cu *ClientUser, itemID int64, req dto.ClientFeedbackReq) error {
 	var item model.DeliveryItem
 	if err := s.DeliveryRepo.FirstItem(ctx, cu.CompanyID, itemID, &item); err != nil {
-		return errs.NotFound("交付文件不存在")
+		return errs.NotFound(errs.ErrDeliveryFileNotFound)
 	}
 	d, err := s.DeliveryRepo.GetByID(ctx, cu.CompanyID, item.DeliveryID)
 	if err != nil {
@@ -423,7 +423,7 @@ func (s *Service) ClientFeedbackSubmit(ctx context.Context, cu *ClientUser, item
 		return err
 	}
 	if req.Content == "" && req.Types == "" {
-		return errs.BadRequest("请填写修改意见")
+		return errs.BadRequest(errs.ErrRetouchFeedbackRequired)
 	}
 	return s.DeliveryRepo.UpdateItem(ctx, cu.CompanyID, itemID, map[string]interface{}{
 		"feedback_content":  req.Content,
@@ -507,7 +507,7 @@ func (s *Service) listRescheduleFeePayments(ctx context.Context, companyID int64
 func (s *Service) getOwnedReschedule(ctx context.Context, cu *ClientUser, rescheduleID int64) (*model.OrderReschedule, error) {
 	rs, err := s.RescheduleRepo.GetByID(ctx, cu.CompanyID, rescheduleID)
 	if err != nil {
-		return nil, errs.NotFound("改期单不存在")
+		return nil, errs.NotFound(errs.ErrRescheduleNotFound)
 	}
 	if rs.CustomerID > 0 && rs.CustomerID == cu.CustomerID {
 		return rs, nil
@@ -515,7 +515,7 @@ func (s *Service) getOwnedReschedule(ctx context.Context, cu *ClientUser, resche
 	if o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, rs.OrderID); err == nil && o.CustomerID == cu.CustomerID {
 		return rs, nil
 	}
-	return nil, errs.NotFound("改期单不存在")
+	return nil, errs.NotFound(errs.ErrRescheduleNotFound)
 }
 
 // ClientRescheduleDetail 改期单详情 + 调度费支付状态（H2：原型 B2 改期调度费支付）
@@ -556,10 +556,10 @@ func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, re
 		return nil, err
 	}
 	if rs.Status != enum.RescheduleStatusApproved {
-		return nil, errs.BadRequest("改期申请尚未通过，暂无需支付调度费")
+		return nil, errs.BadRequest(errs.ErrRescheduleFeeNotDue)
 	}
 	if rs.FeeType != enum.RescheduleFeeCharged || rs.FeeAmount <= 0 {
-		return nil, errs.BadRequest("本次改期无需支付调度费")
+		return nil, errs.BadRequest(errs.ErrRescheduleFeeFree)
 	}
 	existing, err := s.listRescheduleFeePayments(ctx, cu.CompanyID, rs)
 	if err != nil {
@@ -568,9 +568,9 @@ func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, re
 	for _, p := range existing {
 		switch p.Status {
 		case enum.PaymentStatusPending:
-			return nil, errs.BadRequest("调度费凭证已提交，请等待工作室核验")
+			return nil, errs.BadRequest(errs.ErrRescheduleFeeVoucherPending)
 		case enum.PaymentStatusConfirmed:
-			return nil, errs.BadRequest("调度费已核验到账，无需重复支付")
+			return nil, errs.BadRequest(errs.ErrRescheduleFeePaid)
 		}
 	}
 	p := model.OrderPayment{
@@ -610,7 +610,7 @@ func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUs
 		return err
 	}
 	if o.Status != enum.OrderStatusPendingDeposit && o.Status != enum.OrderStatusPendingShoot {
-		return errs.BadRequest("订单已进入拍摄流程，需求变更请联系工作室")
+		return errs.BadRequest(errs.ErrOrderInShooting)
 	}
 	updates := map[string]interface{}{"updated_by": cu.CustomerID}
 	if v := strings.TrimSpace(req.ShootAddress); v != "" {
@@ -626,7 +626,7 @@ func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUs
 		updates["remark"] = v
 	}
 	if len(updates) == 1 {
-		return errs.BadRequest("请至少填写一项需要修改的需求")
+		return errs.BadRequest(errs.ErrOrderRequestChangeEmpty)
 	}
 	if err := s.OrderRepo.Update(ctx, cu.CompanyID, orderID, updates); err != nil {
 		return err

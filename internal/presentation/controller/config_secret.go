@@ -35,7 +35,7 @@ func (h *Controller) ConfigEncrypt(c *gin.Context) {
 		return
 	}
 	if !cipher.Enabled() {
-		response.Fail(c, errs.Internal("未配置主密钥（APP_CONFIG_SECRET / APP_CONFIG_SECRET_FILE），无法加密"))
+		response.Fail(c, errs.Internal(errs.ErrConfigSecretMissing))
 		return
 	}
 

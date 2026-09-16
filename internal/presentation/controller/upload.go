@@ -36,10 +36,10 @@ func (h *Controller) UploadFile(c *gin.Context) {
 		// MaxBytesError 说明请求体超限（可能被 io.ErrUnexpectedEOF 包装，用 errors.As 兜底）
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			response.Fail(c, errs.BadRequest("文件大小超过限制"))
+			response.Fail(c, errs.BadRequest(errs.ErrFileTooLarge))
 			return
 		}
-		response.Fail(c, errs.BadRequest("请上传文件"))
+		response.Fail(c, errs.BadRequest(errs.ErrFileRequired))
 		return
 	}
 	defer file.Close()
@@ -48,14 +48,14 @@ func (h *Controller) UploadFile(c *gin.Context) {
 	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			response.Fail(c, errs.BadRequest("文件大小超过限制"))
+			response.Fail(c, errs.BadRequest(errs.ErrFileTooLarge))
 			return
 		}
-		response.Fail(c, errs.BadRequest("文件读取失败"))
+		response.Fail(c, errs.BadRequest(errs.ErrFileReadFailed))
 		return
 	}
 	if h.Cfg.Upload.MaxSizeMB > 0 && int64(len(data)) > int64(h.Cfg.Upload.MaxSizeMB)*1024*1024 {
-		response.Fail(c, errs.BadRequest("文件大小超过限制"))
+		response.Fail(c, errs.BadRequest(errs.ErrFileTooLarge))
 		return
 	}
 

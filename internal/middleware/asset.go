@@ -28,7 +28,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 			return
 		}
 		if m.tokenRevoked(c.Request.Context(), claims.ID) {
-			response.Fail(c, errs.Unauthorized("登录已失效，请重新登录"))
+			response.Fail(c, errs.Unauthorized(errs.ErrLoginExpired))
 			c.Abort()
 			return
 		}
@@ -42,7 +42,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 				return
 			}
 			if u.Status != 1 {
-				response.Fail(c, errs.Forbidden("账号已被停用"))
+				response.Fail(c, errs.Forbidden(errs.ErrAccountDisabled))
 				c.Abort()
 				return
 			}
@@ -58,7 +58,7 @@ func (m *Middlewares) AssetAuth() gin.HandlerFunc {
 				return
 			}
 			if u.Status != 2 {
-				response.Fail(c, errs.Forbidden("账号状态异常"))
+				response.Fail(c, errs.Forbidden(errs.ErrAccountStatusAbnormal))
 				c.Abort()
 				return
 			}

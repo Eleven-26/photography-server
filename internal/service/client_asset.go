@@ -23,10 +23,10 @@ func (s *Service) ClientAssets(ctx context.Context, companyID int64, page, pageS
 func (s *Service) ClientAssetDetail(ctx context.Context, companyID, id int64) (*model.Asset, error) {
 	a, err := s.AssetRepo.GetByID(ctx, companyID, id)
 	if err != nil {
-		return nil, errs.NotFound("作品不存在或未公开")
+		return nil, errs.NotFound(errs.ErrAssetNotFoundOrPrivate)
 	}
 	if a.Status != enum.AssetStatusPublished || a.Visibility != enum.AssetVisibilityPublic {
-		return nil, errs.NotFound("作品不存在或未公开")
+		return nil, errs.NotFound(errs.ErrAssetNotFoundOrPrivate)
 	}
 	// 浏览数自增失败不影响详情返回（计数属旁路数据）
 	if err := s.AssetRepo.IncrViewCount(ctx, companyID, id); err == nil {

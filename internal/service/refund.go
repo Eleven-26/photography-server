@@ -46,7 +46,7 @@ func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, 
 		}
 		// 申请基数不得超过剩余可退（全额比例 1.0 时也不至于超额）
 		if amount > refundable+domain.FenEps() {
-			return errs.BadRequest("退款金额超过订单剩余可退金额")
+			return errs.BadRequest(errs.ErrRefundExceedAmount)
 		}
 
 		// 同一订单只能有一张申请中的退款单（防多笔小额申请拆分审核绕过累计上限）
@@ -56,7 +56,7 @@ func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, 
 		}
 		for _, a := range applying {
 			if a.Status == enum.RefundStatusApplying {
-				return errs.BadRequest("该订单已有申请中的退款单，请先处理")
+				return errs.BadRequest(errs.ErrRefundExists)
 			}
 		}
 
@@ -68,7 +68,7 @@ func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, 
 			return errs.BadRequest(errs.ErrRefundNoTime)
 		}
 		if refundAmt > refundable+domain.FenEps() {
-			return errs.BadRequest("退款金额超过订单剩余可退金额")
+			return errs.BadRequest(errs.ErrRefundExceedAmount)
 		}
 
 		rf = &model.OrderRefund{
@@ -132,7 +132,7 @@ func (s *Service) AuditRefund(ctx context.Context, op Operator, id int64, approv
 			}
 			// 2.1 审核时二次校验：本次退款不得让累计退款超过已收（部分审核也受此约束）
 			if o.PaidAmt-o.RefundAmt < rf.Amount-domain.FenEps() {
-				return errs.BadRequest("退款金额超过订单剩余可退金额，无法通过")
+				return errs.BadRequest(errs.ErrRefundApproveExceed)
 			}
 			// 3. 累加订单已退金额（带租户过滤，同一事务连接）
 			newRefund := o.RefundAmt + rf.Amount

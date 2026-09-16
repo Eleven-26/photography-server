@@ -63,7 +63,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 			return
 		}
 		if m.tokenRevoked(c.Request.Context(), claims.ID) {
-			response.Fail(c, errs.Unauthorized("登录已失效，请重新登录"))
+			response.Fail(c, errs.Unauthorized(errs.ErrLoginExpired))
 			c.Abort()
 			return
 		}
@@ -81,7 +81,7 @@ func (m *Middlewares) CustomerAuth() gin.HandlerFunc {
 		}
 		// 客户状态校验（#28）：与 Auth/StaffAuth 的 Status 检查对齐——被停用/流失的客户禁止访问
 		if u.Status != 2 {
-			response.Fail(c, errs.Forbidden("账号不可用，请联系工作室"))
+			response.Fail(c, errs.Forbidden(errs.ErrClientAccountUnavailable))
 			c.Abort()
 			return
 		}
