@@ -174,6 +174,31 @@ var staffInclude = []string{
 	"/quote/status/:id",
 }
 
+// staffPublicExtra 员工端**免 StaffAuth** 的登录出口（挂 /wechat/staff）。
+//
+// 员工端登录方式集合（2026-09-14：主登录方式由「手机号+验证码」改为「账号+密码」，与 PC 一致）：
+//
+//	auth/login          账号+密码登录   ← 当前唯一被前端调用的方式，复用 PC 同一套凭据校验与失败锁定
+//	auth/sms-code       发送短信验证码  ← 保留（前端暂不调用）
+//	auth/login-by-code  手机验证码登录  ← 预留（后端已就绪，员工端 UI 未接入）
+//	（规划）auth/login-by-wechat        微信授权登录
+//
+// 三条路径全部公开、**不挂 StaffAuth** —— 登录本身发生在拿到令牌之前。
+// 故归入 PublicExtra（免端级中间件）而非 Extra（Extra 会叠加 Middlewares）。
+//
+// 注意：sms-code 与 login-by-code 是一对，只留发码接口而摘掉登录接口等于能力残缺，
+// 故两者一并保留；将来接验证码登录时前端直接调它们即可，无需再动后端。
+//
+// 2026-09-16 之前这三条内联在 presentation/wechat/staff.go 的 RegisterStaffPublic 里，
+// 是唯一游离于声明之外的路由（该文件因此既放 handler 又放路由清单）。
+func staffPublicExtra(wc *wechat.Controller) []routes.Route {
+	return []routes.Route{
+		{Path: "/auth/sms-code", Handler: wc.StaffSmsCode},
+		{Path: "/auth/login", Handler: wc.StaffPasswordLogin},
+		{Path: "/auth/login-by-code", Handler: wc.StaffLoginByCode},
+	}
+}
+
 // staffEndpoint 员工端（挂 /wechat/staff，员工认证 + 操作日志）。
 func staffEndpoint(wc *wechat.Controller, ctl *controller.Controller, mw *middleware.Middlewares) endpoint.Endpoint {
 	return endpoint.Endpoint{
@@ -182,6 +207,7 @@ func staffEndpoint(wc *wechat.Controller, ctl *controller.Controller, mw *middle
 		Middlewares: []gin.HandlerFunc{mw.StaffAuth(), mw.OperationLog()},
 		Include:     staffInclude,
 		Extra:       staffExtra(wc, ctl),
+		PublicExtra: staffPublicExtra(wc),
 	}
 }
 

@@ -80,25 +80,29 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	endpoint.Mount(api, pcEndpoint(mw), commonRoutes, mw)
 	endpoint.Mount(api, miniappEndpoint(mw), commonRoutes, mw)
 
-	// ---- 客户 H5（客户验证码登录 + CustomerAuth）----
+	// ---- 客户区（H5 与小程序客户区共用同一份路由表）----
+	// 路由声明在 routes 包：ClientPublic（免登录）/ ClientAuthed（分组挂 CustomerAuth）。
+	// 两个端引用的是**同一份 []Route** —— 同一 Route 实例、同一 Handler 函数指针，
+	// 仅挂载分组不同。两端口径由构造保证，不再依赖"记得两边一起改"（routes_test 亦据此断言）。
+	// 此前客户区是唯一命令式内联注册（g.POST 48 条）的端，游离在声明式表与跨端护栏之外。
 	h5Ctl := h5.New(svc, cfg)
-	h5Pub := api.Group("/h5")
-	h5Ctl.RegisterPublic(h5Pub)
-	h5Auth := api.Group("/h5", mw.CustomerAuth())
-	h5Ctl.RegisterAuthed(h5Auth)
+	clientPublic := routes.ClientPublic(h5Ctl)
+	clientAuthed := routes.ClientAuthed(h5Ctl)
 
-	// ---- 微信小程序（移动端统一入口）----
+	// 客户 H5：/h5（公开）+ /h5 + CustomerAuth（客户验证码登录，令牌 → 客户上下文）
+	endpoint.MountTable(api.Group("/h5"), clientPublic)
+	endpoint.MountTable(api.Group("/h5", mw.CustomerAuth()), clientAuthed)
+
+	// 微信小程序（移动端统一入口）：客户区 /wechat 与 H5 同源（同一份表，仅前缀不同）
+	endpoint.MountTable(api.Group("/wechat"), clientPublic)
+	endpoint.MountTable(api.Group("/wechat", mw.CustomerAuth()), clientAuthed)
+
+	// ---- 微信小程序员工区（员工账号密码登录 + StaffAuth）----
+	// 摄影师/助理用小程序处理订单、日程、线索 AI 简报。含三类路由（见 endpoints.go）：
+	//   Include     复用 PC 管理端同一 Handler；
+	//   Extra       异路径别名 / 端差异实现 / 移动端独有；
+	//   PublicExtra 登录出口 /wechat/staff/auth/*（登录发生在拿到令牌之前，不挂 StaffAuth）。
 	wcCtl := wechat.New(svc, cfg)
-	// 客户区（客户验证码登录 + CustomerAuth）：一份实现挂 /wechat，与 H5 同源
-	wcPub := api.Group("/wechat")
-	wcCtl.RegisterPublic(wcPub)
-	wcAuth := api.Group("/wechat", mw.CustomerAuth())
-	wcCtl.RegisterAuthed(wcAuth)
-	// 员工区（员工账号密码登录 + StaffAuth）：摄影师/助理用小程序处理订单、日程、线索
-	// 公开登录出口挂 /wechat/staff/auth/*（account+password；短信验证码登录为预留能力）
-	// 共享 PC 路由子集 + 员工端独有路由，均引用同一 handler（见 endpoints.go）
-	wcStaffPub := api.Group("/wechat/staff")
-	wcCtl.RegisterStaffPublic(wcStaffPub)
 	endpoint.Mount(api, staffEndpoint(wcCtl, ctl, mw), commonRoutes, mw)
 
 	// 调试路由（配置密文生成 + [仅 debug 构建] 基础设施读写实验，均无业务鉴权）：

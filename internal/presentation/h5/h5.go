@@ -1,3 +1,10 @@
+// Package h5 客户 H5 端接口（客户预约全链路：浏览套餐 → 提交预约 → 支付定金 →
+// 选片 → 确认成片 → 评价）。公开接口无需登录，业务接口经 CustomerAuth 注入客户上下文。
+//
+// 路由注册自 2026-09-16 起**不在本包**：客户区 48 条路由声明于
+// presentation/routes/client.go 的 ClientPublic / ClientAuthed，由 router 按端与鉴权分组挂载，
+// 且 H5 与小程序客户区引用**同一份 []Route**（同一 Handler 函数指针）。
+// 本文件只承载 handler 实现与端内辅助（slugFrom / staffFrom / requireCompany）。
 package h5
 
 import (
@@ -27,89 +34,11 @@ func New(svc *service.Service, cfg *config.Config) *Controller {
 	return &Controller{Svc: svc, Cfg: cfg}
 }
 
-// RegisterPublic 注册公开路由（无需登录；租户由 slug 短链标识定位——query slug / X-Slug 头，
-// 服务端反查 company_id，#29 移除裸 company_id 防遍历枚举）
-func (h *Controller) RegisterPublic(g *gin.RouterGroup) {
-	g.POST("/auth/sms-code", h.SmsCode)
-	g.POST("/auth/login", h.Login)
-	g.POST("/package/list", h.PackageList)
-	g.POST("/package/detail/:id", h.PackageDetail)
-	g.POST("/studio/info", h.StudioInfo)
-	g.POST("/slot/list", h.SlotList)
-	g.POST("/custom-request/submit", h.CustomRequestSubmit)
-	// 作品集（报告 H5）：预约主页展示，只出「已发布 + 公开」作品
-	g.POST("/asset/list", h.AssetList)
-	g.POST("/asset/detail/:id", h.AssetDetail)
-}
-
-// RegisterAuthed 注册需登录路由（CustomerAuth 注入 ClientUser）
-//
-// 口径说明（2026-09-12 联调补齐）：
-//   - 所有接口一律 **POST + JSON body**，路径参数用 :id/:order_id（后端不读 query，见 pkg/params）；
-//   - `/delivery/detail/:id` 与 `/delivery/items/:id` 的 :id 均为 **order_id**（与 PC 端同语义，
-//     按订单反查交付单）；真正的 delivery_id 出现在 `/delivery/select/:id` 等推进类接口上；
-//   - 列表统一 `response.PageOK`（`{list,total,page,page_size}`），
-//     逐单明细（退款/收款/改期）为不分页的业务集合，沿用 PC 同路径的裸数组口径。
-func (h *Controller) RegisterAuthed(g *gin.RouterGroup) {
-	// 预约/订单
-	g.POST("/order/submit", h.BookingSubmit)
-	g.POST("/order/confirm/:id", h.BookingConfirm)
-	g.POST("/order/cancel/:id", h.BookingCancel)
-	g.POST("/order/list", h.OrderList)
-	g.POST("/order/detail/:id", h.OrderDetail)
-	// 拍前准备已读（biz_order.prep_read_at）
-	g.POST("/order/prep/read/:id", h.OrderPrepRead)
-	// 改期
-	g.POST("/reschedule/apply/:order_id", h.RescheduleApply)
-	g.POST("/reschedule/cancel/:id", h.RescheduleCancel)
-	g.POST("/reschedule/list/:order_id", h.RescheduleList)
-	// 退款
-	g.POST("/refund/apply/:order_id", h.RefundApply)
-	g.POST("/refund/list/:order_id", h.RefundList)
-	g.POST("/refund/confirm/:id", h.RefundConfirm)
-	// 收款：记录 / 登记转账（资金不经平台，仅登记） / 收款方式
-	g.POST("/payment/list/:order_id", h.PaymentList)
-	g.POST("/pay/mark", h.PaymentMark)
-	g.POST("/payment-method/list", h.PaymentMethods)
-	// 评价
-	g.POST("/review/create/:order_id", h.ReviewCreate)
-	// 我的评价（客户中心 → 我的评价；只读，按令牌内 customer_id 锁定归属）
-	g.POST("/review/list", h.ReviewList)
-	// 选片与交付
-	g.POST("/delivery/detail/:id", h.DeliveryDetail)
-	g.POST("/delivery/items/:id", h.DeliveryItems)
-	g.POST("/delivery/select/:id", h.SelectPhotos)
-	g.POST("/delivery/confirm-extra/:id", h.ConfirmExtra)
-	g.POST("/delivery/confirm/:id", h.ConfirmDelivery)
-	g.POST("/delivery/feedback/:item_id", h.FeedbackSubmit)
-	// 定制需求
-	g.POST("/custom-request/list", h.CustomRequestList)
-	// 客户中心（H5 CC01）：个人资料读写。
-	// 字段白名单见 dto.ClientProfileUpdateReq —— crm_customer 与员工端共用一张表，
-	// remark / tags / level / source / status 属工作室内部信息，不在客户端可改范围。
-	g.POST("/customer/profile", h.CustomerProfile)
-	g.POST("/customer/profile/update", h.CustomerProfileUpdate)
-	// 定制需求页「选择门店 → 选择摄影师」的候选（仅客户历史服务过的门店/摄影师，
-	// 外加本次分享链接的分享人；见 service.ClientPhotographerOptions）
-	g.POST("/customer/photographer-options", h.PhotographerOptions)
-	// 报价（报告 H1）：列表 / 详情 / 接受 / 提出修改
-	g.POST("/quote/list", h.QuoteList)
-	g.POST("/quote/detail/:id", h.QuoteDetail)
-	g.POST("/quote/accept/:id", h.QuoteAccept)
-	g.POST("/quote/modify/:id", h.QuoteModify)
-	// 改期调度费（报告 H2）：详情含支付状态，支付走「上传凭证 → 工作室核验」
-	g.POST("/reschedule/detail/:id", h.RescheduleDetail)
-	g.POST("/reschedule/pay/:id", h.ReschedulePay)
-	// 加片费试算（报告 H3）
-	g.POST("/delivery/extra-quote/:id", h.ExtraQuote)
-	// 拍摄需求修改（报告 H4）
-	g.POST("/order/requirement/update/:id", h.OrderRequirementUpdate)
-	// 站内通知（报告 H6）
-	g.POST("/notification/list", h.NotificationList)
-	g.POST("/notification/unread-count", h.NotificationUnreadCount)
-	g.POST("/notification/read/:id", h.NotificationRead)
-	g.POST("/notification/read-all", h.NotificationReadAll)
-}
+// 路由注册已迁出本文件（2026-09-16）：
+// 客户区 48 条路由现声明在 presentation/routes/client.go 的 ClientPublic / ClientAuthed，
+// 由 router 按端与鉴权分组挂载 —— H5 与小程序客户区引用的是同一份 []Route
+// （同一 Handler 函数指针），两端口径由构造保证，护栏测试亦可覆盖。
+// 本文件从此只保留 handler 实现与辅助函数。
 
 // slugFrom 提取客户端公开接口的预约主页短链标识：query slug 与 X-Slug 头二选一（头优先）。
 // slug 形如 "sunset-studio"，为工作室预约主页 URL/二维码携带的不可枚举标识（#29），

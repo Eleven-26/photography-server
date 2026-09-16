@@ -27,6 +27,12 @@ type Endpoint struct {
 	Include []string
 	// Extra 端独有路由：异路径别名（Handler 仍复用公共实现）与真实端差异实现。
 	Extra []routes.Route
+	// PublicExtra 免本端分组中间件的路由。挂在同一 Prefix 下，但**不叠加** Middlewares。
+	//
+	// 存在的理由：登录出口天然不能挂认证中间件——令牌正是在这些接口里签发的。
+	// 员工端此前把三条登录路由内联在 presentation/wechat/staff.go 里自行 g.POST，
+	// 是唯一游离于声明之外的路由；现纳入声明，handler 文件不再掺路由。
+	PublicExtra []routes.Route
 }
 
 // Mount 在 parent 下新建分组并挂载端点声明的全部路由。
@@ -41,6 +47,24 @@ func Mount(parent *gin.RouterGroup, ep Endpoint, common []routes.Route, mw *midd
 	}
 	for _, r := range ep.Extra {
 		post(g, r, mw)
+	}
+	// 免本端中间件的路由另起一个同前缀分组（不能再叠加 ep.Middlewares）。
+	if len(ep.PublicExtra) > 0 {
+		pg := parent.Group(ep.Prefix)
+		for _, r := range ep.PublicExtra {
+			post(pg, r, mw)
+		}
+	}
+}
+
+// MountTable 把一份完整路由表全量挂到已有分组 g 上。
+//
+// 与 Mount 的区别：Mount 面向"端声明"（有 Include 裁剪与 Extra 补充），本函数面向
+// "一张已经分好组的表"——客户区公开表与鉴权表各自完整，鉴权由调用方选定的分组中间件
+// （CustomerAuth）承担，而非权限点。故此处不做裁剪、不挂分组中间件。
+func MountTable(g *gin.RouterGroup, rs []routes.Route) {
+	for _, r := range rs {
+		post(g, r, nil)
 	}
 }
 

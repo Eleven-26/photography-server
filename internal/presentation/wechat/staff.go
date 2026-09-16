@@ -18,23 +18,11 @@ import (
 // 本文件只保留【员工端独有 handler】与【真实端差异实现】（退款审核 approve / 创建交付单不收 body）。
 // Controller 类型与 New 构造见 wechat.go。
 
-// RegisterStaffPublic 注册员工区公开路由（挂 /wechat/staff）。
-//
-// 员工端**登录方式集合**（2026-09-14：主登录方式由「手机号+验证码」改为「账号+密码」，与 PC 一致）：
-//
-//	auth/login          账号+密码登录   ← 当前唯一被前端调用的方式，复用 PC 同一套凭据校验与失败锁定
-//	auth/sms-code       发送短信验证码  ← 保留（前端暂不调用）
-//	auth/login-by-code  手机验证码登录  ← 预留（后端已就绪，员工端 UI 未接入）
-//	（规划）auth/login-by-wechat        微信授权登录
-//
-// 三条路径全部公开、不挂 StaffAuth —— 登录本身发生在拿到令牌之前。
-// 注意：sms-code 与 login-by-code 是一对，只留发码接口而摘掉登录接口等于能力残缺，
-// 故两者一并保留；将来接验证码登录时前端直接调它们即可，无需再动后端。
-func (h *Controller) RegisterStaffPublic(g *gin.RouterGroup) {
-	g.POST("/auth/sms-code", h.StaffSmsCode)
-	g.POST("/auth/login", h.StaffPasswordLogin)
-	g.POST("/auth/login-by-code", h.StaffLoginByCode)
-}
+// 路由注册已迁出本文件（2026-09-16）：
+// 员工端三条登录出口（auth/sms-code、auth/login、auth/login-by-code）现声明在
+// router/endpoints.go 的 staffPublicExtra —— 它们必须在拿到令牌之前可用，故单独归为
+// 「免端级中间件」的路由，而不是内联在本文件里 g.POST。
+// 与 PC 同路径的路由见 staffInclude，端独有的见 staffExtra；本文件从此只保留 handler。
 
 // ---------------------------------------------------------------------
 // 公开接口
