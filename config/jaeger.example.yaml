@@ -31,14 +31,14 @@ extensions:
         clickhouse:
           # compose 网络内用服务名；宿主机直连调试改为 127.0.0.1:9000
           addresses:
-            - clickhouse:9000
+            - photography-clickhouse:9000
           database: jaeger
           # compose 的 clickhouse 服务若设置了 CLICKHOUSE_USER/CLICKHOUSE_PASSWORD，
           # 需在此加 basic auth（username/password），两处保持一致；未设密码则删除本段
-          # auth:
-          #   basic:
-          #     username: default
-          #     password: ""
+          auth:
+            basic:
+              username: root
+              password: root
           create_schema: true   # 启动自动建 spans/索引表（首次启动必须）
           # ttl: 720h           # 数据保留时长，过期由 ClickHouse 自动清理（0/缺省=不清理）
   jaeger_query:
@@ -55,16 +55,16 @@ receivers:
 
 processors:
   batch:
-    # 默认即可；高吞吐可调 timeout/send_batch_size
+  # 默认即可；高吞吐可调 timeout/send_batch_size
 
 exporters:
   jaeger_storage_exporter:
     trace_storage: clickhouse-storage
 
 service:
-  extensions: [jaeger_storage, jaeger_query]
+  extensions: [ jaeger_storage, jaeger_query ]
   pipelines:
     traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [jaeger_storage_exporter]
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ jaeger_storage_exporter ]

@@ -209,8 +209,8 @@ services:
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-jaeger}   # 启动时自动创建该库（Jaeger 不自己建库）
       # 可选加固：设 CLICKHOUSE_USER/CLICKHOUSE_PASSWORD 后，须同步到 config/jaeger 配置的 auth.basic
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-root}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-root}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "${CLICKHOUSE_PORT:-9000}:9000"          # native 协议（Jaeger 连接用）
