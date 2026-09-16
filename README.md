@@ -188,56 +188,10 @@ HTTP 入口（方便新增字段时在线生成密文，**只加密不解密**�
 
 ⚠️ **生产部署前置条件**：`prod` 模板里有 `ENCv1` 密文，**部署环境必须先配置 KEK**（`APP_CONFIG_SECRET_FILE` 或 `APP_CONFIG_SECRET`），否则服务启动 fail-fast。应急可直接用 `APP_MONGODB_URI` 等 env 覆盖（env 优先级最高）。
 
-## Docker 部署
-```bash
-# 把配置复制出来并修改成真实值
-
-# 创建所有配置目录
-mkdir -p volume/horizon volume/jaeger volume/nats/conf
-
-# 复制，需要手动改值
-cp ./photography-server/.env.example .env
-cp ./photography-server/docker-compose.yml docker-compose.yml
-
-# 复制根目录配置文件，需要手动改值
-cp ./photography-server/config/horizon.example.yaml ./volume/horizon/horizon.yaml
-cp ./photography-server/config/jaeger.example.yaml ./volume/jaeger/config.yaml
-cp ./photography-server/config/nats.example.conf ./volume/nats/conf/nats.conf
-
-# 目录结构
-prod
-├── photography-server
-├── photography-frontend
-├── photography-wechat
-├── photography-h5
-├── volume # 存放挂载数据
-├── .env
-├── docker-compose.yml
-
-# 在prod目录下执行
-docker compose up -d --build
+## docker-compose 部署
 ```
-
-| 服务 | 宿主机端口 | 说明 |
-|------|-----------|------|
-| backend | 8080 | Go 后端 API |
-| frontend | 8081 | PC 管理后台（Nginx 反代 `/api`） |
-| h5 | 8082 | H5 预约站（uni-app H5 产物） |
-| wechat | 8083 | 微信小程序员工端（uni-app 产物） |
-| mysql | 3306 | 数据库（photography 库） |
-| redis | 6379 | 缓存 |
-| nats | 4222 / 8222 | 消息队列 / 监控 |
-| xxl-job-admin | 9100 | 任务调度中心 |
-| elasticsearch | 9200 | 搜索引擎 |
-| mongo | 27017 | 文档数据库 |
-| skywalking-oap | 11800 / 12800 | 链路追踪后端①（skywalking-go native agent 上报 / 查询） |
-| skywalking-ui | 9080 | 链路追踪 UI①（Horizon） |
-| skywalking-banyandb | 17912 / 17913 | 链路追踪存储①（BanyanDB） |
-| jaeger | 4317 / 16686 | 链路追踪后端②（OTel OTLP 上报 / Jaeger UI） |
-| clickhouse | 9000 | 链路追踪存储②（Jaeger 数据落库） |
-| nacos | 8848 / 9848 | 配置中心/注册中心（控制台 / SDK gRPC，9848=8848+1000 不可改） |
-
-后端容器的**业务配置**（db/redis/nats/mongodb/elasticsearch/xxljob/jwt/upload/log/jaeger）全部来自 Nacos，不再用 `APP_*` 环境变量注入，连接地址在 Nacos 模板里指向 compose 服务名；容器 env 只保留 `APP_PROFILE` + `APP_NACOS_*`（连接自举）+ `APP_CONFIG_SECRET*`（密文主密钥）。
+参考文档：./docs/docker-compose部署流程.md
+```
 
 ### 链路追踪（两通道各自独立）
 
