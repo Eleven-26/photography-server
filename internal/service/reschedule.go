@@ -7,12 +7,12 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 )
 
 // 管理端改期。
@@ -32,7 +32,7 @@ func (s *Service) ListOrderReschedules(ctx context.Context, op Operator, orderID
 
 // ApplyOrderReschedule 管理端发起改期（apply_source=1）。
 // 费用档位、可改期状态、重复申请校验与客户申请链路保持一致，避免两套规则打架。
-func (s *Service) ApplyOrderReschedule(ctx context.Context, op Operator, orderID int64, req dto.RescheduleApplyReq) (*model.OrderReschedule, error) {
+func (s *Service) ApplyOrderReschedule(ctx context.Context, op Operator, orderID int64, req contract.RescheduleApplyReq) (*model.OrderReschedule, error) {
 	if req.NewDate == "" || req.NewTime == "" {
 		return nil, errs.BadRequest(errs.ErrRescheduleDateRequired)
 	}

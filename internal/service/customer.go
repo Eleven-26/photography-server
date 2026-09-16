@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 )
 
 func (s *Service) ListCustomers(ctx context.Context, op Operator, page, pageSize int, keyword string) ([]model.Customer, int64, error) {
@@ -31,7 +31,7 @@ func (s *Service) GetCustomer(ctx context.Context, op Operator, id int64) (*mode
 	return c, nil
 }
 
-func (s *Service) CreateCustomer(ctx context.Context, op Operator, req dto.CustomerCreateReq) (*model.Customer, error) {
+func (s *Service) CreateCustomer(ctx context.Context, op Operator, req contract.CustomerCreateReq) (*model.Customer, error) {
 	c := model.Customer{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -60,7 +60,7 @@ func (s *Service) CreateCustomer(ctx context.Context, op Operator, req dto.Custo
 	return &c, nil
 }
 
-func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req dto.CustomerUpdateReq) error {
+func (s *Service) UpdateCustomer(ctx context.Context, op Operator, id int64, req contract.CustomerUpdateReq) error {
 	cur, err := s.CustomerRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrCustomerNotFound)
@@ -112,13 +112,13 @@ func allowNotifyPtr(v *int) *int {
 	return v
 }
 
-func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*dto.CustomerStatsResp, error) {
+func (s *Service) GetCustomerStats(ctx context.Context, op Operator) (*contract.CustomerStatsResp, error) {
 	st, err := s.CustomerRepo.GetStats(ctx, op.CompanyID)
 	if err != nil {
 		return nil, err
 	}
 	// repository 返回自持结构，service 负责映射为对外 dto
-	return &dto.CustomerStatsResp{
+	return &contract.CustomerStatsResp{
 		Total:           st.Total,
 		Potential:       st.Potential,
 		Active:          st.Active,

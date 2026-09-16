@@ -10,11 +10,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 // clientCatalog 客户端（H5/小程序）公开目录能力：
@@ -64,7 +64,7 @@ func (s *Service) ClientStudioInfo(ctx context.Context, companyID int64) (*model
 
 // ClientSlots 指定日期的可约时段：按档期模板展开，并排除已被档期锁占用的时段。
 // 返回时段列表 + 是否可约。
-func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string, photographerID int64) ([]dto.ClientSlot, error) {
+func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string, photographerID int64) ([]contract.ClientSlot, error) {
 	if date == "" {
 		return nil, errs.BadRequest(errs.ErrDateRequired)
 	}
@@ -95,13 +95,13 @@ func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string,
 		occupied[b.TimeRange] = true
 	}
 
-	slots := make([]dto.ClientSlot, 0, len(templates))
+	slots := make([]contract.ClientSlot, 0, len(templates))
 	for _, t := range templates {
 		if t.Weekday != weekday {
 			continue
 		}
 		tr := fmt.Sprintf("%s-%s", t.StartTime, t.EndTime)
-		slots = append(slots, dto.ClientSlot{
+		slots = append(slots, contract.ClientSlot{
 			StartTime: t.StartTime,
 			EndTime:   t.EndTime,
 			Available: !occupied[tr] && !occupied[t.StartTime],
@@ -119,7 +119,7 @@ func (s *Service) ClientSlots(ctx context.Context, companyID int64, date string,
 // 显式选择优先，分享链接兜底 —— 客户从个人中心进来（URL 无 staff_id）也能指定摄影师，
 // 而不是只能靠链接归属。两者都缺失时落 store_id 对应门店或公共池（store_id=0），
 // 由工作室后续指派/认领。
-func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64, cu *ClientUser, req dto.ClientCustomRequestReq, staffID int64) (*model.CustomRequest, error) {
+func (s *Service) ClientSubmitCustomRequest(ctx context.Context, companyID int64, cu *ClientUser, req contract.ClientCustomRequestReq, staffID int64) (*model.CustomRequest, error) {
 	if req.ProjectType == "" {
 		return nil, errs.BadRequest(errs.ErrBookingProjectTypeRequired)
 	}

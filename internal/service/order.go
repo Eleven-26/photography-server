@@ -7,12 +7,12 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -20,7 +20,7 @@ func (s *Service) ListOrders(ctx context.Context, op Operator, page, pageSize in
 	return s.OrderRepo.List(ctx, op.CompanyID, page, pageSize, status, customerID)
 }
 
-func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*dto.OrderDetail, error) {
+func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*contract.OrderDetail, error) {
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
@@ -49,7 +49,7 @@ func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*d
 		transitions = append(transitions, int(st))
 	}
 
-	return &dto.OrderDetail{
+	return &contract.OrderDetail{
 		Order:              o,
 		Payments:           payments,
 		Refunds:            refunds,
@@ -65,7 +65,7 @@ func (s *Service) GetOrderDetail(ctx context.Context, op Operator, id int64) (*d
 //  2. 客户必须属于本公司（防跨租户挂单）；
 //  3. AddonAmount 不得为负（防把订单总额压到极低/负）；
 //  4. 金额以"分"计算并由 Total-Deposit 推导 Final（#24），快照同步客户姓名/手机号。
-func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCreateReq) (*model.Order, error) {
+func (s *Service) CreateOrder(ctx context.Context, op Operator, req contract.OrderCreateReq) (*model.Order, error) {
 	pkg, err := s.PackageRepo.GetByID(ctx, op.CompanyID, req.PackageID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrPackageNotFound)
@@ -178,7 +178,7 @@ func (s *Service) CreateOrder(ctx context.Context, op Operator, req dto.OrderCre
 	return &o, nil
 }
 
-func (s *Service) UpdateOrder(ctx context.Context, op Operator, id int64, req dto.OrderUpdateReq) error {
+func (s *Service) UpdateOrder(ctx context.Context, op Operator, id int64, req contract.OrderUpdateReq) error {
 	o, err := s.OrderRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrOrderNotFound)

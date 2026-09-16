@@ -3,11 +3,11 @@ package wechat
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 // 小程序员工区接口（订单处理 + 日程 + 线索 AI 简报 + 个人中心）。
@@ -144,7 +144,7 @@ func (h *Controller) RescheduleAudit(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffRescheduleAuditReq
+	var req contract.StaffRescheduleAuditReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -250,7 +250,7 @@ func (h *Controller) BriefConfirm(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffBriefConfirmReq
+	var req contract.StaffBriefConfirmReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -288,7 +288,7 @@ func (h *Controller) ReviewReply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffReviewReplyReq
+	var req contract.StaffReviewReplyReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -344,7 +344,7 @@ func (h *Controller) TodayFollow(c *gin.Context) {
 // CustomerMobileUpdate 修改客户手机号（换绑，含格式与占用校验）
 func (h *Controller) CustomerMobileUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.StaffCustomerMobileReq
+	var req contract.StaffCustomerMobileReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -384,7 +384,7 @@ func (h *Controller) FeedbackHandle(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffFeedbackHandleReq
+	var req contract.StaffFeedbackHandleReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -433,7 +433,7 @@ func (h *Controller) StaffMobileCode(c *gin.Context) {
 // StaffChangeMobile 校验验证码并换绑本人手机号（body: {code, new_mobile}）
 func (h *Controller) StaffChangeMobile(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.StaffChangeMobileReq
+	var req contract.StaffChangeMobileReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -449,10 +449,10 @@ func (h *Controller) StaffChangeMobile(c *gin.Context) {
 // 意见反馈（免权限点：提交人本人）
 // ---------------------------------------------------------------------
 
-// FeedbackSubmit 提交意见反馈（body: dto.FeedbackSubmitReq）
+// FeedbackSubmit 提交意见反馈（body: contract.FeedbackSubmitReq）
 func (h *Controller) FeedbackSubmit(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.FeedbackSubmitReq
+	var req contract.FeedbackSubmitReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

@@ -63,7 +63,7 @@ func (r *CustomerRepo) Delete(ctx context.Context, companyID, customerID int64) 
 	return r.tenant(companyID).WithContext(ctx).Delete(&model.Customer{}, customerID).Error
 }
 
-// CustomerStats 客户统计（仓储自持的领域结构，避免反向依赖 presentation/dto）
+// CustomerStats 客户统计（仓储自持的领域结构，仓储层不依赖契约层 internal/contract）
 type CustomerStats struct {
 	Total        int64
 	Potential    int64

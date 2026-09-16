@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 )
 
 // orderRemarkMaxRunes 订单备注列（varchar(500)）的安全上限，留出余量按 rune 截断。
@@ -26,7 +26,7 @@ const orderRemarkMaxRunes = 480
 // （查不到则建档，见 FindOrCreateCustomerByMobile）。
 //
 // 建单成功后把需求标记为「已响应」并写入转单说明，避免同一需求被重复转单。
-func (s *Service) ConvertCustomRequestToOrder(ctx context.Context, op Operator, id int64, req dto.OrderCreateReq) (*model.Order, error) {
+func (s *Service) ConvertCustomRequestToOrder(ctx context.Context, op Operator, id int64, req contract.OrderCreateReq) (*model.Order, error) {
 	if req.PackageID <= 0 {
 		return nil, errs.BadRequest(errs.ErrCustomRequestPackageRequired)
 	}

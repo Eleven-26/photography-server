@@ -3,17 +3,17 @@ package service
 import (
 	"context"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 func (s *Service) ListCalendar(ctx context.Context, op Operator, startDate, endDate string, photographerID int64) ([]model.CalendarBlock, error) {
 	return s.CalendarRepo.List(ctx, op.CompanyID, startDate, endDate, photographerID)
 }
 
-func (s *Service) BlockCalendar(ctx context.Context, op Operator, req dto.CalendarBlockReq) (*model.CalendarBlock, error) {
+func (s *Service) BlockCalendar(ctx context.Context, op Operator, req contract.CalendarBlockReq) (*model.CalendarBlock, error) {
 	block := model.CalendarBlock{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},

@@ -5,7 +5,7 @@ import (
 
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/presentation/response"
+	"photography-server/internal/pkg/response"
 )
 
 // AssetAuth 静态资源（/uploads）访问鉴权中间件（#9）：

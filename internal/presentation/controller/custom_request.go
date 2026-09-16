@@ -3,10 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 // CustomRequestList 定制需求列表（管理端）。
@@ -34,7 +34,7 @@ func (h *Controller) CustomRequestRespond(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffCustomRequestRespondReq
+	var req contract.StaffCustomRequestRespondReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -55,7 +55,7 @@ func (h *Controller) CustomRequestConvert(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.OrderCreateReq
+	var req contract.OrderCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

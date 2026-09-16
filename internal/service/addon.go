@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -29,7 +29,7 @@ func (s *Service) ListOrderAddons(ctx context.Context, op Operator, orderID int6
 }
 
 // CreateOrderAddon 新增加项：写加项 + 重算订单金额（同事务）
-func (s *Service) CreateOrderAddon(ctx context.Context, op Operator, orderID int64, req dto.OrderAddonReq) (*model.OrderAddon, error) {
+func (s *Service) CreateOrderAddon(ctx context.Context, op Operator, orderID int64, req contract.OrderAddonReq) (*model.OrderAddon, error) {
 	o, err := s.ensureOrderEditable(ctx, op.CompanyID, orderID)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (s *Service) CreateOrderAddon(ctx context.Context, op Operator, orderID int
 }
 
 // UpdateOrderAddon 修改加项：更新加项 + 重算订单金额（同事务）
-func (s *Service) UpdateOrderAddon(ctx context.Context, op Operator, addonID int64, req dto.OrderAddonReq) (*model.OrderAddon, error) {
+func (s *Service) UpdateOrderAddon(ctx context.Context, op Operator, addonID int64, req contract.OrderAddonReq) (*model.OrderAddon, error) {
 	a, err := s.AddonRepo.GetByID(ctx, op.CompanyID, addonID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrAddonNotFound)

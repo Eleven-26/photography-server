@@ -6,11 +6,11 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/presentation/dto"
 )
 
 // Login 登录（PC 管理后台 / 小程序管理后台）。ctx 由 controller 传入
@@ -20,7 +20,7 @@ import (
 // 凭据校验（bcrypt 比对 + 失败锁定）已抽到 verifyPasswordCredential，与员工端
 // 账号密码登录（StaffPasswordLogin）共用同一实现——两端的限流口径与错误文案
 // 必须一致，各写一份必然漂移出安全缺口。
-func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req dto.LoginReq, ip string) (*dto.LoginResp, error) {
+func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours int, req contract.LoginReq, ip string) (*contract.LoginResp, error) {
 	u, err := s.verifyPasswordCredential(ctx, req.Username, req.Password, ip)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (s *Service) Login(ctx context.Context, secret, issuer string, expireHours 
 	s.AuthRepo.UpdateLoginInfo(ctx, u.ID, ip)
 
 	u.Password = ""
-	return &dto.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
+	return &contract.LoginResp{Token: token, User: s.buildUserInfo(ctx, u)}, nil
 }
 
 // verifyPasswordCredential 账号密码凭据校验（含失败限流），
@@ -117,7 +117,7 @@ func (s *Service) verifyPasswordCredential(ctx context.Context, username, passwo
 	return u, nil
 }
 
-func (s *Service) Profile(ctx context.Context, op Operator) (*dto.UserInfoVO, error) {
+func (s *Service) Profile(ctx context.Context, op Operator) (*contract.UserInfoVO, error) {
 	u, err := s.AuthRepo.GetByID(ctx, op.CompanyID, op.UserID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrUserNotFound)
@@ -134,8 +134,8 @@ func (s *Service) Profile(ctx context.Context, op Operator) (*dto.UserInfoVO, er
 //
 // admin 角色在此补齐全量权限点：后端判定靠角色码短路，但前端渲染菜单/按钮需要
 // 具体清单，否则管理员界面会被自身权限判定误隐藏。
-func (s *Service) buildUserInfo(ctx context.Context, u *model.SysUser) dto.UserInfoVO {
-	vo := dto.UserInfoVO{SysUser: *u, Permissions: []string{}}
+func (s *Service) buildUserInfo(ctx context.Context, u *model.SysUser) contract.UserInfoVO {
+	vo := contract.UserInfoVO{SysUser: *u, Permissions: []string{}}
 	if u.RoleID <= 0 {
 		return vo
 	}

@@ -7,11 +7,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -24,7 +24,7 @@ var paymentTypeSet = map[string]bool{"deposit": true, "final": true, "addon": tr
 //  2. Type 必须为 deposit/final/addon 白名单；
 //  3. 申请金额不得超过订单剩余应收（total_amt - paid_amt），防止超额收款；
 //  4. 累计校验在确认收款事务内加行锁再做最终判定（见 ConfirmPayment）。
-func (s *Service) CreatePayment(ctx context.Context, op Operator, orderID int64, req dto.PaymentCreateReq) (*model.OrderPayment, error) {
+func (s *Service) CreatePayment(ctx context.Context, op Operator, orderID int64, req contract.PaymentCreateReq) (*model.OrderPayment, error) {
 	if req.Amount <= 0 {
 		return nil, errs.BadRequest(errs.ErrPaymentAmountPositive)
 	}

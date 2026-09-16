@@ -3,11 +3,11 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) LeadList(c *gin.Context) {
@@ -40,7 +40,7 @@ func (h *Controller) LeadDetail(c *gin.Context) {
 
 func (h *Controller) LeadCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.LeadCreateReq
+	var req contract.LeadCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -60,7 +60,7 @@ func (h *Controller) LeadUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.LeadUpdateReq
+	var req contract.LeadUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -83,7 +83,7 @@ func (h *Controller) LeadFollow(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.LeadFollowReq
+	var req contract.LeadFollowReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -119,7 +119,7 @@ func (h *Controller) QuoteCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.QuoteCreateReq
+	var req contract.QuoteCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -154,7 +154,7 @@ func (h *Controller) QuoteStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.QuoteStatusReq
+	var req contract.QuoteStatusReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -192,7 +192,7 @@ func (h *Controller) LeadMessageSend(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StaffLeadMessageReq
+	var req contract.StaffLeadMessageReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

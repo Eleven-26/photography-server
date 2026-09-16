@@ -11,8 +11,8 @@ package controller
 import (
 	"photography-server/internal/config"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/response"
 
 	"github.com/gin-gonic/gin"
 )

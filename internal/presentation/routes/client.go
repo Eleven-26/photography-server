@@ -90,7 +90,7 @@ func ClientAuthed(c *h5.Controller) []Route {
 		// 定制需求（本人提交的历史需求）
 		{Path: "/custom-request/list", Handler: c.CustomRequestList},
 		// 客户中心（H5 CC01）：个人资料读写。
-		// 字段白名单见 dto.ClientProfileUpdateReq —— crm_customer 与员工端共用一张表，
+		// 字段白名单见 contract.ClientProfileUpdateReq —— crm_customer 与员工端共用一张表，
 		// remark / tags / level / source / status 属工作室内部信息，不在客户端可改范围。
 		{Path: "/customer/profile", Handler: c.CustomerProfile},
 		{Path: "/customer/profile/update", Handler: c.CustomerProfileUpdate},

@@ -22,8 +22,8 @@ import (
 
 	"photography-server/internal/enum"
 	"photography-server/internal/pkg/errs"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/response"
 )
 
 // 注意：本文件是 dev/test 环境专用的「基础设施调试控制台」。

@@ -132,7 +132,7 @@ type App struct {
 // 背景：前端（PC 管理端 / 员工端小程序）要把工作室的分享地址给到客户，客户在微信里
 // 打开后落到 H5（photography-h5），由 `?slug=` 定位租户（见 h5.go→slugFrom）。
 // 预约主页与作品集两条链接共用同一个 H5 基址：前者基址 + `/?slug=…`（走 H5 默认页），
-// 后者再加 `#/pages/works/index`（见 dto.NewStaffStudioSettingResp）。
+// 后者再加 `#/pages/works/index`（见 contract.NewStaffStudioSettingResp）。
 // 域名由**服务端**下发而非写死在小程序/前端里：改域名只需改 Nacos 配置、不必重新发版。
 //
 // 环境变量覆盖：APP_SHARE_H5_BASE_URL。

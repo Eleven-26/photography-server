@@ -10,7 +10,7 @@ import (
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/presentation/response"
+	"photography-server/internal/pkg/response"
 )
 
 // extractToken 从 Authorization: Bearer 中提取令牌

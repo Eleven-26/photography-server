@@ -14,12 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/config"
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 	"photography-server/internal/service"
 )
 
@@ -56,7 +56,7 @@ func slugFrom(c *gin.Context) string {
 
 // staffFrom 提取分享链接携带的员工账号 ID：X-Staff-Id 头 → body staff_id → query ?staff_id=
 // （与 slugFrom 同款优先级）。链接形如 https://host/?slug=xxx&staff_id=12，由员工端
-// 「我的预约主页」分享出去（见 dto.NewStaffStudioSettingResp）。
+// 「我的预约主页」分享出去（见 contract.NewStaffStudioSettingResp）。
 // 用途：客户从谁的链接进来下单，订单就归到该员工名下（biz_order.photographer_id），
 // 员工端「仅本人」数据范围据此能查到自己的客户单。
 // 缺失或非法一律返回 0 —— 视为「非分享进入」，不报错，订单由工作室后续指派。
@@ -240,7 +240,7 @@ func (h *Controller) SlotList(c *gin.Context) {
 // 摄影师归属（2026-09-15 补齐）：body.photographer_id（客户在 H5 定制需求页的显式选择）优先，
 // 分享链接的 staff_id 兜底 —— 两者都缺则落门店/公共池，见 service.ClientSubmitCustomRequest。
 func (h *Controller) CustomRequestSubmit(c *gin.Context) {
-	var req dto.ClientCustomRequestReq
+	var req contract.ClientCustomRequestReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -276,7 +276,7 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 // 客户从谁的预约主页进来下单，订单就算谁的。
 func (h *Controller) BookingSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	var req dto.ClientBookingReq
+	var req contract.ClientBookingReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -374,7 +374,7 @@ func (h *Controller) RescheduleApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientRescheduleReq
+	var req contract.ClientRescheduleReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -426,7 +426,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientRefundReq
+	var req contract.ClientRefundReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -490,7 +490,7 @@ func (h *Controller) PaymentList(c *gin.Context) {
 // 资金不经平台：仅落 status=1 待核验记录，到账确认仍在员工端 /payment/confirm/:id。
 func (h *Controller) PaymentMark(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	var req dto.ClientPaymentMarkReq
+	var req contract.ClientPaymentMarkReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -522,7 +522,7 @@ func (h *Controller) ReviewCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientReviewReq
+	var req contract.ClientReviewReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -563,7 +563,7 @@ func (h *Controller) CustomerProfile(c *gin.Context) {
 // 客户端显示「已保存」而库里没变，正是最难排查的一类假故障（同封面保存那次的教训）。
 func (h *Controller) CustomerProfileUpdate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
-	var req dto.ClientProfileUpdateReq
+	var req contract.ClientProfileUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -684,7 +684,7 @@ func (h *Controller) FeedbackSubmit(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientFeedbackReq
+	var req contract.ClientFeedbackReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -803,7 +803,7 @@ func (h *Controller) QuoteModify(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientQuoteModifyReq
+	var req contract.ClientQuoteModifyReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -843,7 +843,7 @@ func (h *Controller) ReschedulePay(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientReschedulePayReq
+	var req contract.ClientReschedulePayReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -864,7 +864,7 @@ func (h *Controller) ExtraQuote(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientExtraQuoteReq
+	var req contract.ClientExtraQuoteReq
 	_ = c.ShouldBindJSON(&req)
 	q, err := h.Svc.ClientExtraQuote(c.Request.Context(), cu, id, req.SelectCount)
 	if err != nil {
@@ -882,7 +882,7 @@ func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ClientOrderRequirementReq
+	var req contract.ClientOrderRequirementReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

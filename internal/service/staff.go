@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 )
 
 // staff 小程序员工端能力：工作台待办、改期审批、线索沟通与 AI 简报、
@@ -18,8 +18,8 @@ import (
 // 订单状态流转/收款/交付上传等操作直接复用 PC 端既有 service 方法。
 
 // StaffOverview 工作台待办统计（按状态计数，全部走现有 List 的 total）
-func (s *Service) StaffOverview(ctx context.Context, op Operator) (*dto.StaffOverview, error) {
-	ov := &dto.StaffOverview{}
+func (s *Service) StaffOverview(ctx context.Context, op Operator) (*contract.StaffOverview, error) {
+	ov := &contract.StaffOverview{}
 	type countJob struct {
 		run  func() (int64, error)
 		dest *int64
@@ -160,7 +160,7 @@ func (s *Service) StaffLeadMessages(ctx context.Context, op Operator, leadID int
 }
 
 // StaffSendLeadMessage 工作室发出沟通消息（追问/报价通知/作品分享）
-func (s *Service) StaffSendLeadMessage(ctx context.Context, op Operator, leadID int64, req dto.StaffLeadMessageReq) (*model.LeadMessage, error) {
+func (s *Service) StaffSendLeadMessage(ctx context.Context, op Operator, leadID int64, req contract.StaffLeadMessageReq) (*model.LeadMessage, error) {
 	if strings.TrimSpace(req.Content) == "" {
 		return nil, errs.BadRequest(errs.ErrMessageContentRequired)
 	}
@@ -321,7 +321,7 @@ func (s *Service) SlotTemplates(ctx context.Context, op Operator, photographerID
 }
 
 // SaveSlotTemplate 新建/更新档期时段模板
-func (s *Service) SaveSlotTemplate(ctx context.Context, op Operator, id int64, req dto.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
+func (s *Service) SaveSlotTemplate(ctx context.Context, op Operator, id int64, req contract.StaffSlotTemplateReq) (*model.SlotTemplate, error) {
 	if req.Weekday < 0 || req.Weekday > 6 {
 		return nil, errs.BadRequest(errs.ErrWeekdayInvalid)
 	}
@@ -395,7 +395,7 @@ func (s *Service) StaffReviewReply(ctx context.Context, op Operator, reviewID in
 //
 // 预约主页短链标识（homepage_slug）为空时按公司 ID 派生补写并落库：
 // 分享链接需 slug 与 share.h5_base_url **同时具备**才拼得出
-// （见 dto.NewStaffStudioSettingResp），slug 为空则前端「我的预约主页」拿到空串、
+// （见 contract.NewStaffStudioSettingResp），slug 为空则前端「我的预约主页」拿到空串、
 // 无从分享。自动兜底保证开箱即用；管理员仍可在 PC「设置」页改成更好记的标识
 // （已有值不再覆盖）。
 func (s *Service) StudioSetting(ctx context.Context, op Operator) (*model.StudioSetting, error) {
@@ -427,7 +427,7 @@ func DefaultHomepageSlug(companyID int64) string {
 
 // UpdateStudioSetting 工作室设置更新（updates 由 controller 按「指针非 nil 才更新」组装）。
 //
-// homepage_slug 会被写进对外分享的链接（见 dto.NewStaffStudioSettingResp），
+// homepage_slug 会被写进对外分享的链接（见 contract.NewStaffStudioSettingResp），
 // 故在此收敛格式：统一小写、去空白，并校验字符集与长度。
 func (s *Service) UpdateStudioSetting(ctx context.Context, op Operator, updates map[string]interface{}) error {
 	if len(updates) == 0 {

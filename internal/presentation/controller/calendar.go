@@ -3,11 +3,11 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) CalendarList(c *gin.Context) {
@@ -23,7 +23,7 @@ func (h *Controller) CalendarList(c *gin.Context) {
 
 func (h *Controller) CalendarLock(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.CalendarBlockReq
+	var req contract.CalendarBlockReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -77,7 +77,7 @@ func (h *Controller) SlotTemplateSave(c *gin.Context) {
 		}
 		id = parsed
 	}
-	var req dto.StaffSlotTemplateReq
+	var req contract.StaffSlotTemplateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

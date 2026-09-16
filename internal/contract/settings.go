@@ -1,4 +1,4 @@
-package dto
+package contract
 
 import "photography-server/internal/model"
 

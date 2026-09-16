@@ -1,4 +1,4 @@
-package dto
+package contract
 
 // FinanceSummaryResp 财务汇总（PC 财务页）。
 //

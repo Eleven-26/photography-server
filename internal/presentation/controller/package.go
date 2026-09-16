@@ -3,11 +3,11 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) PackageList(c *gin.Context) {
@@ -39,7 +39,7 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 
 func (h *Controller) PackageCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.PackageReq
+	var req contract.PackageReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -59,7 +59,7 @@ func (h *Controller) PackageUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.PackageReq
+	var req contract.PackageReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

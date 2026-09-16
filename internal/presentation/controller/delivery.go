@@ -3,10 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 // DeliveryCreate 新建交付任务 body: DeliveryCreateReq（路径 :order_id 优先于 body.order_id）
@@ -17,7 +17,7 @@ func (h *Controller) DeliveryCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.DeliveryCreateReq
+	var req contract.DeliveryCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -99,7 +99,7 @@ func (h *Controller) DeliveryUploadSamples(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Items []dto.DeliveryItemReq `json:"items" binding:"required"`
+		Items []contract.DeliveryItemReq `json:"items" binding:"required"`
 	}
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
@@ -120,7 +120,7 @@ func (h *Controller) DeliverySelect(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.DeliverySelectReq
+	var req contract.DeliverySelectReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -141,7 +141,7 @@ func (h *Controller) DeliveryUploadRetouched(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Items []dto.DeliveryItemReq `json:"items" binding:"required"`
+		Items []contract.DeliveryItemReq `json:"items" binding:"required"`
 	}
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)

@@ -4,21 +4,21 @@ import (
 	"context"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
 func (s *Service) CreateDelivery(ctx context.Context, op Operator, orderID int64) (*model.Delivery, error) {
-	return s.CreateDeliveryTask(ctx, op, dto.DeliveryCreateReq{OrderID: orderID})
+	return s.CreateDeliveryTask(ctx, op, contract.DeliveryCreateReq{OrderID: orderID})
 }
 
 // CreateDeliveryTask 新建交付任务（PC 交付工作台 / 员工端共用）。
 // 同一订单只允许一张交付单：已存在时直接返回原单，避免重复建单导致选片链路分裂。
-func (s *Service) CreateDeliveryTask(ctx context.Context, op Operator, req dto.DeliveryCreateReq) (*model.Delivery, error) {
+func (s *Service) CreateDeliveryTask(ctx context.Context, op Operator, req contract.DeliveryCreateReq) (*model.Delivery, error) {
 	if req.OrderID <= 0 {
 		return nil, errs.BadRequest(errs.ErrOrderIDInvalid)
 	}
@@ -86,7 +86,7 @@ func (s *Service) GetDeliveryByOrder(ctx context.Context, op Operator, orderID i
 	return s.DeliveryRepo.GetByOrderID(ctx, op.CompanyID, orderID)
 }
 
-func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
+func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int64, items []contract.DeliveryItemReq) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
@@ -126,7 +126,7 @@ func (s *Service) UploadSamples(ctx context.Context, op Operator, deliveryID int
 	return nil
 }
 
-func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int64, req dto.DeliverySelectReq) error {
+func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int64, req contract.DeliverySelectReq) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)
@@ -147,7 +147,7 @@ func (s *Service) SelectPhotos(ctx context.Context, op Operator, deliveryID int6
 	})
 }
 
-func (s *Service) UploadRetouched(ctx context.Context, op Operator, deliveryID int64, items []dto.DeliveryItemReq) error {
+func (s *Service) UploadRetouched(ctx context.Context, op Operator, deliveryID int64, items []contract.DeliveryItemReq) error {
 	d, err := s.DeliveryRepo.GetByID(ctx, op.CompanyID, deliveryID)
 	if err != nil {
 		return errs.NotFound(errs.ErrDeliveryNotFound)

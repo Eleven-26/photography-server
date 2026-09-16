@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 func (s *Service) ListAssets(ctx context.Context, op Operator, page, pageSize int, keyword, category, status, featured string) ([]model.Asset, int64, error) {
@@ -23,7 +23,7 @@ func (s *Service) GetAsset(ctx context.Context, op Operator, id int64) (*model.A
 	return a, nil
 }
 
-func (s *Service) CreateAsset(ctx context.Context, op Operator, req dto.AssetCreateReq) (*model.Asset, error) {
+func (s *Service) CreateAsset(ctx context.Context, op Operator, req contract.AssetCreateReq) (*model.Asset, error) {
 	a := model.Asset{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -55,7 +55,7 @@ func (s *Service) CreateAsset(ctx context.Context, op Operator, req dto.AssetCre
 	return &a, nil
 }
 
-func (s *Service) UpdateAsset(ctx context.Context, op Operator, id int64, req dto.AssetUpdateReq) error {
+func (s *Service) UpdateAsset(ctx context.Context, op Operator, id int64, req contract.AssetUpdateReq) error {
 	a, err := s.AssetRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrAssetNotFound)
@@ -94,7 +94,7 @@ func (s *Service) UpdateAsset(ctx context.Context, op Operator, id int64, req dt
 
 // UpdateAssetFlags 轻量开关：发布状态 / 公开可见性 / 精选展示。
 // 与 UpdateAsset 分离，避免"只想取消精选"却必须回传全部字段（title 等为 required）。
-func (s *Service) UpdateAssetFlags(ctx context.Context, op Operator, id int64, req dto.AssetFlagsReq) error {
+func (s *Service) UpdateAssetFlags(ctx context.Context, op Operator, id int64, req contract.AssetFlagsReq) error {
 	a, err := s.AssetRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrAssetNotFound)

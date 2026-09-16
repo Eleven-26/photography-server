@@ -3,10 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) AssetList(c *gin.Context) {
@@ -38,7 +38,7 @@ func (h *Controller) AssetDetail(c *gin.Context) {
 
 func (h *Controller) AssetCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.AssetCreateReq
+	var req contract.AssetCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -58,7 +58,7 @@ func (h *Controller) AssetUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AssetUpdateReq
+	var req contract.AssetUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -92,7 +92,7 @@ func (h *Controller) AssetStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.AssetFlagsReq
+	var req contract.AssetFlagsReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

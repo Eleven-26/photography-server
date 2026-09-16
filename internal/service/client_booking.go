@@ -7,12 +7,12 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -37,7 +37,7 @@ func clientOrderOwned(o *model.Order, cu *ClientUser) error {
 //
 // staffID：分享链接携带的员工账号 ID（0 = 非分享进入，或链接未带参）。
 // 命中同租户在职员工时写入订单 photographer_id，实现「谁分享、单算谁的」。
-func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req dto.ClientBookingReq, staffID int64) (*model.Order, error) {
+func (s *Service) ClientSubmitBooking(ctx context.Context, cu *ClientUser, req contract.ClientBookingReq, staffID int64) (*model.Order, error) {
 	if req.PackageID <= 0 {
 		return nil, errs.BadRequest(errs.ErrOrderPackageRequired)
 	}
@@ -234,7 +234,7 @@ func (s *Service) ClientOrders(ctx context.Context, cu *ClientUser, page, pageSi
 }
 
 // ClientOrderDetail 我的订单详情（含收款/退款/交付/改期/加项/评价）
-func (s *Service) ClientOrderDetail(ctx context.Context, cu *ClientUser, orderID int64) (*dto.ClientOrderDetail, error) {
+func (s *Service) ClientOrderDetail(ctx context.Context, cu *ClientUser, orderID int64) (*contract.ClientOrderDetail, error) {
 	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
@@ -271,7 +271,7 @@ func (s *Service) ClientOrderDetail(ctx context.Context, cu *ClientUser, orderID
 		logger.Warnf("ClientOrderDetail: GetByOrderID failed, orderID=%d, err=%v", orderID, err)
 	}
 
-	return &dto.ClientOrderDetail{
+	return &contract.ClientOrderDetail{
 		Order:       o,
 		Payments:    payments,
 		Refunds:     refunds,

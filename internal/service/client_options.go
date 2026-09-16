@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"photography-server/internal/presentation/dto"
+	"photography-server/internal/contract"
 	"photography-server/internal/repository"
 )
 
@@ -12,7 +12,7 @@ import (
 //
 // 为什么要有它：定制需求此前只能靠**分享链接**带入归属（URL ?staff_id=），
 // 客户自己从个人中心进来时 URL 里没有摄影师，需求就无从归属。本接口给出
-// 「服务过这个客户的门店与摄影师」，让客户在页面上直接选（见 dto.ClientStoreOption）。
+// 「服务过这个客户的门店与摄影师」，让客户在页面上直接选（见 contract.ClientStoreOption）。
 //
 // 归属铁律：一律以令牌内的 cu.CustomerID 为准（同 client_profile.go）——
 // 候选只来自该客户自己的订单/需求记录，不接受客户端传入的任何过滤条件。
@@ -21,7 +21,7 @@ import (
 //
 // shareStaffID = 分享链接带入的分享人（无链接时为 0）：即使他尚无该客户的订单/需求记录，
 // 也并入候选 —— 客户正是从他的链接进来的，理应能指定他（新客户首次分享进入的常见情形）。
-func (s *Service) ClientPhotographerOptions(ctx context.Context, cu *ClientUser, shareStaffID int64) ([]dto.ClientStoreOption, error) {
+func (s *Service) ClientPhotographerOptions(ctx context.Context, cu *ClientUser, shareStaffID int64) ([]contract.ClientStoreOption, error) {
 	fromOrders, err := s.OrderRepo.ListCustomerStaffPairs(ctx, cu.CompanyID, cu.CustomerID)
 	if err != nil {
 		return nil, err
@@ -52,14 +52,14 @@ func (s *Service) ClientPhotographerOptions(ctx context.Context, cu *ClientUser,
 	if err != nil {
 		return nil, err
 	}
-	byStore := make(map[int64][]dto.ClientPhotographerOption)
+	byStore := make(map[int64][]contract.ClientPhotographerOption)
 	for _, u := range users {
 		// 停用员工不进入候选：他接不了单，给了客户也会被提交接口拒
 		// （见 ClientSubmitCustomRequest 的 status 校验），不如一开始就不展示。
 		if u.Status != 1 {
 			continue
 		}
-		byStore[u.StoreID] = append(byStore[u.StoreID], dto.ClientPhotographerOption{
+		byStore[u.StoreID] = append(byStore[u.StoreID], contract.ClientPhotographerOption{
 			ID:     u.ID,
 			Name:   u.Nickname,
 			Avatar: u.Avatar,
@@ -80,14 +80,14 @@ func (s *Service) ClientPhotographerOptions(ctx context.Context, cu *ClientUser,
 
 	// 排序输出：门店按 ID 升序（0 = 摄影师未分配门店的占位组，排最前），摄影师按 ID 升序。
 	// 顺序稳定便于前端做「默认选中第一项」，也让同一客户的两次请求结果可比对。
-	out := make([]dto.ClientStoreOption, 0, len(storeIDs))
+	out := make([]contract.ClientStoreOption, 0, len(storeIDs))
 	for _, sid := range sortedIDSet(storeIDs) {
 		opts := byStore[sid]
 		if opts == nil {
-			opts = []dto.ClientPhotographerOption{} // 该门店下没有可选摄影师时给空数组，避免下发 null
+			opts = []contract.ClientPhotographerOption{} // 该门店下没有可选摄影师时给空数组，避免下发 null
 		}
 		sort.Slice(opts, func(i, j int) bool { return opts[i].ID < opts[j].ID })
-		out = append(out, dto.ClientStoreOption{
+		out = append(out, contract.ClientStoreOption{
 			StoreID:       sid,
 			StoreName:     storeName[sid], // 门店已删/未分配时为 ""，前端显示为「未指定门店」
 			Photographers: opts,

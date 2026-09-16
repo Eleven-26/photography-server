@@ -3,15 +3,15 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 // Login 登录
 func (h *Controller) Login(c *gin.Context) {
-	var req dto.LoginReq
+	var req contract.LoginReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -38,7 +38,7 @@ func (h *Controller) Profile(c *gin.Context) {
 // ChangePassword 修改密码
 func (h *Controller) ChangePassword(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.ChangePasswordReq
+	var req contract.ChangePasswordReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

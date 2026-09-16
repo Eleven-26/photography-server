@@ -3,11 +3,11 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) UserList(c *gin.Context) {
@@ -24,7 +24,7 @@ func (h *Controller) UserList(c *gin.Context) {
 
 func (h *Controller) UserCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.UserCreateReq
+	var req contract.UserCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -43,7 +43,7 @@ func (h *Controller) UserUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.UserUpdateReq
+	var req contract.UserUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -76,7 +76,7 @@ func (h *Controller) UserResetPassword(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.ResetPasswordReq
+	var req contract.ResetPasswordReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -100,7 +100,7 @@ func (h *Controller) RoleList(c *gin.Context) {
 
 func (h *Controller) RoleCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.RoleCreateReq
+	var req contract.RoleCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -119,7 +119,7 @@ func (h *Controller) RoleUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.RoleUpdateReq
+	var req contract.RoleUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -153,7 +153,7 @@ func (h *Controller) RoleGrant(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.RoleGrantReq
+	var req contract.RoleGrantReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -198,7 +198,7 @@ func (h *Controller) StoreList(c *gin.Context) {
 
 func (h *Controller) StoreCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.StoreCreateReq
+	var req contract.StoreCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -217,7 +217,7 @@ func (h *Controller) StoreUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.StoreUpdateReq
+	var req contract.StoreUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

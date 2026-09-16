@@ -10,7 +10,7 @@ import (
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/jwtpkg"
-	"photography-server/internal/presentation/response"
+	"photography-server/internal/pkg/response"
 )
 
 // ClientUserKey 客户端用户上下文键，同时用于 gin.Context 与 request context

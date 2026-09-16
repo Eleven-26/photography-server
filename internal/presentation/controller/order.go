@@ -3,18 +3,18 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/params"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) OrderCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.OrderCreateReq
+	var req contract.OrderCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *Controller) OrderUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.OrderUpdateReq
+	var req contract.OrderUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -82,7 +82,7 @@ func (h *Controller) OrderStatus(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.OrderStatusReq
+	var req contract.OrderStatusReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -139,7 +139,7 @@ func (h *Controller) PaymentCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.PaymentCreateReq
+	var req contract.PaymentCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -205,7 +205,7 @@ func (h *Controller) RefundApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.RefundCreateReq
+	var req contract.RefundCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -288,7 +288,7 @@ func (h *Controller) OrderAddonCreate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.OrderAddonReq
+	var req contract.OrderAddonReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -308,7 +308,7 @@ func (h *Controller) OrderAddonUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.OrderAddonReq
+	var req contract.OrderAddonReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -360,7 +360,7 @@ func (h *Controller) OrderRescheduleApply(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.RescheduleApplyReq
+	var req contract.RescheduleApplyReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

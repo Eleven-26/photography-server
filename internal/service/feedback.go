@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 // 反馈口径常量（与 model.SysFeedbackType 的取值、DDL 列宽对齐）
@@ -23,7 +23,7 @@ const (
 // 自助类能力：操作对象是提交人本人，不做角色校验（路由亦免权限点）。
 // 服务端只做三件事：必填与长度校验、类型枚举收敛、截图数量截断。
 // status 固定 1（待处理）—— 员工端不参与流转，避免自问自答式"已处理"。
-func (s *Service) SubmitFeedback(ctx context.Context, op Operator, req dto.FeedbackSubmitReq) error {
+func (s *Service) SubmitFeedback(ctx context.Context, op Operator, req contract.FeedbackSubmitReq) error {
 	content := strings.TrimSpace(req.Content)
 	if content == "" {
 		return errs.BadRequest(errs.ErrFeedbackContentRequired)

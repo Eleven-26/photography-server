@@ -1,4 +1,4 @@
-package dto
+package contract
 
 import (
 	"net/url"

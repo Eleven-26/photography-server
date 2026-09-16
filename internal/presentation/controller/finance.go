@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) FinanceSummary(c *gin.Context) {

@@ -6,14 +6,14 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 // Workspace 工作空间首屏数据：公司信息 + 门店 + 角色 + 收款方式。
 // 响应结构在 dto 包显式声明（对外契约），本层只负责组装。
-func (s *Service) Workspace(ctx context.Context, op Operator) (*dto.WorkspaceResp, error) {
+func (s *Service) Workspace(ctx context.Context, op Operator) (*contract.WorkspaceResp, error) {
 	c, err := s.SettingsRepo.GetCompany(ctx, op.CompanyID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -21,7 +21,7 @@ func (s *Service) Workspace(ctx context.Context, op Operator) (*dto.WorkspaceRes
 		}
 		return nil, err
 	}
-	w := &dto.WorkspaceResp{Company: *c}
+	w := &contract.WorkspaceResp{Company: *c}
 	w.Stores, err = s.SettingsRepo.ListStores(ctx, op.CompanyID)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (s *Service) Workspace(ctx context.Context, op Operator) (*dto.WorkspaceRes
 	return w, nil
 }
 
-func (s *Service) UpdateCompany(ctx context.Context, op Operator, req dto.CompanyUpdateReq) error {
+func (s *Service) UpdateCompany(ctx context.Context, op Operator, req contract.CompanyUpdateReq) error {
 	return s.SettingsRepo.UpdateCompany(ctx, op.CompanyID, map[string]interface{}{
 		"name": req.Name, "logo": req.Logo,
 		"city": req.City, "intro": req.Intro,
@@ -52,7 +52,7 @@ func (s *Service) ListPaymentMethods(ctx context.Context, op Operator) ([]model.
 	return s.SettingsRepo.ListPaymentMethods(ctx, op.CompanyID)
 }
 
-func (s *Service) CreatePaymentMethod(ctx context.Context, op Operator, req dto.PaymentMethodReq) error {
+func (s *Service) CreatePaymentMethod(ctx context.Context, op Operator, req contract.PaymentMethodReq) error {
 	m := model.PaymentMethod{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -64,7 +64,7 @@ func (s *Service) CreatePaymentMethod(ctx context.Context, op Operator, req dto.
 	return s.SettingsRepo.CreatePaymentMethod(ctx, &m)
 }
 
-func (s *Service) UpdatePaymentMethod(ctx context.Context, op Operator, id int64, req dto.PaymentMethodReq) error {
+func (s *Service) UpdatePaymentMethod(ctx context.Context, op Operator, id int64, req contract.PaymentMethodReq) error {
 	_, err := s.SettingsRepo.GetPaymentMethodByID(ctx, op.CompanyID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

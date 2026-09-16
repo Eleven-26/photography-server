@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -14,7 +14,7 @@ import (
 //
 // 归属铁律：一律以令牌内的 cu.CustomerID 为准，**不接受**请求体传 customer_id，
 // 否则客户能改/看别人的档案（#29 同款防遍历要求）。
-// 可改字段白名单见 dto.ClientProfileUpdateReq —— crm_customer 是与员工端共用的表，
+// 可改字段白名单见 contract.ClientProfileUpdateReq —— crm_customer 是与员工端共用的表，
 // 内部字段（remark / tags / level / source / status）不在白名单内。
 
 // 性别取值（biz_crm_customer.gender 列注释：male-男 female-女 unknown-未知）。
@@ -22,17 +22,17 @@ import (
 var customerGenders = map[string]bool{"": true, "male": true, "female": true, "unknown": true}
 
 // ClientProfile 我的资料
-func (s *Service) ClientProfile(ctx context.Context, cu *ClientUser) (*dto.ClientProfileResp, error) {
+func (s *Service) ClientProfile(ctx context.Context, cu *ClientUser) (*contract.ClientProfileResp, error) {
 	c, err := s.CustomerRepo.GetByID(ctx, cu.CompanyID, cu.CustomerID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrCustomerNotFound)
 	}
-	return dto.NewClientProfileResp(c), nil
+	return contract.NewClientProfileResp(c), nil
 }
 
 // ClientUpdateProfile 客户自助修改资料。
 // 每个字段「指针非 nil 才写」：nil = 未提交，显式空串 = 清空（清偏好必须能生效）。
-func (s *Service) ClientUpdateProfile(ctx context.Context, cu *ClientUser, req dto.ClientProfileUpdateReq) (*dto.ClientProfileResp, error) {
+func (s *Service) ClientUpdateProfile(ctx context.Context, cu *ClientUser, req contract.ClientProfileUpdateReq) (*contract.ClientProfileResp, error) {
 	updates := map[string]interface{}{}
 
 	if req.Name != nil {

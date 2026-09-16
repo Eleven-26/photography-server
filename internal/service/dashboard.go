@@ -3,18 +3,18 @@ package service
 import (
 	"context"
 
-	"photography-server/internal/presentation/dto"
+	"photography-server/internal/contract"
 )
 
 // Overview 工作台概览。repository 负责取数，本层映射为对外契约（dto），
 // 使仓储/数据库结构调整不会直接泄漏到 API 响应。
-func (s *Service) Overview(ctx context.Context, op Operator) (*dto.DashboardOverviewResp, error) {
+func (s *Service) Overview(ctx context.Context, op Operator) (*contract.DashboardOverviewResp, error) {
 	ov, err := s.DashboardRepo.GetOverview(ctx, op.CompanyID, op.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &dto.DashboardOverviewResp{
+	resp := &contract.DashboardOverviewResp{
 		TodayOrders:       ov.TodayOrders,
 		TodayAmount:       ov.TodayAmount,
 		MonthOrders:       ov.MonthOrders,
@@ -36,7 +36,7 @@ func (s *Service) Overview(ctx context.Context, op Operator) (*dto.DashboardOver
 
 	// 列表型字段显式转换：dto 与仓储结构各自演进，避免字段名漂移直接穿透到 API。
 	for _, ts := range ov.TodayShoots {
-		resp.TodayShoots = append(resp.TodayShoots, dto.TodayShoot{
+		resp.TodayShoots = append(resp.TodayShoots, contract.TodayShoot{
 			ID:           ts.ID,
 			Code:         ts.Code,
 			CustomerName: ts.CustomerName,
@@ -48,7 +48,7 @@ func (s *Service) Overview(ctx context.Context, op Operator) (*dto.DashboardOver
 		})
 	}
 	for _, td := range ov.TodoItems {
-		resp.TodoItems = append(resp.TodoItems, dto.TodoItem{
+		resp.TodoItems = append(resp.TodoItems, contract.TodoItem{
 			Key:   td.Key,
 			Label: td.Label,
 			Count: td.Count,

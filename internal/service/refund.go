@@ -7,11 +7,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -20,7 +20,7 @@ import (
 //  1. 退款申请金额不得超过「已收 - 已退」（剩余可退），防止超额退/重复退；
 //  2. 同一订单同时最多一张申请中的退款单；
 //  3. 申请与金额校验放入事务 + 行锁，避免并发创建多张申请单导致累计超额。
-func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, req dto.RefundCreateReq) (*model.OrderRefund, error) {
+func (s *Service) CreateRefund(ctx context.Context, op Operator, orderID int64, req contract.RefundCreateReq) (*model.OrderRefund, error) {
 	var rf *model.OrderRefund
 	err := repository.Tx(func(tx *gorm.DB) error {
 		o, err := s.OrderRepo.WithTx(tx).GetByIDForUpdate(ctx, op.CompanyID, orderID)

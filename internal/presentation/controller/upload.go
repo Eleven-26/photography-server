@@ -10,7 +10,7 @@ import (
 
 	"photography-server/internal/middleware"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/response"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/service"
 )
 

@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 )
 
 func (s *Service) ListPackages(ctx context.Context, op Operator, page, pageSize int, keyword, status, category string) ([]model.Package, int64, error) {
@@ -23,7 +23,7 @@ func (s *Service) GetPackage(ctx context.Context, op Operator, id int64) (*model
 	return p, nil
 }
 
-func (s *Service) CreatePackage(ctx context.Context, op Operator, req dto.PackageReq) (*model.Package, error) {
+func (s *Service) CreatePackage(ctx context.Context, op Operator, req contract.PackageReq) (*model.Package, error) {
 	p := model.Package{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -50,7 +50,7 @@ func (s *Service) CreatePackage(ctx context.Context, op Operator, req dto.Packag
 	return &p, nil
 }
 
-func (s *Service) UpdatePackage(ctx context.Context, op Operator, id int64, req dto.PackageReq) error {
+func (s *Service) UpdatePackage(ctx context.Context, op Operator, id int64, req contract.PackageReq) error {
 	p, err := s.PackageRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrPackageNotFound)

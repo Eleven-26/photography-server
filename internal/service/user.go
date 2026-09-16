@@ -7,11 +7,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/authcache"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -26,7 +26,7 @@ func (s *Service) ListUsers(ctx context.Context, op Operator, page, pageSize int
 	return list, total, nil
 }
 
-func (s *Service) CreateUser(ctx context.Context, op Operator, req dto.UserCreateReq) error {
+func (s *Service) CreateUser(ctx context.Context, op Operator, req contract.UserCreateReq) error {
 	count, _ := s.UserRepo.CountByUsername(ctx, op.CompanyID, req.Username)
 	if count > 0 {
 		return errs.Conflict(errs.ErrUserDuplicate)
@@ -54,7 +54,7 @@ func (s *Service) CreateUser(ctx context.Context, op Operator, req dto.UserCreat
 	return s.UserRepo.Create(ctx, &u)
 }
 
-func (s *Service) UpdateUser(ctx context.Context, op Operator, id int64, req dto.UserUpdateReq) error {
+func (s *Service) UpdateUser(ctx context.Context, op Operator, id int64, req contract.UserUpdateReq) error {
 	_, err := s.UserRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrUserNotFound)
@@ -121,7 +121,7 @@ func (s *Service) ListRoles(ctx context.Context, op Operator) ([]model.SysRole, 
 	return list, nil
 }
 
-func (s *Service) CreateRole(ctx context.Context, op Operator, req dto.RoleCreateReq) error {
+func (s *Service) CreateRole(ctx context.Context, op Operator, req contract.RoleCreateReq) error {
 	r := model.SysRole{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -137,7 +137,7 @@ func (s *Service) CreateRole(ctx context.Context, op Operator, req dto.RoleCreat
 	return s.UserRepo.CreateRole(ctx, &r)
 }
 
-func (s *Service) UpdateRole(ctx context.Context, op Operator, id int64, req dto.RoleUpdateReq) error {
+func (s *Service) UpdateRole(ctx context.Context, op Operator, id int64, req contract.RoleUpdateReq) error {
 	if err := s.UserRepo.UpdateRole(ctx, op.CompanyID, id, map[string]interface{}{
 		"name": req.Name, "code": req.Code, "remark": req.Remark, "status": req.Status, "updated_by": op.UserID,
 	}); err != nil {
@@ -168,7 +168,7 @@ func (s *Service) DeleteRole(ctx context.Context, op Operator, id int64) error {
 // -------- 角色权限（RBAC）--------
 
 // GetRolePerms 读取角色权限配置（权限配置界面回显）
-func (s *Service) GetRolePerms(ctx context.Context, op Operator, roleID int64) (*dto.RolePermsResp, error) {
+func (s *Service) GetRolePerms(ctx context.Context, op Operator, roleID int64) (*contract.RolePermsResp, error) {
 	role, err := s.UserRepo.GetRoleByID(ctx, op.CompanyID, roleID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrRoleNotFound)
@@ -184,7 +184,7 @@ func (s *Service) GetRolePerms(ctx context.Context, op Operator, roleID int64) (
 			valid = append(valid, p)
 		}
 	}
-	return &dto.RolePermsResp{
+	return &contract.RolePermsResp{
 		RoleID:      role.ID,
 		RoleName:    role.Name,
 		RoleCode:    role.Code,
@@ -197,7 +197,7 @@ func (s *Service) GetRolePerms(ctx context.Context, op Operator, roleID int64) (
 //
 // 保护规则：内置超管（admin）角色权限固定不可修改 —— 其权限由角色码短路获得，
 // 即使改了仍会全量放行，允许修改只会造成"改了不生效"的困惑。
-func (s *Service) GrantRolePerms(ctx context.Context, op Operator, roleID int64, req dto.RoleGrantReq) error {
+func (s *Service) GrantRolePerms(ctx context.Context, op Operator, roleID int64, req contract.RoleGrantReq) error {
 	role, err := s.UserRepo.GetRoleByID(ctx, op.CompanyID, roleID)
 	if err != nil {
 		return errs.NotFound(errs.ErrRoleNotFound)
@@ -257,7 +257,7 @@ func (s *Service) ListStores(ctx context.Context, op Operator) ([]model.SysStore
 	return s.UserRepo.ListStores(ctx, op.CompanyID)
 }
 
-func (s *Service) CreateStore(ctx context.Context, op Operator, req dto.StoreCreateReq) error {
+func (s *Service) CreateStore(ctx context.Context, op Operator, req contract.StoreCreateReq) error {
 	st := model.SysStore{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -268,7 +268,7 @@ func (s *Service) CreateStore(ctx context.Context, op Operator, req dto.StoreCre
 	return s.UserRepo.CreateStore(ctx, &st)
 }
 
-func (s *Service) UpdateStore(ctx context.Context, op Operator, id int64, req dto.StoreUpdateReq) error {
+func (s *Service) UpdateStore(ctx context.Context, op Operator, id int64, req contract.StoreUpdateReq) error {
 	return s.UserRepo.UpdateStore(ctx, op.CompanyID, id, map[string]interface{}{
 		"name": req.Name, "address": req.Address, "phone": req.Phone, "status": req.Status, "updated_by": op.UserID,
 	})

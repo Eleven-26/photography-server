@@ -9,12 +9,12 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -23,7 +23,7 @@ import (
 
 // ClientRescheduleApply 客户发起改期申请（同一订单同时最多一张待确认改期单）。
 // 费用按工作室改期政策计算：>=FreeHours 免费、区间收调度费、<MinHours 拒绝。
-func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientRescheduleReq) (*model.OrderReschedule, error) {
+func (s *Service) ClientRescheduleApply(ctx context.Context, cu *ClientUser, orderID int64, req contract.ClientRescheduleReq) (*model.OrderReschedule, error) {
 	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
@@ -123,7 +123,7 @@ func (s *Service) ClientRescheduleCancel(ctx context.Context, cu *ClientUser, re
 }
 
 // ClientRefundApply 客户申请退款（apply_source=2），金额按退款规则试算
-func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientRefundReq) (*model.OrderRefund, error) {
+func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID int64, req contract.ClientRefundReq) (*model.OrderRefund, error) {
 	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
@@ -180,7 +180,7 @@ func (s *Service) ClientRefundApply(ctx context.Context, cu *ClientUser, orderID
 }
 
 // ClientReviewCreate 订单评价（已完成订单、每单一评）
-func (s *Service) ClientReviewCreate(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientReviewReq) (*model.OrderReview, error) {
+func (s *Service) ClientReviewCreate(ctx context.Context, cu *ClientUser, orderID int64, req contract.ClientReviewReq) (*model.OrderReview, error) {
 	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrOrderNotFound)
@@ -406,7 +406,7 @@ func (s *Service) ClientConfirmDelivery(ctx context.Context, cu *ClientUser, del
 }
 
 // ClientFeedbackSubmit 客户提交精修反馈（对某张精修成品提出修改意见）
-func (s *Service) ClientFeedbackSubmit(ctx context.Context, cu *ClientUser, itemID int64, req dto.ClientFeedbackReq) error {
+func (s *Service) ClientFeedbackSubmit(ctx context.Context, cu *ClientUser, itemID int64, req contract.ClientFeedbackReq) error {
 	var item model.DeliveryItem
 	if err := s.DeliveryRepo.FirstItem(ctx, cu.CompanyID, itemID, &item); err != nil {
 		return errs.NotFound(errs.ErrDeliveryFileNotFound)
@@ -456,7 +456,7 @@ func (s *Service) clientOwnedDelivery(ctx context.Context, cu *ClientUser, deliv
 // ClientExtraQuote 加片费试算（H3：原型 C13「24/20 张 +¥240」）。
 // 纯计算、不落库：客户勾选过程中实时看到超出张数与加片费，确认前金额透明。
 // selectCount 传 0 时按当前已选张数试算；正式计价仍在 ClientSelectPhotos（提交选片时落库）。
-func (s *Service) ClientExtraQuote(ctx context.Context, cu *ClientUser, deliveryID int64, selectCount int) (*dto.ClientExtraQuoteResp, error) {
+func (s *Service) ClientExtraQuote(ctx context.Context, cu *ClientUser, deliveryID int64, selectCount int) (*contract.ClientExtraQuoteResp, error) {
 	d, o, err := s.clientOwnedDelivery(ctx, cu, deliveryID)
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (s *Service) ClientExtraQuote(ctx context.Context, cu *ClientUser, delivery
 		unitPrice = pkg.AddonUnitPrice
 	}
 	extraCount, extraFee := domain.ExtraRetouchFee(count, included, unitPrice)
-	return &dto.ClientExtraQuoteResp{
+	return &contract.ClientExtraQuoteResp{
 		IncludedCount:  included,
 		SelectedCount:  count,
 		ExtraCount:     extraCount,
@@ -519,7 +519,7 @@ func (s *Service) getOwnedReschedule(ctx context.Context, cu *ClientUser, resche
 }
 
 // ClientRescheduleDetail 改期单详情 + 调度费支付状态（H2：原型 B2 改期调度费支付）
-func (s *Service) ClientRescheduleDetail(ctx context.Context, cu *ClientUser, rescheduleID int64) (*dto.ClientRescheduleDetailResp, error) {
+func (s *Service) ClientRescheduleDetail(ctx context.Context, cu *ClientUser, rescheduleID int64) (*contract.ClientRescheduleDetailResp, error) {
 	rs, err := s.getOwnedReschedule(ctx, cu, rescheduleID)
 	if err != nil {
 		return nil, err
@@ -528,20 +528,20 @@ func (s *Service) ClientRescheduleDetail(ctx context.Context, cu *ClientUser, re
 	if err != nil {
 		return nil, err
 	}
-	status := dto.RescheduleFeeNoNeed
+	status := contract.RescheduleFeeNoNeed
 	if rs.FeeType == enum.RescheduleFeeCharged && rs.FeeAmount > 0 {
-		status = dto.RescheduleFeeUnpaid
+		status = contract.RescheduleFeeUnpaid
 		for _, p := range payments {
 			if p.Status == enum.PaymentStatusConfirmed {
-				status = dto.RescheduleFeePaid
+				status = contract.RescheduleFeePaid
 				break
 			}
 			if p.Status == enum.PaymentStatusPending {
-				status = dto.RescheduleFeePending
+				status = contract.RescheduleFeePending
 			}
 		}
 	}
-	return &dto.ClientRescheduleDetailResp{
+	return &contract.ClientRescheduleDetailResp{
 		Reschedule: *rs,
 		PayStatus:  status,
 		Payments:   payments,
@@ -550,7 +550,7 @@ func (s *Service) ClientRescheduleDetail(ctx context.Context, cu *ClientUser, re
 
 // ClientPayRescheduleFee 客户提交调度费支付凭证（H2），进入工作室核验队列。
 // 前置：改期单已同意且确需收费；幂等：已有待核验/已核验记录时直接拒绝，避免重复上传。
-func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, rescheduleID int64, req dto.ClientReschedulePayReq) (*model.OrderPayment, error) {
+func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, rescheduleID int64, req contract.ClientReschedulePayReq) (*model.OrderPayment, error) {
 	rs, err := s.getOwnedReschedule(ctx, cu, rescheduleID)
 	if err != nil {
 		return nil, err
@@ -601,7 +601,7 @@ func (s *Service) ClientPayRescheduleFee(ctx context.Context, cu *ClientUser, re
 // 白名单字段仅「地点 / 人数 / 风格 / 备注」：金额与套餐不在其列，拍摄日期与时段也不在——
 // 日期时段变更必须走改期单（需重排档期锁），否则会出现「订单已改、档期仍锁在旧日期」。
 // 仅「待定金 / 待拍摄」可改；空值表示「不修改」，避免误清空既有需求。
-func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientOrderRequirementReq) error {
+func (s *Service) ClientUpdateOrderRequirement(ctx context.Context, cu *ClientUser, orderID int64, req contract.ClientOrderRequirementReq) error {
 	o, err := s.OrderRepo.GetByID(ctx, cu.CompanyID, orderID)
 	if err != nil {
 		return errs.NotFound(errs.ErrOrderNotFound)

@@ -3,10 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) CustomerList(c *gin.Context) {
@@ -37,7 +37,7 @@ func (h *Controller) CustomerDetail(c *gin.Context) {
 
 func (h *Controller) CustomerCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.CustomerCreateReq
+	var req contract.CustomerCreateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *Controller) CustomerUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.CustomerUpdateReq
+	var req contract.CustomerUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/dto"
 )
 
 // client_finance 客户端（H5/小程序）资金与售后链路：
@@ -115,7 +115,7 @@ func (s *Service) ClientPayments(ctx context.Context, cu *ClientUser, orderID in
 //  2. 金额默认按「订单剩余应收」（total - paid）取，客户不传也无需自己算；
 //     显式传值时不得让累计已收超过订单总额（与 PC CreatePayment 同一上限口径）。
 //  3. 银行转账类收款方式必须带凭证，否则员工端无据可核。
-func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, orderID int64, req dto.ClientPaymentMarkReq) (*model.OrderPayment, error) {
+func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, orderID int64, req contract.ClientPaymentMarkReq) (*model.OrderPayment, error) {
 	o, err := s.clientOwnedOrder(ctx, cu, orderID)
 	if err != nil {
 		return nil, err
@@ -195,17 +195,17 @@ func (s *Service) ClientRegisterPayment(ctx context.Context, cu *ClientUser, ord
 //
 // 为什么不复用 PC 的 /settings/payment-method/list：那是管理端配置接口（settings:view），
 // 且返回内部 status/sort 等字段；客户侧只需要"照着付款"的最小信息集。
-func (s *Service) ClientPaymentMethods(ctx context.Context, cu *ClientUser) ([]dto.ClientPaymentMethodResp, error) {
+func (s *Service) ClientPaymentMethods(ctx context.Context, cu *ClientUser) ([]contract.ClientPaymentMethodResp, error) {
 	list, err := s.SettingsRepo.ListPaymentMethods(ctx, cu.CompanyID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]dto.ClientPaymentMethodResp, 0, len(list))
+	out := make([]contract.ClientPaymentMethodResp, 0, len(list))
 	for _, m := range list {
 		if m.Status != 1 { // 停用项不下发
 			continue
 		}
-		out = append(out, dto.ClientPaymentMethodResp{
+		out = append(out, contract.ClientPaymentMethodResp{
 			ID:          m.ID,
 			Name:        m.Name,
 			Type:        m.Type,

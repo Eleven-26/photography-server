@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
-	"photography-server/internal/presentation/dto"
 )
 
 // monthRange 返回左闭右开区间 [月初, 下月初)。
@@ -28,13 +28,13 @@ func monthRange(month string) (string, string) {
 
 // FinanceSummary 财务汇总。repository 取数 → 本层映射为对外契约（dto），
 // 避免仓储结构体直接充当 API 响应。
-func (s *Service) FinanceSummary(ctx context.Context, op Operator, month string) (*dto.FinanceSummaryResp, error) {
+func (s *Service) FinanceSummary(ctx context.Context, op Operator, month string) (*contract.FinanceSummaryResp, error) {
 	start, end := monthRange(month)
 	sum, err := s.FinanceRepo.GetSummary(ctx, op.CompanyID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return &dto.FinanceSummaryResp{
+	return &contract.FinanceSummaryResp{
 		MonthReceivable:     sum.MonthReceivable,
 		MonthReceived:       sum.MonthReceived,
 		MonthRemaining:      sum.MonthRemaining,

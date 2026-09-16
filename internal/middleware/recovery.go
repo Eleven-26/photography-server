@@ -8,7 +8,7 @@ import (
 
 	"photography-server/internal/pkg/errs"
 	"photography-server/internal/pkg/logger"
-	"photography-server/internal/presentation/response"
+	"photography-server/internal/pkg/response"
 )
 
 // Recovery 统一异常恢复，返回 JSON 错误

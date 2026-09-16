@@ -1,4 +1,4 @@
-package dto
+package contract
 
 // DashboardOverviewResp 工作台概览（PC 首页）。
 //

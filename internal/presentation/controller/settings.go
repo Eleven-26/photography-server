@@ -3,10 +3,10 @@ package controller
 import (
 	"github.com/gin-gonic/gin"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/middleware"
+	"photography-server/internal/pkg/response"
 	"photography-server/internal/presentation/bind"
-	"photography-server/internal/presentation/dto"
-	"photography-server/internal/presentation/response"
 )
 
 func (h *Controller) Workspace(c *gin.Context) {
@@ -21,7 +21,7 @@ func (h *Controller) Workspace(c *gin.Context) {
 
 func (h *Controller) CompanyUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.CompanyUpdateReq
+	var req contract.CompanyUpdateReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -45,7 +45,7 @@ func (h *Controller) PaymentMethodList(c *gin.Context) {
 
 func (h *Controller) PaymentMethodCreate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.PaymentMethodReq
+	var req contract.PaymentMethodReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -64,7 +64,7 @@ func (h *Controller) PaymentMethodUpdate(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	var req dto.PaymentMethodReq
+	var req contract.PaymentMethodReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return
@@ -117,13 +117,13 @@ func (h *Controller) StudioGet(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, dto.NewStaffStudioSettingResp(st, h.Cfg.Share.H5BaseURL, op.UserID))
+	response.OK(c, contract.NewStaffStudioSettingResp(st, h.Cfg.Share.H5BaseURL, op.UserID))
 }
 
 // StudioUpdate 工作室设置更新（仅更新传入字段，数值支持改为 0）
 func (h *Controller) StudioUpdate(c *gin.Context) {
 	op := middleware.GetOperator(c)
-	var req dto.StaffStudioSettingReq
+	var req contract.StaffStudioSettingReq
 	if err := bind.BindJSON(c, &req); err != nil {
 		response.Fail(c, err)
 		return

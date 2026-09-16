@@ -8,11 +8,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"photography-server/internal/contract"
 	"photography-server/internal/domain"
 	"photography-server/internal/enum"
 	"photography-server/internal/model"
 	"photography-server/internal/pkg/errs"
-	"photography-server/internal/presentation/dto"
 	"photography-server/internal/repository"
 )
 
@@ -28,7 +28,7 @@ func (s *Service) GetLeadDetail(ctx context.Context, op Operator, id int64) (*mo
 	return l, nil
 }
 
-func (s *Service) CreateLead(ctx context.Context, op Operator, req dto.LeadCreateReq) (*model.Lead, error) {
+func (s *Service) CreateLead(ctx context.Context, op Operator, req contract.LeadCreateReq) (*model.Lead, error) {
 	l := model.Lead{
 		TenantBase: model.TenantBase{
 			Base:      model.Base{CreatedBy: op.UserID, UpdatedBy: op.UserID},
@@ -69,7 +69,7 @@ func (s *Service) CreateLead(ctx context.Context, op Operator, req dto.LeadCreat
 
 // UpdateLead 局部更新：未传字段保持库中原值。
 // 前端「标记流失」「改状态」只会传 status，若按全量覆盖会把姓名/手机号/备注清空。
-func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto.LeadUpdateReq) error {
+func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req contract.LeadUpdateReq) error {
 	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
@@ -100,7 +100,7 @@ func (s *Service) UpdateLead(ctx context.Context, op Operator, id int64, req dto
 	})
 }
 
-func (s *Service) FollowLead(ctx context.Context, op Operator, id int64, req dto.LeadFollowReq) error {
+func (s *Service) FollowLead(ctx context.Context, op Operator, id int64, req contract.LeadFollowReq) error {
 	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, id)
 	if err != nil {
 		return errs.NotFound(errs.ErrLeadNotFound)
@@ -166,7 +166,7 @@ func (s *Service) ConvertLeadToCustomer(ctx context.Context, op Operator, leadID
 	return c, nil
 }
 
-func (s *Service) CreateQuote(ctx context.Context, op Operator, leadID int64, req dto.QuoteCreateReq) (*model.Quote, error) {
+func (s *Service) CreateQuote(ctx context.Context, op Operator, leadID int64, req contract.QuoteCreateReq) (*model.Quote, error) {
 	l, err := s.LeadRepo.GetByID(ctx, op.CompanyID, leadID)
 	if err != nil {
 		return nil, errs.NotFound(errs.ErrLeadNotFound)
