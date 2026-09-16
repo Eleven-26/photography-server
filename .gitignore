@@ -21,6 +21,9 @@ config/config.local.yaml
 # uploads
 uploads/
 
+# docker compose 数据卷根目录（mysql/redis/nacos/clickhouse 等容器数据 + uploads，首启自动创建）
+volume/
+
 # logs
 logs/
 *.log

@@ -11,8 +11,12 @@ run:
 
 # 本地 dev：Go 进程不会自动读 .env（那是 docker compose 的能力），
 # 这里手动 source 后启动，否则 config.yaml 的 nacos.username/password 为空 → 拉取配置 401。
+# ⚠️ .env 里的 APP_NACOS_SERVER_ADDR 是【容器内】地址（compose 网络里的 nacos:8848），
+#     host 跑 Go 解析不了该主机名，故 source 之后强制覆盖为本机映射端口 127.0.0.1:${NACOS_PORT}。
 run-dev:
 	@if [ -f .env ]; then set -a; . ./.env; set +a; else echo "⚠️ 未找到 .env，按 config.yaml 原样启动"; fi; \
+	export APP_NACOS_SERVER_ADDR="127.0.0.1:$${NACOS_PORT:-8848}"; \
+	echo "→ Nacos 地址（host 视角）: $$APP_NACOS_SERVER_ADDR"; \
 	go run $(GO_TAGS_FLAG) ./cmd/server -c config/config.yaml -p dev
 
 build:

@@ -9,6 +9,8 @@
 # ============================================================
 
 app:
+  # 服务名：Nacos 服务注册名兜底（nacos.service_name 为空时取它）
+  name: photography-server
   mode: debug
   port: 8080
   timezone: Asia/Shanghai
@@ -58,7 +60,11 @@ log:
   level: info
 
 upload:
-  dir: /data/uploads
+  # ⚠️ 必须与容器内实际挂载点一致：compose 把宿主 ${UPLOADS_DIR} 挂到 /app/uploads，
+  #    Dockerfile 也只创建 /app/uploads 且以非 root 用户 appuser 运行。写成 /data/... 会：
+  #    ① /data 不存在且不可写 → MkdirAll 失败 → 所有上传 500；
+  #    ② 即便建得出来也不在挂载卷内 → 容器一重建图片全丢。
+  dir: /app/uploads
   max_size_mb: 50
 
 xxljob:
@@ -68,7 +74,7 @@ xxljob:
   executor_ip: 127.0.0.1
   executor_port: "9999"
   registry_key: photography-server
-  log_dir: /data/logs/xxl-job
+  log_dir: /app/logs/xxl-job
 
 elasticsearch:
   enable: true

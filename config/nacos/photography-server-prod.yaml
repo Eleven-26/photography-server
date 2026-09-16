@@ -9,6 +9,9 @@
 # ============================================================
 
 app:
+  # 服务名：Nacos 服务注册名兜底（nacos.service_name 为空时取它；生产由 .env 的
+  # APP_NACOS_SERVICE_NAME=photography-server 注入，此处同值保持显式可读）
+  name: photography-server
   mode: release
   port: 8080
   timezone: Asia/Shanghai
@@ -60,17 +63,23 @@ log:
   level: warn
 
 upload:
-  dir: /data/uploads
+  # ⚠️ 必须与容器内实际挂载点一致：compose 把宿主 ${UPLOADS_DIR} 挂到 /app/uploads，
+  #    Dockerfile 也只创建 /app/uploads 且以非 root 用户 appuser 运行。写成 /data/... 会：
+  #    ① /data 不存在且不可写 → MkdirAll 失败 → 所有上传 500；
+  #    ② 即便建得出来也不在挂载卷内 → 容器一重建图片全丢。
+  dir: /app/uploads
   max_size_mb: 100
 
 xxljob:
+  # 目前 Go 侧只有 job.test / job.health_check 两个占位任务，无真实业务定时任务；
+  # 2核2G 等小内存机器建议置 false（省约 500MB，仍会打 "xxl-job disabled, skipping" 正常启动）。
   enable: true # APP_XXLJOB_ENABLE
   server_addr: http://xxl-job-admin:8080 # APP_XXLJOB_SERVER_ADDR（容器内访问监听端口 8080；9100 是宿主映射）
   access_token: "ENCv1:L1XSnxgDuiPxAD0yHqA/KH5jo+cbqY8Jm70ZX9MUvsR1ktaqyH0pXT2oId+B2tmZ/Cy5FNVh" # 密文；原 XXLJOB_ACCESS_TOKEN
   executor_ip: 127.0.0.1 # APP_XXLJOB_EXECUTOR_IP
   executor_port: "9999" # APP_XXLJOB_EXECUTOR_PORT
   registry_key: photography-server # APP_XXLJOB_REGISTRY_KEY
-  log_dir: /data/logs/xxl-job
+  log_dir: /app/logs/xxl-job # 预留：当前 Go 执行器未读取，仅避开不存在的 /data
 
 elasticsearch:
   enable: false # APP_ELASTICSEARCH_ENABLE；多地址可用 APP_ELASTICSEARCH_URLS 覆盖（逗号分隔）

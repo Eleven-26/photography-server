@@ -7,12 +7,21 @@
 # ============================================================
 
 app:
+  # 服务名：Nacos 服务注册名兜底（nacos.service_name 为空时取它）
+  name: photography-server
   mode: debug
   port: 8080
   timezone: Asia/Shanghai
   cors_origins:
     - http://localhost:5173 # Vite 开发服务器（SLOT 管理端）
     - http://127.0.0.1:5173
+
+# 对外分享链接基址（H5 站点）：预约主页与作品集两条分享链接共用，只差落地路由。
+# 客户在微信内打开后落到 photography-h5，由 ?slug= 定位租户。
+# 留空时 staff studio/get 的 homepage_url / portfolio_url 返回空串（前端提示「主页标识未设置」）。
+# 容器内栈联调可填宿主访问 H5 容器的地址（如 http://localhost:8082）。APP_SHARE_H5_BASE_URL 可覆盖。
+share:
+  h5_base_url: ""
 
 jwt:
   secret: "ENCv1:xvrLWIThdYyIVIa7EZupM13tJx/3/1i6WW5mjWPzbCFtuKdwJGguHDo5sD8h0JCqng=="

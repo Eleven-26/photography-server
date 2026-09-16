@@ -8,6 +8,8 @@
 # ============================================================
 
 app:
+  # 服务名：Nacos 服务注册名兜底（nacos.service_name 为空时取它）
+  name: photography-server
   mode: debug
   port: 8080
   timezone: Asia/Shanghai
