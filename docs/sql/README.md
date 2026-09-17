@@ -22,6 +22,9 @@ docs/sql/
 ├── ddl.sql                  # 【全量】建表结构（31 张表、606 列）
 ├── dml.sql                  # 【全量】初始化数据（公司/门店/角色/角色权限/管理员/收款方式/示例业务数据）
 ├── verify_consistency.sh    # 全量 vs 增量链 一致性校验（依赖本地 mysql-dev 容器）
+├── initdb/                  # 【第三方组件】容器首启初始化（非业务表，不参与增量链）
+│   ├── 01-nacos-schema.sql  # Nacos 3.2.4 官方 schema（13 张表）+ 建 nacos 库
+│   └── 02-xxl-job-tables.sql # XXL-JOB 3.4.2 官方建表脚本（自带建 xxl_job 库）
 ├── 增量/
 │   ├── ddl-初版.sql          # 增量链起点 = 第一版 ddl 快照（已冻结，不含后续 upgrade 的改动）
 │   ├── dml-初版.sql          # 增量链起点 = 第一版 dml 快照（已冻结）
@@ -41,6 +44,26 @@ mysql -uroot -p < docs/sql/dml.sql   # 初始化数据（必须在 ddl 之后）
 ```
 
 默认管理员：`admin / admin123456`（`sys_user` 中为 bcrypt 密文）。
+
+### 容器部署（docker compose 首次启动自动完成）
+
+用 compose 部署时**不需要手工执行上面的命令**：`mysql` 容器首次启动（数据卷为空）会按文件名顺序
+执行 `/docker-entrypoint-initdb.d/` 下的四个脚本：
+
+| 执行顺序 | 来源 | 作用 |
+|---|---|---|
+| `01-nacos-schema.sql` | `initdb/01-nacos-schema.sql` | 建 `nacos` 库 + 13 张表（Nacos 的配置与用户存储） |
+| `02-xxl-job-tables.sql` | `initdb/02-xxl-job-tables.sql` | 建 `xxl_job` 库 + 表（调度中心用） |
+| `03-business-ddl.sql` | `ddl.sql`（本目录） | 建 `photography` 库 + 31 张业务表 |
+| `04-business-dml.sql` | `dml.sql`（本目录） | 业务初始数据 |
+
+⚠️ 两点必须知道：
+
+1. **只在数据卷为空时执行**。若 `volume/mysql/data` 已有数据，initdb 会被整体跳过 —— 老库按下面的增量链升级，
+   遗漏的库表用 `docker exec -i photography-mysql mysql -uroot -p < docs/sql/initdb/01-nacos-schema.sql` 手工补。
+2. **`initdb/` 下的第三方 schema 不参与「全量 ≡ 增量链」这条不变量** —— 它们描述的是外部组件的库表，
+   升级 Nacos / XXL-JOB 版本时**整体替换**该文件，不走 `增量/upgrade_*.sql`；对应的组件版本号在 `.env`
+   （`NACOS_VERSION` / `XXLJOB_ADMIN_VERSION`）里，两者必须同步改。
 
 ### 老环境升级（已有库增量升级）
 

@@ -45,7 +45,9 @@ func main() {
 
 	// Nacos 是唯一业务配置源：本地文件仅为 bootstrap（Nacos 连接信息），业务配置 100% 从 Nacos 拉取
 	// （data_id 按 -p/APP_PROFILE 区分），拉取失败直接终止启动（fail-fast）；SDK 不可达时自动降级本地快照。
-	cfg, err := config.LoadWithFetcher(configPath, profile, infrastructure.FetchConfig)
+	// FetchConfigWithRetry 给上述 fail-fast 外挂指数退避（次数/间隔见 APP_NACOS_FETCH_*），
+	// 避免 Nacos 冷启期本进程被 restart 策略拉着快速重启成环。
+	cfg, err := config.LoadWithFetcher(configPath, profile, infrastructure.FetchConfigWithRetry)
 	if err != nil {
 		panic(fmt.Sprintf("加载配置失败: %v", err))
 	}

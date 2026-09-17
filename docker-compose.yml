@@ -15,6 +15,17 @@ services:
     volumes:
       - ${MYSQL_DATA_DIR:-./volume/mysql/data}:/var/lib/mysql
       - ${MYSQL_CONF_DIR:-./volume/mysql/conf}:/etc/mysql/conf.d
+      # ===== 首次初始化脚本（/docker-entrypoint-initdb.d/）=====
+      # mysql 官方镜像【仅在数据卷为空时】按文件名字典序执行本目录下的 *.sql；
+      # 已有数据的库一律跳过 -> 天然幂等，对现网零风险，可放心保留。
+      # 顺序由文件名前缀决定：第三方组件 schema 在前、业务库表在后。
+      #   nacos 库表（13 张，Nacos 3.x 的 MySQL 存储）
+      - ${MYSQL_INITDB_NACOS:-./photography-server/docs/sql/initdb/01-nacos-schema.sql}:/docker-entrypoint-initdb.d/01-nacos-schema.sql:ro
+      #   xxl_job 库表（xxl-job-admin 首启必需）
+      - ${MYSQL_INITDB_XXLJOB:-./photography-server/docs/sql/initdb/02-xxl-job-tables.sql}:/docker-entrypoint-initdb.d/02-xxl-job-tables.sql:ro
+      #   业务库表 + 初始数据（自带 CREATE DATABASE photography + USE，见 docs/sql/README.md）
+      - ${MYSQL_INITDB_DDL:-./photography-server/docs/sql/ddl.sql}:/docker-entrypoint-initdb.d/03-business-ddl.sql:ro
+      - ${MYSQL_INITDB_DML:-./photography-server/docs/sql/dml.sql}:/docker-entrypoint-initdb.d/04-business-dml.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: ${MYSQL_HEALTH_INTERVAL:-5s}
@@ -53,6 +64,15 @@ services:
     volumes:
       - ${NATS_CONF_DIR:-./volume/nats/conf}/nats.conf:/etc/nats/nats.conf:ro
       - ${NATS_DATA_DIR:-./volume/nats/data}:/data
+    healthcheck:
+      # 监控端口（8222）的 /healthz；alpine 镜像自带 busybox wget。
+      # 前提是 nats.conf 里配了 http_port: 8222，否则监控端口不开、本探针恒失败。
+      #   模板见 config/nats.example.conf，部署时须先 cp 到 ${NATS_CONF_DIR}/nats.conf
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8222/healthz || exit 1"]
+      interval: ${NATS_HEALTH_INTERVAL:-5s}
+      timeout: ${NATS_HEALTH_TIMEOUT:-3s}
+      retries: ${NATS_HEALTH_RETRIES:-12}
+      start_period: 10s
     restart: unless-stopped
     networks:
       - backend-net
@@ -73,6 +93,15 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      # xxl-job-admin 镜像内是否带 curl/wget 不确定，故双候选；
+      # 都不可用时会恒为 unhealthy —— 但它【不阻塞 backend】（见 backend.depends_on），
+      # 只影响 docker compose ps 观感，可按需删除本节。
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8080/xxl-job-admin/ || wget -q -O /dev/null http://127.0.0.1:8080/xxl-job-admin/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     networks:
       - backend-net
@@ -252,18 +281,39 @@ services:
       - backend-net
 
   # ===== Nacos 配置中心 + 注册中心（唯一业务配置源，backend 硬依赖）=====
-  # standalone 模式 + 内嵌 Derby 存储，开箱可用；数据卷持久化便于重启后保留配置与本地快照语义一致。
+  # standalone 模式 + MySQL 存储：3.x 起内嵌 Derby 落在【容器可写层】（本服务从未挂可写卷），
+  # recreate 即丢全部配置与注册信息；切 MySQL 后配置才真正持久化，库表由 mysql 的 initdb 建好。
+  # 数据源 env 映射（对应官方镜像 conf/application.properties 模板）：
+  #   SPRING_DATASOURCE_PLATFORM -> spring.sql.init.platform（留空=Derby，mysql=MySQL）
+  #   MYSQL_SERVICE_*            -> db.url.0 / db.user.0 / db.password.0
+  #   注意：3.x 用 spring.sql.init.platform，与 2.x 的 spring.datasource.platform 不同名，勿照抄旧文档。
+  #   "库表先于服务"是真依赖：故 depends_on mysql 且等 healthy；nacos 库由
+  #      docs/sql/initdb/01-nacos-schema.sql 建好（13 张表）。
   # v3 控制台为独立端口（容器内 8080，宿主经 NACOS_CONSOLE_PORT 访问）；v2 旧版控制台在 http://localhost:8848/nacos。
   # 客户端 SDK 走 gRPC：9848 = 8848+1000，映射端口必须保持该偏移关系。
-  # 业务配置发布：data_id=photography-server-<profile>.yaml，模板见 config/nacos/（未发布则 backend fail-fast）。
+  # 业务配置发布：data_id=photography-server-<profile>.yaml，模板见 config/nacos/（未发布则 backend fail-fast）；
+  #   发布由一次性容器 nacos-init 承担，见下方服务。
   # 鉴权三件套：NACOS_AUTH_ENABLE=true 时 TOKEN / IDENTITY_KEY / IDENTITY_VALUE 缺一即 exit 255
   # （脚本报 "env NACOS_AUTH_IDENTITY_KEY must be set."）。IDENTITY 为服务端间识别头，standalone 也必填；
   # Go 客户端不使用它们，连接只需 APP_NACOS_USERNAME/PASSWORD。
   nacos:
     image: nacos/nacos-server:${NACOS_VERSION:-v3.2.4}
     container_name: photography-nacos
+    depends_on:
+      mysql:
+        condition: service_healthy
     environment:
       - MODE=standalone
+      # ---- 存储：MySQL ----
+      - SPRING_DATASOURCE_PLATFORM=${NACOS_DB_PLATFORM:-mysql}
+      - MYSQL_SERVICE_HOST=${NACOS_DB_HOST:-mysql}
+      - MYSQL_SERVICE_PORT=${NACOS_DB_PORT:-3306}
+      - MYSQL_SERVICE_DB_NAME=${NACOS_DB_NAME:-nacos}
+      - MYSQL_SERVICE_USER=${NACOS_DB_USER:-root}
+      - MYSQL_SERVICE_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      # allowPublicKeyRetrieval 为 MySQL 8 caching_sha2_password 认证所需，勿删
+      - "MYSQL_SERVICE_DB_PARAM=${NACOS_DB_PARAM:-characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}"
+      # ---- 鉴权 ----
       - NACOS_AUTH_ENABLE=${NACOS_AUTH_ENABLE:-false} # 开启后须同步设置 APP_NACOS_USERNAME/PASSWORD
       - NACOS_AUTH_TOKEN=${NACOS_AUTH_TOKEN:-}
       - NACOS_AUTH_IDENTITY_KEY=${NACOS_AUTH_IDENTITY_KEY:-serverIdentity}
@@ -275,10 +325,54 @@ services:
       - "${NACOS_PORT:-8848}:8848"      # OpenAPI（v2 控制台也在 8848/nacos）
       - "${NACOS_GRPC_PORT:-9848}:9848" # gRPC（客户端 SDK 实际连接端口）
       - "${NACOS_CONSOLE_PORT:-8850}:8080" # v3 控制台（独立端口，勿用 8080 宿主位——backend 已占）
+    healthcheck:
+      # 候选端点按"开鉴权后仍免登录"优先：/v1/console/health/** 在官方 nacos.security.ignore.urls
+      # 白名单内；/v3/admin/** 受 nacos.core.auth.admin.enabled 管控（默认 true -> 需鉴权），仅作兜底。
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8848/nacos/v1/console/health/readiness || curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8848/nacos/v3/admin/core/state/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s   # 冷启 + 建库表耗时，给足
     restart: unless-stopped
     networks:
       - backend-net
 
+  # ===== Nacos 一次性初始化（把"数据级依赖"纳入编排）=====
+  # 职责：① 初始化管理员（Nacos 3.x 起用户表为空，不再预置 nacos/nacos）；
+  #       ② 发布业务配置 data_id（未发布则 backend 拉配置 fail-fast，连 MySQL 之前就死）。
+  # 这两件事 depends_on 表达不了 —— 交给一个【跑完即退】的容器，
+  # backend 以 service_completed_successfully 等它退出码 0（见 backend.depends_on）。
+  # 幂等：每次 up 都会重放本容器（它不是常驻服务），脚本内三步全部"已达成即跳过"：
+  #   能登录=管理员已建 -> 跳过初始化；远端配置与模板一致 -> 跳过推送。等于每次 up 自动校准配置。
+  # 镜像直接复用 nacos-server（内含 bash + curl），无需额外拉 init 镜像。
+  # 调试期想临时关掉：.env 设 NACOS_INIT_ENABLE=false（容器秒退且退出码 0，不阻塞 backend）。
+  nacos-init:
+    image: ${NACOS_INIT_IMAGE:-nacos/nacos-server:v3.2.4}
+    container_name: photography-nacos-init
+    depends_on:
+      nacos:
+        condition: service_healthy
+    environment:
+      - NACOS_SERVER=http://nacos:8848
+      - NACOS_ADMIN_USERNAME=${APP_NACOS_USERNAME:-nacos}
+      - NACOS_ADMIN_PASSWORD=${APP_NACOS_PASSWORD:-}
+      - NACOS_INIT_ENABLE=${NACOS_INIT_ENABLE:-true}
+      - NACOS_INIT_FORCE_PUSH=${NACOS_INIT_FORCE_PUSH:-false}
+      - NACOS_INIT_TIMEOUT=${NACOS_INIT_TIMEOUT:-180}
+      - APP_PROFILE=${APP_PROFILE:-prod}
+      - APP_NACOS_GROUP=${APP_NACOS_GROUP:-DEFAULT_GROUP}
+      - APP_NACOS_NAMESPACE=${APP_NACOS_NAMESPACE:-}
+      - APP_NACOS_DATA_ID=${APP_NACOS_DATA_ID:-photography-server-${APP_PROFILE:-prod}.yaml}
+      - APP_NACOS_APP_NAME=${APP_NACOS_APP_NAME:-photography-server}
+      - NACOS_CONFIG_DIR=/config
+    volumes:
+      - ${NACOS_INIT_SCRIPT:-./photography-server/scripts/nacos_init.sh}:/init.sh:ro
+      # 配置模板目录（photography-server-<profile>.yaml），与 scripts/nacos_publish.sh 共用同一份
+      - ${NACOS_CONFIG_DIR:-./photography-server/config/nacos}:/config:ro
+    entrypoint: ["bash", "/init.sh"]
+    restart: "no"       # 一次性容器：禁止 always，否则 service_completed_successfully 永远等不到
+    networks:
+      - backend-net
   # 后端服务
   backend:
     build:
@@ -303,7 +397,7 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy   # 原为 service_started：容器起了不等于能订阅
       xxl-job-admin:
         condition: service_started
       # elasticsearch / mongo 已从 depends_on 移除：二者属 debug profile 的可选组件，
@@ -314,9 +408,12 @@ services:
       # 只跑 Jaeger 通道时可注释掉本项，避免每次 up 都拉起整套 SkyWalking 栈
       skywalking-oap:
         condition: service_started
-      # Nacos 是唯一业务配置源（硬依赖）：backend 启动必连，未发布 data_id 会 fail-fast
+      # Nacos 是唯一业务配置源（硬依赖）：既要【容器就绪】也要【配置已发布】。
+      # 后者是数据级状态，compose 表达不了 —— 只能等"负责发配置的那个容器成功退出"。
       nacos:
-        condition: service_started
+        condition: service_healthy
+      nacos-init:
+        condition: service_completed_successfully
     environment:
       # 【业务配置一律不在容器 env 里】app.mode / jwt.* / db.* / redis.* / nats.* / mongodb.* /
       # log.* / upload.* / xxljob.* / elasticsearch.* / jaeger.* 100% 来自 Nacos：

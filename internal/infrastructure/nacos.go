@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,6 +106,65 @@ func FetchConfig(n config.Nacos) (string, error) {
 		return "", fmt.Errorf("远端配置为空（data_id=%s group=%s），请检查 Nacos 上是否已发布该配置", n.DataId, n.Group)
 	}
 	return content, nil
+}
+
+// 配置拉取重试参数（启动自举阶段只能读环境变量——此刻配置还没拿到）：
+//   APP_NACOS_FETCH_RETRIES     最大尝试次数（含首次），默认 8
+//   APP_NACOS_FETCH_INTERVAL_MS 首次退避间隔（毫秒），默认 3000；每次翻倍，上限 15s
+const (
+	defaultFetchRetries    = 8
+	defaultFetchIntervalMs = 3000
+	maxFetchIntervalMs     = 15000
+)
+
+// FetchConfigWithRetry 带指数退避的配置拉取（启动路径专用，main 用它替代裸 FetchConfig）。
+//
+// 为什么需要：Nacos 是启动链上最靠前的硬依赖，旧实现“一次失败即 panic”再叠加
+// restart: unless-stopped，会形成【无退避的快速重启环】—— Nacos 冷启的 60s 内本进程可能重启
+// 几十次，日志刷屏且往 Nacos 打一堆脏连接。加退避后，`docker compose restart backend`、
+// Nacos 滚动重启等日常场景都不必再关心两者的起停顺序。
+//
+// 注意：所有错误都重试（含“远端配置为空”）——首次部署时配置可能正由 nacos-init 容器发布，
+// 几秒后就可用，过早 fail-fast 反而制造无谓的启动失败。
+func FetchConfigWithRetry(n config.Nacos) (string, error) {
+	retries := envInt("APP_NACOS_FETCH_RETRIES", defaultFetchRetries)
+	interval := envInt("APP_NACOS_FETCH_INTERVAL_MS", defaultFetchIntervalMs)
+
+	var lastErr error
+	for attempt := 1; attempt <= retries; attempt++ {
+		content, err := FetchConfig(n)
+		if err == nil {
+			if attempt > 1 {
+				logger.Infof("nacos 配置拉取在第 %d 次尝试成功", attempt)
+			}
+			return content, nil
+		}
+		lastErr = err
+		if attempt == retries {
+			break
+		}
+		wait := time.Duration(interval) * time.Millisecond
+		if wait > maxFetchIntervalMs*time.Millisecond {
+			wait = maxFetchIntervalMs * time.Millisecond
+		}
+		logger.Warnf("拉取 nacos 配置失败（第 %d/%d 次）：%v；%s 后重试", attempt, retries, err, wait)
+		time.Sleep(wait)
+		interval *= 2
+	}
+	return "", fmt.Errorf("拉取 nacos 配置已重试 %d 次仍失败：%w", retries, lastErr)
+}
+
+// envInt 读取正整数环境变量；缺省/非法/非正数一律返回 def。
+func envInt(key string, def int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
 }
 
 // RegisterService 把本实例注册到 Nacos（临时实例：Ephemeral=true，SDK 按 BeatInterval 自动心跳）。
