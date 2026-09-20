@@ -23,6 +23,17 @@ type configEncryptReq struct {
 
 // ConfigEncrypt 生成配置密文
 // POST /test/config/encrypt
+// @Summary      生成配置密文
+// @Description  把明文加密为 ENCv1 密文（**只加密、不解密**），用于维护 Nacos 模板中的敏感字段。
+// @Description  响应形如 {count, items:[{cipher}]}，明文不进日志、不回显。仅 dev/test/docker.dev 注册，不受 debug 构建标签影响。
+// @Tags         调试
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{values=[]string}  true  "待加密的明文列表（至少 1 项）"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /test/config/encrypt [post]
 func (h *Controller) ConfigEncrypt(c *gin.Context) {
 	var req configEncryptReq
 	if err := bind.BindJSON(c, &req); err != nil {

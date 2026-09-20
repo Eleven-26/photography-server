@@ -22,6 +22,24 @@ import (
 //
 // 可选表单字段 public=1 时落公开媒体目录（返回 /media/…，免登录可访问），
 // 供作品集封面/图集这类对外宣传物料使用；缺省仍落鉴权目录 /uploads（见 service.UploadOptions）。
+// @Summary      上传文件
+// @Description  上传图片/视频（multipart/form-data）。表单字段：file（必填）、biz_type、biz_id、store_id、public。
+// @Description  public=1 落公开媒体目录并返回 /media/… 链接（**免登录可访问**，供作品集封面/图集等对外物料）；
+// @Description  其余取值（含空串）一律落强制鉴权的 /uploads，两者物理隔离。超限返回文件过大错误。
+// @Tags         上传
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file      formData  file    true   "文件内容"
+// @Param        biz_type  formData  string  false  "业务类型（order / delivery / asset 等）"
+// @Param        biz_id    formData  int     false  "业务主键"
+// @Param        store_id  formData  int     false  "门店ID"
+// @Param        public    formData  string  false  "1=公开媒体目录 /media；其余（含空）按私有 /uploads"
+// @Success      200  {object}  response.Body{data=service.UploadResult}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /upload/file [post]
 func (h *Controller) UploadFile(c *gin.Context) {
 	op := middleware.GetOperator(c)
 

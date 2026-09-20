@@ -15,6 +15,455 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/asset/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "创建作品集条目；images 与 package_ids 为逗号分隔字符串。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "创建作品",
+                "parameters": [
+                    {
+                        "description": "作品信息（title 必填）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.AssetCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Asset"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/asset/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除作品集条目。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "删除作品",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "作品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/asset/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回单条作品详情。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "作品详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "作品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Asset"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/asset/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询作品集，支持关键词、分类、发布状态、精选过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "作品列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 1-草稿 2-已发布；featured 0-否 1-是）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "category": {
+                                    "type": "string"
+                                },
+                                "featured": {
+                                    "type": "string"
+                                },
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Asset"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/asset/status/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "局部切换发布状态 / 可见性 / 精选，不要求回传全字段；字段传 null 表示保持原值。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "作品状态开关",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "作品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "开关字段（status 1-草稿 2-已发布；visibility 1-公开 2-未公开；featured 0-否 1-是）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.AssetFlagsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/asset/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新作品；body.id 为主键。状态/可见性/精选/授权传 null 表示保持原值（0 是合法取值）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "作品集"
+                ],
+                "summary": "更新作品",
+                "parameters": [
+                    {
+                        "description": "作品信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.AssetUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "员工账号密码登录（pc / miniapp 管理端共用），成功后返回 JWT 与用户信息（含角色、权限点、数据范围）；连续失败会触发账号锁定。",
@@ -60,6 +509,774 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/cancel/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "释放已锁定的档期时段。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "取消档期锁定",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "档期记录ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按日期区间查询档期占用；photographer_id 可选，用于只看某位摄影师。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "档期列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（日期格式 2006-01-02）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "end_date": {
+                                    "type": "string"
+                                },
+                                "photographer_id": {
+                                    "type": "integer"
+                                },
+                                "start_date": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.CalendarBlock"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/lock": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "手动锁定某个时段（占用档期，防重复排期）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "锁定档期",
+                "parameters": [
+                    {
+                        "description": "档期信息（date / time_range 必填）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.CalendarBlockReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.CalendarBlock"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/slot-template/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除排班时段模板。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "删除档期时段模板",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "模板ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/slot-template/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回排班时段模板；photographer_id 可选，缺省取当前操作人。与员工端共用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "档期时段模板列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（可省略）",
+                        "name": "req",
+                        "in": "body",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "photographer_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.SlotTemplate"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/slot-template/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "新建（不传 :id）/ 更新（传 :id）档期时段模板；同一 handler 挂两个路径，与员工端共用实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "保存档期时段模板",
+                "parameters": [
+                    {
+                        "description": "模板信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffSlotTemplateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.SlotTemplate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/calendar/slot-template/save/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "新建（不传 :id）/ 更新（传 :id）档期时段模板；同一 handler 挂两个路径，与员工端共用实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "档期"
+                ],
+                "summary": "保存档期时段模板",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "模板ID（更新时传；新建不传）",
+                        "name": "id",
+                        "in": "path"
+                    },
+                    {
+                        "description": "模板信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffSlotTemplateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.SlotTemplate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/custom-request/convert/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把定制需求转为订单。⚠️ 需求**不含套餐**，必须在此指定 package_id；成功后需求自动置为「已响应」。转单复用 CreateOrder。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定制需求"
+                ],
+                "summary": "定制需求转订单",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "定制需求ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "订单信息（package_id 必填）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.OrderCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Order"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/custom-request/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询定制需求。与员工端 /wechat/staff/custom-request/list 是同一 Handler，两端结构一致。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定制需求"
+                ],
+                "summary": "定制需求列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 1-待处理 2-已响应 3-已关闭，0/不传=全部；photographer_id 0/不传=不过滤）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "photographer_id": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.CustomRequest"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/custom-request/respond/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "填写对定制需求的响应内容，需求置为「已响应」。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定制需求"
+                ],
+                "summary": "响应定制需求",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "定制需求ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "响应内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffCustomRequestRespondReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/response.Body"
                         }
@@ -582,6 +1799,5424 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/overview": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回首页经营概览（订单/客户/收款等聚合指标与今日拍摄、待办）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "数据看板"
+                ],
+                "summary": "数据看板",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.DashboardOverviewResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/confirm/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把交付单置为已交付。⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "标记交付完成",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "为订单创建交付单；body.order_id 为订单主键（body 优先于路径参数）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "创建交付任务",
+                "parameters": [
+                    {
+                        "description": "交付信息（含 order_id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.DeliveryCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Delivery"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按订单反查交付单。⚠️ 本接口的 :id 是**订单 ID**（与 /delivery/remind 等推进类接口不同）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "交付单详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Delivery"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/items/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按订单返回交付文件明细。⚠️ 本接口的 :id 是**订单 ID**，与 /delivery/detail/:id 语义一致。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "交付文件明细",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.DeliveryItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询交付单看板，按交付阶段筛选。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "交付工作台列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（stage 见 enum.DeliveryStage，0/不传=全部）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "stage": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/repository.DeliveryListItem"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/remind/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "向交付单负责人推送提醒通知。⚠️ 本接口的 :id 是**交付单 ID**（非订单 ID）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "提醒交付负责人",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/select/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "记录客户选片结果。⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "客户选片",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "选中的文件 ID 列表",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.DeliverySelectReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/upload-retouched/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "批量登记精修成品文件（进入待客户确认）。⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "上传精修成品",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "精修文件列表（至少 1 项）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/contract.DeliveryItemReq"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/delivery/upload-samples/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "批量登记样片文件。⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "交付"
+                ],
+                "summary": "上传样片",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "样片文件列表（至少 1 项）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/contract.DeliveryItemReq"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/finance/export": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按月份导出对账明细，缺省当月。**响应为 CSV 文件流，浏览器直接下载，不走统一 JSON 包装**。\n权限点独立于 finance:view —— 可见不等于可带走（finance:export）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "财务"
+                ],
+                "summary": "导出对账 CSV",
+                "parameters": [
+                    {
+                        "description": "查询条件（month 格式 2006-01，缺省当月）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "month": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV 文件内容（Content-Disposition 附带文件名）",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/finance/payments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询收款流水，可按确认状态过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "财务"
+                ],
+                "summary": "财务收款流水",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 收款确认状态，空=全部）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OrderPayment"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/finance/refunds": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询退款流水，可按审批状态过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "财务"
+                ],
+                "summary": "财务退款流水",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 退款状态，空=全部）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OrderRefund"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/finance/summary": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按月汇总收款 / 退款 / 待确认金额等指标，缺省当月。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "财务"
+                ],
+                "summary": "财务汇总",
+                "parameters": [
+                    {
+                        "description": "查询条件（month 格式 2006-01，缺省当月）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "month": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.FinanceSummaryResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/asset/detail/{id}": {
+            "post": {
+                "description": "作品详情，附带浏览数 +1。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·作品集"
+                ],
+                "summary": "公开作品详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "作品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Asset"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/asset/list": {
+            "post": {
+                "description": "预约主页作品集，**只出「已发布 + 公开」的作品**。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·作品集"
+                ],
+                "summary": "公开作品列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（featured=1 只看精选；slug 见说明）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "category": {
+                                    "type": "string"
+                                },
+                                "featured": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Asset"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/auth/login": {
+            "post": {
+                "description": "手机号 + 短信验证码登录；**未注册的手机号自动建档客户**（手机号为租户内唯一键）。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。\n校验规则：dev / docker.dev 允许免验证码登录（短信通道未接入），test / prod 及未知 profile 强制校验验证码。\n登录成功返回客户令牌，后续请求以 \"Bearer \u003ctoken\u003e\" 放入 Authorization 头。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·登录"
+                ],
+                "summary": "客户登录",
+                "parameters": [
+                    {
+                        "description": "登录信息（mobile 必填；openid 为小程序场景透传）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "mobile": {
+                                    "type": "string"
+                                },
+                                "openid": {
+                                    "type": "string"
+                                },
+                                "slug": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "customer": {
+                                                    "$ref": "#/definitions/model.Customer"
+                                                },
+                                                "token": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/auth/sms-code": {
+            "post": {
+                "description": "短信发往指定手机号，场景固定为 login；短信通道未接入时验证码只打服务端日志。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·登录"
+                ],
+                "summary": "发送登录验证码",
+                "parameters": [
+                    {
+                        "description": "手机号",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "mobile": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/custom-request/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户本人提交过的定制需求历史（分页）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·定制需求"
+                ],
+                "summary": "我的定制需求",
+                "parameters": [
+                    {
+                        "description": "分页参数（page / page_size）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.PageReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.CustomRequest"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/custom-request/submit": {
+            "post": {
+                "description": "提交定制需求，**游客与登录客户均可**。已登录取令牌内公司，游客按 slug 反查租户。\n摄影师归属：body.photographer_id（客户显式选择）优先，分享链接的 staff_id 兜底，两者都缺则落门店/公共池。\n⚠️ 本接口会往 crm_customer 建档（手机号唯一键），公开可调，存在被刷数据的风险。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·定制需求"
+                ],
+                "summary": "提交定制需求",
+                "parameters": [
+                    {
+                        "description": "定制需求信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientCustomRequestReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.CustomRequest"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/customer/photographer-options": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "定制需求页「选择门店 → 选择摄影师」的候选 = 该客户曾下过单或提过需求的门店与摄影师，外加分享链接的分享人。\n无候选（新客户且非分享进入）时返回空数组，前端不展示选择器，需求仍可提交。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·我的"
+                ],
+                "summary": "门店/摄影师候选",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/contract.ClientStoreOption"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/customer/profile": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户中心 → 个人信息。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·我的"
+                ],
+                "summary": "我的资料",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.ClientProfileResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/customer/profile/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户自助修改资料，**只接受字段白名单**（remark / tags / level / source / status 属工作室内部信息，不可改）。\n请求体畸形时直接报错，不静默当「无字段要改」——避免返回成功但库里没变。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·我的"
+                ],
+                "summary": "修改我的资料",
+                "parameters": [
+                    {
+                        "description": "资料字段（白名单）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientProfileUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.ClientProfileResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/confirm-extra/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "确认加片费用",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/confirm/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "确认成片",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "选片页 / 成片页数据源。⚠️ 本接口的 :id 是 **order_id**（与 PC 端同语义）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "交付单与明细",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "delivery": {
+                                                    "$ref": "#/definitions/model.Delivery"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/model.DeliveryItem"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/extra-quote/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按已选张数试算加片费；**body 可为空**（缺省按当前已选张数试算）。⚠️ :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "加片费试算",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "试算参数（可省略）",
+                        "name": "req",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientExtraQuoteReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.ClientExtraQuoteResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/feedback/{item_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "⚠️ 本接口的 :item_id 是**交付文件 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "提交精修反馈",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付文件ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "反馈内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientFeedbackReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/items/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "按订单反查交付文件明细，供「文件管理」tab 直接取列表；未建交付单返回空列表。⚠️ :id 是 **order_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "交付文件明细",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.DeliveryItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/delivery/select/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "⚠️ 本接口的 :id 是**交付单 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·交付"
+                ],
+                "summary": "提交选片",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "选中的文件 ID 列表",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "item_ids": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "integer",
+                                        "format": "int64"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/notification/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户本人的站内通知（分页）；unread=1 只看未读。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·通知"
+                ],
+                "summary": "我的通知列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（unread=1 只看未读）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "unread": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.SysNotification"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/notification/read-all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·通知"
+                ],
+                "summary": "全部标记已读",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/notification/read/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·通知"
+                ],
+                "summary": "标记通知已读",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "通知ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/notification/unread-count": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "铃铛红点用。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·通知"
+                ],
+                "summary": "未读通知数",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/cancel/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "取消本人的预约单并记录原因；body 可为空（reason 可选）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "取消预约单",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "取消原因（可省略）",
+                        "name": "req",
+                        "in": "body",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "reason": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/confirm/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "确认预约单",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "订单详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.ClientOrderDetail"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询当前客户名下订单，可按状态过滤（归属由令牌内 customer_id 锁定）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "我的订单",
+                "parameters": [
+                    {
+                        "description": "查询条件",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Order"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/prep/read/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户确认已读「拍前准备清单」，写 biz_order.prep_read_at；**幂等**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "拍前准备已读",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/requirement/update/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户修改拍摄需求，**仅待定金 / 待拍摄状态可改，且只接受白名单字段**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "修改拍摄需求",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "需求字段（白名单）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientOrderRequirementReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/order/submit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户提交预约单。分享人归属：链接参数 staff_id 随预约落到订单（biz_order.photographer_id）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·订单"
+                ],
+                "summary": "提交预约单",
+                "parameters": [
+                    {
+                        "description": "预约信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientBookingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Order"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/package/detail/{id}": {
+            "post": {
+                "description": "套餐详情（预约主页点开套餐卡片）。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·套餐"
+                ],
+                "summary": "套餐详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "套餐ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Package"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/package/list": {
+            "post": {
+                "description": "预约主页套餐列表，**只返回已上架套餐**。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·套餐"
+                ],
+                "summary": "套餐列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（slug 见说明）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "category": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Package"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/pay/mark": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户登记「我已完成转账，通知摄影师」。资金不经平台：仅落一条待核验记录，到账确认仍在员工端 /payment/confirm/{id}。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·收款"
+                ],
+                "summary": "登记转账",
+                "parameters": [
+                    {
+                        "description": "转账登记（含 order_id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientPaymentMarkReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OrderPayment"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/payment-method/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户可见的收款方式，**只返回启用项**，供支付页展示收款码/账号。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·收款"
+                ],
+                "summary": "收款方式列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/contract.ClientPaymentMethodResp"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/payment/list/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回某订单的收款记录（支付页展示登记状态；**不分页**）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·收款"
+                ],
+                "summary": "我的收款记录",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.OrderPayment"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/quote/accept/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·报价"
+                ],
+                "summary": "接受报价",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "报价单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/quote/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "单张报价详情，按 id 直取；归属校验含线索兜底。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·报价"
+                ],
+                "summary": "报价详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "报价单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Quote"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/quote/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回本人的报价单（含明细字段，前端按 id 取单条即可）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·报价"
+                ],
+                "summary": "我的报价单列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Quote"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/quote/modify/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·报价"
+                ],
+                "summary": "对报价提修改意见",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "报价单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "修改意见",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientQuoteModifyReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/refund/apply/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户对订单发起退款申请；金额为空时按退款规则自动计算。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·退款"
+                ],
+                "summary": "申请退款",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "退款请求",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientRefundReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OrderRefund"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/refund/confirm/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户确认收到退款，写 customer_confirm_at，与员工端审批闭环；**幂等**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·退款"
+                ],
+                "summary": "确认收到退款",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "退款单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/refund/list/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回某订单下的退款记录（退款进度页；**不分页**）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·退款"
+                ],
+                "summary": "我的退款记录",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.OrderRefund"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/reschedule/apply/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户发起改期申请（apply_source=2）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·改期"
+                ],
+                "summary": "申请改期",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "改期信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientRescheduleReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OrderReschedule"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/reschedule/cancel/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·改期"
+                ],
+                "summary": "撤回改期申请",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "改期单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/reschedule/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "改期单详情，含调度费支付状态。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·改期"
+                ],
+                "summary": "改期单详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "改期单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.ClientRescheduleDetailResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/reschedule/list/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回某订单下的改期单（改期进度页；**不分页**，逐单明细集合）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·改期"
+                ],
+                "summary": "我的改期单列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.OrderReschedule"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/reschedule/pay/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "提交改期调度费的支付凭证（资金不经平台，走「上传凭证 → 工作室核验」）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·改期"
+                ],
+                "summary": "提交调度费凭证",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "改期单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "支付凭证",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientReschedulePayReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OrderPayment"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/review/create/{order_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·评价"
+                ],
+                "summary": "评价订单",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "order_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "评价内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ClientReviewReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OrderReview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/review/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户中心 → 我的评价，只读；按令牌内 customer_id 锁定归属（**不分页**，同改期/退款列表口径）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·评价"
+                ],
+                "summary": "我的评价",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/repository.ReviewListItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/slot/list": {
+            "post": {
+                "description": "查询指定日期的可约时段；photographer_id 可选，用于只看某位摄影师的空闲时段。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·工作室"
+                ],
+                "summary": "可约时段",
+                "parameters": [
+                    {
+                        "description": "查询条件（date 格式 2006-01-02；slug 见说明）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "date": {
+                                    "type": "string"
+                                },
+                                "photographer_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/contract.ClientSlot"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/h5/studio/info": {
+            "post": {
+                "description": "预约主页展示用的工作室信息（名称 / 简介 / 联系方式 / 分享链接等）。\n租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户区·工作室"
+                ],
+                "summary": "工作室信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.StudioSetting"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/brief/generate/{lead_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "依据线索信息重建需求摘要（已确认项 + 待追问项），**覆盖旧数据**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "重建需求摘要",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "lead_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.LeadBriefItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/brief/list/{lead_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回线索的需求摘要项（已确认项 + 待追问项）。与员工端 AI 简报复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "需求摘要列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "lead_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.LeadBriefItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/convert/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把线索转为客户档案（幂等：线索已有 customer_id 时复用既有客户，不重复建档）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "线索转客户",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Customer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "新建线索。**有手机号时在同一事务内自动建档客户**（复用 FindOrCreateCustomerByMobile，手机号为租户内唯一键）；无手机号不建档。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "新建线索",
+                "parameters": [
+                    {
+                        "description": "线索信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.LeadCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Lead"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "⚠️ 当前为**占位实现**：handler 直接返回成功，未做实际删除（路由已挂 /lead/delete/:id）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "删除线索",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回线索详情（含客户来讯与需求摘要）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "线索详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Lead"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/follow/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "写入一条跟进记录，并刷新线索的跟进时间与归属。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "记录线索跟进",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "跟进内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.LeadFollowReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询线索，支持关键词、状态与归属人过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "线索列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 见 enum.LeadStatus；owner_id 0=不过滤）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "owner_id": {
+                                    "type": "integer"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Lead"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/message/send/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "向线索发送沟通消息（追问 / 报价通知 / 作品分享）。与员工端复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "发送沟通消息",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "消息内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffLeadMessageReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.LeadMessage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/messages/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回线索的双向沟通记录（客户来讯 + 工作室发出）。与员工端复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "线索沟通记录",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.LeadMessage"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/lead/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新线索；body.id 为主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "线索"
+                ],
+                "summary": "更新线索",
+                "parameters": [
+                    {
+                        "description": "线索信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.LeadUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/notification/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询当前操作人的站内通知（员工端按 receiver_type=1 + 操作人隔离）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "通知"
+                ],
+                "summary": "通知列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（unread=1 只看未读）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "unread": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.SysNotification"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/notification/read-all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把当前操作人的全部未读通知标记为已读。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "通知"
+                ],
+                "summary": "全部标记已读",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/notification/read/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把指定通知标记为已读（仅能操作本人的通知）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "通知"
+                ],
+                "summary": "标记通知已读",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "通知ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/notification/unread-count": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前操作人的未读通知数量（用于角标）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "通知"
+                ],
+                "summary": "未读通知数",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "unread": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/response.Body"
                         }
@@ -1591,6 +8226,457 @@ const docTemplate = `{
                 }
             }
         },
+        "/package/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "创建套餐。套餐是公司（slug）维度资源，不归属单个摄影师。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "创建套餐",
+                "parameters": [
+                    {
+                        "description": "套餐信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.PackageReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Package"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/package/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除套餐。**在售套餐会被守卫拦截**（ErrPackageActiveDelete）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "删除套餐",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "套餐ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/package/detail/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回套餐详情。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "套餐详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "套餐ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Package"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/package/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询套餐，支持关键词、上下架状态、分类过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "套餐列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 1-草稿 2-已上架 3-已下线）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "category": {
+                                    "type": "string"
+                                },
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Package"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/package/status/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "切换套餐上架 / 下线状态。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "套餐上下架",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "套餐ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "status 1-草稿 2-已上架 3-已下线（enum.PackageStatus，数字类型）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/package/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新套餐；body.id 为主键。**在售套餐改价会被守卫拦截**（ErrPackageActiveUpdate），避免在售套餐被静默改价。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "套餐"
+                ],
+                "summary": "更新套餐",
+                "parameters": [
+                    {
+                        "description": "套餐信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.PackageReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/payment/confirm/{id}": {
             "post": {
                 "security": [
@@ -1851,6 +8937,215 @@ const docTemplate = `{
                 }
             }
         },
+        "/quote/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "针对线索创建报价单；body.lead_id 为线索主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "报价"
+                ],
+                "summary": "创建报价",
+                "parameters": [
+                    {
+                        "description": "报价信息（含 lead_id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.QuoteCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Quote"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/quote/list/{lead_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回某条线索下的全部报价单（不分页）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "报价"
+                ],
+                "summary": "线索报价列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "lead_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Quote"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/quote/status/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "流转报价单状态（草稿/已发送/已接受/已拒绝等，见 enum.QuoteStatus）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "报价"
+                ],
+                "summary": "更新报价状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "报价单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "目标状态",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.QuoteStatusReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/refund/apply/{order_id}": {
             "post": {
                 "security": [
@@ -2066,6 +9361,1381 @@ const docTemplate = `{
                 }
             }
         },
+        "/role/catalog": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回全量权限点分组清单（前端渲染权限配置树的选项）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "权限点清单",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.PermGroup"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "新建角色（权限点用 /role/grant/:id 单独保存）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "新建角色",
+                "parameters": [
+                    {
+                        "description": "角色信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.RoleCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除角色及其权限绑定。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "删除角色",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/grant/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "保存角色的数据范围 + 权限点集合，**全量覆盖式**（未传的权限点会被移除）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "保存角色权限",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "权限点集合与数据范围",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.RoleGrantReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回全部角色（不分页），含数据范围 data_scope。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "角色列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.SysRole"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/permissions/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "读取角色的权限配置（权限配置界面回显）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "读取角色权限",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.RolePermsResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新角色基本信息与数据范围；body.id 为主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "更新角色",
+                "parameters": [
+                    {
+                        "description": "角色信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.RoleUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/company/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新租户公司资料。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "更新公司信息",
+                "parameters": [
+                    {
+                        "description": "公司信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.CompanyUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/operation-log/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询操作日志，支持关键词、模块、状态过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "操作日志列表",
+                "parameters": [
+                    {
+                        "description": "查询条件",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "module": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.SysOperationLog"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/payment-method/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "新建收款方式",
+                "parameters": [
+                    {
+                        "description": "收款方式信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.PaymentMethodReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/payment-method/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "删除收款方式",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "收款方式ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/payment-method/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回工作室收款方式（资金不经平台，仅登记）。与员工端 /wechat/staff/settings/payment-method/list 复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "收款方式列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.PaymentMethod"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/payment-method/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新收款方式；body.id 为主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "更新收款方式",
+                "parameters": [
+                    {
+                        "description": "收款方式信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.PaymentMethodReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/studio/get": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "读取工作室设置（预约主页 / 接单规则 / 改期政策）；不存在时自动建默认行。\n响应在 model.StudioSetting 之上追加 homepage_url / portfolio_url 两条分享链接（域名由服务端下发，\n并已拼入分享人账号 ID \u0026staff_id=\u003c当前操作人\u003e），前端直接展示与复制，不再自行拼域名。与员工端复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "读取工作室设置",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.StaffStudioSettingResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/studio/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新工作室设置，**仅更新传入字段**（数值支持改为 0）。与员工端复用同一实现。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "更新工作室设置",
+                "parameters": [
+                    {
+                        "description": "设置字段（未传字段保持原值）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffStudioSettingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/workspace": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前操作人所在租户的工作台聚合信息（公司 / 门店 / 角色 / 权限点）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "工作室设置"
+                ],
+                "summary": "工作台信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.WorkspaceResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/store/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "新建门店",
+                "parameters": [
+                    {
+                        "description": "门店信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StoreCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/store/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "删除门店",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "门店ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/store/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回全部门店（不分页）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "门店列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.SysStore"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/store/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新门店信息；body.id 为主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "更新门店",
+                "parameters": [
+                    {
+                        "description": "门店信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StoreUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/test/config/encrypt": {
+            "post": {
+                "description": "把明文加密为 ENCv1 密文（**只加密、不解密**），用于维护 Nacos 模板中的敏感字段。\n响应形如 {count, items:[{cipher}]}，明文不进日志、不回显。仅 dev/test/docker.dev 注册，不受 debug 构建标签影响。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "调试"
+                ],
+                "summary": "生成配置密文",
+                "parameters": [
+                    {
+                        "description": "待加密的明文列表（至少 1 项）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "values": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/upload/file": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "上传图片/视频（multipart/form-data）。表单字段：file（必填）、biz_type、biz_id、store_id、public。\npublic=1 落公开媒体目录并返回 /media/… 链接（**免登录可访问**，供作品集封面/图集等对外物料）；\n其余取值（含空串）一律落强制鉴权的 /uploads，两者物理隔离。超限返回文件过大错误。",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "上传"
+                ],
+                "summary": "上传文件",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "文件内容",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "业务类型（order / delivery / asset 等）",
+                        "name": "biz_type",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "业务主键",
+                        "name": "biz_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "门店ID",
+                        "name": "store_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "1=公开媒体目录 /media；其余（含空）按私有 /uploads",
+                        "name": "public",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.UploadResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
         "/user/change-password": {
             "post": {
                 "security": [
@@ -2100,6 +10770,231 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "新建员工账号并分配角色 / 门店。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "新建员工",
+                "parameters": [
+                    {
+                        "description": "员工信息",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.UserCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/delete/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除员工账号。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "删除员工",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "员工ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询员工账号，支持关键词与门店过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "员工列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（store_id 0=不过滤）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {
+                                    "type": "string"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "store_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.SysUser"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2214,9 +11109,2036 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/user/reset-password/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "管理员为指定员工重置登录密码。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "重置员工密码",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "员工ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "新密码",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.ResetPasswordReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新员工资料与角色 / 门店；body.id 为主键。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户与角色"
+                ],
+                "summary": "更新员工",
+                "parameters": [
+                    {
+                        "description": "员工信息（含 id）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.UserUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/auth/login": {
+            "post": {
+                "description": "员工端主登录方式，与 PC 端 /auth/login 共用同一套凭据校验（bcrypt + 失败锁定）。**免鉴权**。\n响应结构与 PC 完全一致：{ token, user }，user 内嵌 sys_user 字段并追加 role_code / role_name / data_scope / permissions。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·登录"
+                ],
+                "summary": "员工账号密码登录",
+                "parameters": [
+                    {
+                        "description": "登录凭据（platform: ios/android，选填）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "device_name": {
+                                    "type": "string"
+                                },
+                                "password": {
+                                    "type": "string"
+                                },
+                                "platform": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.LoginResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/auth/login-by-code": {
+            "post": {
+                "description": "手机号 + 短信验证码登录。**免鉴权**；后端已就绪，员工端 UI 暂未接入（与 auth/sms-code 成对保留）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·登录"
+                ],
+                "summary": "员工验证码登录",
+                "parameters": [
+                    {
+                        "description": "手机号与验证码（platform: ios/android，选填）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "device_name": {
+                                    "type": "string"
+                                },
+                                "mobile": {
+                                    "type": "string"
+                                },
+                                "platform": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.LoginResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/auth/sms-code": {
+            "post": {
+                "description": "员工登录短信验证码，场景固定为 login。**免鉴权**（登录发生在拿到令牌之前）。\n前端暂未调用：员工端主登录方式为「账号 + 密码」（/wechat/staff/auth/login）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·登录"
+                ],
+                "summary": "发送登录验证码",
+                "parameters": [
+                    {
+                        "description": "手机号",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "mobile": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/brief/confirm/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "人工确认/修正 AI 提取出的简报项取值（AI 提取结果需人工复核后生效）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·线索简报"
+                ],
+                "summary": "确认简报项",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "简报项ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "确认值",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffBriefConfirmReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/brief/generate/{lead_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "依据线索信息重建需求摘要（已确认项 + 待追问项），**覆盖旧数据**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·线索简报"
+                ],
+                "summary": "生成线索 AI 简报",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "lead_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.LeadBriefItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/brief/list/{lead_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·线索简报"
+                ],
+                "summary": "简报项列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "线索ID",
+                        "name": "lead_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.LeadBriefItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/brief/send/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "把简报项作为追问消息发送给客户。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·线索简报"
+                ],
+                "summary": "发送追问",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "简报项ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/customer/mobile": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "为客户换绑手机号（含格式校验与租户内占用校验）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·客户档案"
+                ],
+                "summary": "修改客户手机号",
+                "parameters": [
+                    {
+                        "description": "客户ID与新手机号",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffCustomerMobileReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/customer/today-follow": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回到期/逾期且未成交未流失的线索（客户档案页今日待跟进）。跟进对象是线索。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·客户档案"
+                ],
+                "summary": "今日待跟进",
+                "parameters": [
+                    {
+                        "description": "返回条数上限（0=默认）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Lead"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/delivery/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "**端差异实现**：员工端只接 body.order_id（不传 stage），与 PC 的 /delivery/create 契约不同，两个前端各自依赖，不可合并。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·交付"
+                ],
+                "summary": "创建交付单",
+                "parameters": [
+                    {
+                        "description": "订单ID",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "order_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Delivery"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/delivery/feedback/handle/{item_id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "标记反馈已处理并记录处理备注。⚠️ :item_id 是**交付文件 ID**。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·反馈整理"
+                ],
+                "summary": "处理反馈",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付文件ID",
+                        "name": "item_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "处理备注",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffFeedbackHandleReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/delivery/feedback/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "客户修图反馈的待办列表（分页）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·反馈整理"
+                ],
+                "summary": "修图反馈列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 1-待处理 2-已处理，0=全部）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/repository.FeedbackListItem"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/delivery/send-final/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "向客户发送最终确认。⚠️ :id 为**交付单 ID**（与 /delivery/confirm 同口径）。\nPC 交付工作台无此动作，属移动端独有能力，故不进公共路由表。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·交付"
+                ],
+                "summary": "发送最终确认",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "交付单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/device/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "当前账号的登录设备（个人中心 → 设备管理；操作对象是登录者本人，免权限点）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·个人中心"
+                ],
+                "summary": "登录设备列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.UserDevice"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/device/remove/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "强制下线某台登录设备（免权限点：操作对象是登录者本人设备）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·个人中心"
+                ],
+                "summary": "踢出登录设备",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "设备ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/feedback/submit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "员工提交意见反馈，流转在管理后台处理。免权限点（提交人本人）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·个人中心"
+                ],
+                "summary": "提交意见反馈",
+                "parameters": [
+                    {
+                        "description": "反馈内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.FeedbackSubmitReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/overview": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "员工端首页待办统计（今日拍摄 / 待处理事项等）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·工作台"
+                ],
+                "summary": "工作台待办",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/contract.StaffOverview"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/refund/audit/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "**端差异实现**：员工端契约是 {\"approve\": bool}，PC 是 {\"approved\": *bool} 且必填；改任一侧都是破坏性变更。\napprove=false 表示驳回，布尔零值合法，故不使用 required 校验。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·退款"
+                ],
+                "summary": "退款审核",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "退款单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "审核结论（approve=false 即驳回）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "approve": {
+                                    "type": "boolean"
+                                },
+                                "remark": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/reschedule/audit/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·改期"
+                ],
+                "summary": "改期审批",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "改期单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "审批结论",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffRescheduleAuditReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/reschedule/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询改期单，可按状态过滤。（发起改期复用 PC 的 /order/reschedule/apply/:order_id）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·改期"
+                ],
+                "summary": "改期单列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（status 0=全部）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                },
+                                "status": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OrderReschedule"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/review/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询客户评价，可按最低星级过滤。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·评价"
+                ],
+                "summary": "评价列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（min_rating 0=不限）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "min_rating": {
+                                    "type": "integer"
+                                },
+                                "page": {
+                                    "type": "integer"
+                                },
+                                "page_size": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/response.Page"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "list": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OrderReview"
+                                                            }
+                                                        },
+                                                        "page": {
+                                                            "type": "integer"
+                                                        },
+                                                        "page_size": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/review/reply/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·评价"
+                ],
+                "summary": "回复评价",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "评价ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "回复内容",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffReviewReplyReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/schedule/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "员工端日程（按日期区间查询档期占用）；复用管理端 ListCalendar。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·日程"
+                ],
+                "summary": "日程列表",
+                "parameters": [
+                    {
+                        "description": "查询条件（日期格式 2006-01-02）",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "end_date": {
+                                    "type": "string"
+                                },
+                                "photographer_id": {
+                                    "type": "integer"
+                                },
+                                "start_date": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Body"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.CalendarBlock"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/user/change-mobile": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "校验验证码后换绑本人手机号。免权限点（操作对象是登录者本人账号）。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·个人中心"
+                ],
+                "summary": "换绑手机号",
+                "parameters": [
+                    {
+                        "description": "验证码与新手机号",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contract.StaffChangeMobileReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
+        },
+        "/wechat/staff/user/mobile-code": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "验证码发往**当前绑定的手机号**，场景 scene=change_mobile（与登录场景隔离）。免权限点。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "员工端·个人中心"
+                ],
+                "summary": "发送换绑验证码",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Body"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "contract.AssetCreateReq": {
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "authorization": {
+                    "description": "客户授权 1-待授权 2-已授权（0=默认已授权）",
+                    "type": "integer"
+                },
+                "category": {
+                    "description": "分类",
+                    "type": "string"
+                },
+                "cover": {
+                    "description": "封面图URL",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "作品描述",
+                    "type": "string"
+                },
+                "featured": {
+                    "description": "精选展示 0-否 1-是",
+                    "type": "integer"
+                },
+                "images": {
+                    "description": "图片列表，逗号分隔",
+                    "type": "string"
+                },
+                "location": {
+                    "description": "拍摄地点",
+                    "type": "string"
+                },
+                "model": {
+                    "description": "模特姓名",
+                    "type": "string"
+                },
+                "package_ids": {
+                    "description": "关联套餐ID，逗号分隔",
+                    "type": "string"
+                },
+                "photographer": {
+                    "description": "摄影师姓名",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "拍摄日期",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态 1-草稿 2-已发布",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.AssetStatus"
+                        }
+                    ]
+                },
+                "title": {
+                    "description": "作品标题",
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "可见性 1-公开 2-未公开（0=默认公开）",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.AssetFlagsReq": {
+            "type": "object",
+            "properties": {
+                "featured": {
+                    "description": "0-否 1-是",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "1-草稿 2-已发布",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.AssetStatus"
+                        }
+                    ]
+                },
+                "visibility": {
+                    "description": "1-公开 2-未公开",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.AssetUpdateReq": {
+            "type": "object",
+            "required": [
+                "title"
+            ],
+            "properties": {
+                "authorization": {
+                    "description": "客户授权 1-待授权 2-已授权（nil=保持原值）",
+                    "type": "integer"
+                },
+                "category": {
+                    "description": "分类",
+                    "type": "string"
+                },
+                "cover": {
+                    "description": "封面图URL",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "作品描述",
+                    "type": "string"
+                },
+                "featured": {
+                    "description": "精选展示 0-否 1-是（nil=保持原值）",
+                    "type": "integer"
+                },
+                "images": {
+                    "description": "图片列表，逗号分隔",
+                    "type": "string"
+                },
+                "location": {
+                    "description": "拍摄地点",
+                    "type": "string"
+                },
+                "model": {
+                    "description": "模特姓名",
+                    "type": "string"
+                },
+                "package_ids": {
+                    "description": "关联套餐ID，逗号分隔",
+                    "type": "string"
+                },
+                "photographer": {
+                    "description": "摄影师姓名",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "拍摄日期",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态 1-草稿 2-已发布（nil=保持原值）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.AssetStatus"
+                        }
+                    ]
+                },
+                "title": {
+                    "description": "作品标题",
+                    "type": "string"
+                },
+                "visibility": {
+                    "description": "可见性 1-公开 2-未公开（nil=保持原值）",
+                    "type": "integer"
+                }
+            }
+        },
         "contract.AuditReq": {
             "type": "object",
             "properties": {
@@ -2226,6 +13148,55 @@ const docTemplate = `{
                 },
                 "remark": {
                     "description": "审批备注",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.CalendarBlockReq": {
+            "type": "object",
+            "required": [
+                "date",
+                "time_range"
+            ],
+            "properties": {
+                "customer_id": {
+                    "description": "客户ID",
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "description": "客户姓名",
+                    "type": "string"
+                },
+                "date": {
+                    "description": "日期，格式：2006-01-02",
+                    "type": "string"
+                },
+                "order_id": {
+                    "description": "订单ID",
+                    "type": "integer"
+                },
+                "photographer": {
+                    "description": "摄影师姓名",
+                    "type": "string"
+                },
+                "photographer_id": {
+                    "description": "摄影师ID",
+                    "type": "integer"
+                },
+                "project_type": {
+                    "description": "项目类型",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
+                },
+                "time_range": {
+                    "description": "时段，如：09:00-12:00",
                     "type": "string"
                 }
             }
@@ -2243,6 +13214,570 @@ const docTemplate = `{
                 },
                 "old_password": {
                     "description": "原密码",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientBookingReq": {
+            "type": "object",
+            "required": [
+                "package_id",
+                "shoot_date",
+                "shoot_time"
+            ],
+            "properties": {
+                "package_id": {
+                    "description": "套餐ID",
+                    "type": "integer"
+                },
+                "people_count": {
+                    "description": "拍摄人数（如 2大1小）",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "shoot_address": {
+                    "description": "拍摄地点",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "拍摄日期 2006-01-02",
+                    "type": "string"
+                },
+                "shoot_style": {
+                    "description": "拍摄风格",
+                    "type": "string"
+                },
+                "shoot_time": {
+                    "description": "拍摄时段 09:00-11:00",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientCustomRequestReq": {
+            "type": "object",
+            "properties": {
+                "budget_max": {
+                    "description": "预算上限",
+                    "type": "number"
+                },
+                "budget_min": {
+                    "description": "预算下限",
+                    "type": "number"
+                },
+                "detail": {
+                    "description": "详细需求",
+                    "type": "string"
+                },
+                "expected_date": {
+                    "description": "期望拍摄日期",
+                    "type": "string"
+                },
+                "images": {
+                    "description": "参考图片(逗号分隔)",
+                    "type": "string"
+                },
+                "location": {
+                    "description": "期望拍摄地点",
+                    "type": "string"
+                },
+                "mobile": {
+                    "description": "联系电话（游客提交时必填）",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "称呼（游客提交时必填）",
+                    "type": "string"
+                },
+                "photographer_id": {
+                    "description": "PhotographerID 客户指定的摄影师（0 = 未指定）。\n与链接参数 staff_id（h5.go → staffFrom）是**同一语义的两个来源**：本字段是客户在\nH5 页面上的显式选择，优先；缺省（0）时才回落到分享链接带入的 staff_id。\n这样「非分享链接进入」（URL 无 staff_id）的客户也能指定摄影师，而不是无从归属。",
+                    "type": "integer"
+                },
+                "project_type": {
+                    "description": "拍摄类型",
+                    "type": "string"
+                },
+                "store_id": {
+                    "description": "目标门店（可选；0=公共池。H5 定制需求页「选择门店」时传入）",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.ClientExtraQuoteReq": {
+            "type": "object",
+            "properties": {
+                "select_count": {
+                    "description": "预计选片张数",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.ClientExtraQuoteResp": {
+            "type": "object",
+            "properties": {
+                "extra_confirmed": {
+                    "description": "客户是否已确认加片 0-否 1-是（已确认即锁定选片）",
+                    "type": "integer"
+                },
+                "extra_count": {
+                    "description": "超出套餐张数",
+                    "type": "integer"
+                },
+                "extra_fee": {
+                    "description": "加片费合计",
+                    "type": "number"
+                },
+                "included_count": {
+                    "description": "套餐包含精修张数",
+                    "type": "integer"
+                },
+                "selected_count": {
+                    "description": "本次试算的选片张数",
+                    "type": "integer"
+                },
+                "unit_price": {
+                    "description": "加片单价",
+                    "type": "number"
+                }
+            }
+        },
+        "contract.ClientFeedbackReq": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "修改意见",
+                    "type": "string"
+                },
+                "priority": {
+                    "description": "normal-普通 important-重要 urgent-紧急",
+                    "type": "string"
+                },
+                "types": {
+                    "description": "修改类型(逗号分隔)",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientOrderDetail": {
+            "type": "object",
+            "properties": {
+                "addons": {
+                    "description": "加项",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderAddon"
+                    }
+                },
+                "delivery": {
+                    "description": "交付信息（未创建交付单时为 null）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Delivery"
+                        }
+                    ]
+                },
+                "logs": {
+                    "description": "操作日志",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderLog"
+                    }
+                },
+                "order": {
+                    "description": "订单信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Order"
+                        }
+                    ]
+                },
+                "payments": {
+                    "description": "收款记录",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderPayment"
+                    }
+                },
+                "refunds": {
+                    "description": "退款记录",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderRefund"
+                    }
+                },
+                "reschedules": {
+                    "description": "改期单",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderReschedule"
+                    }
+                },
+                "review": {
+                    "description": "评价（未评价时为 null）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.OrderReview"
+                        }
+                    ]
+                }
+            }
+        },
+        "contract.ClientOrderRequirementReq": {
+            "type": "object",
+            "properties": {
+                "people_count": {
+                    "description": "拍摄人数（如 2大1小）",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "shoot_address": {
+                    "description": "拍摄地点",
+                    "type": "string"
+                },
+                "shoot_style": {
+                    "description": "拍摄风格",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientPaymentMarkReq": {
+            "type": "object",
+            "required": [
+                "order_id",
+                "type"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "金额（传 0 或不传 = 按订单剩余应收自动取值）",
+                    "type": "number"
+                },
+                "method_id": {
+                    "description": "收款方式（biz_payment_method.id，选填）",
+                    "type": "integer"
+                },
+                "order_id": {
+                    "description": "订单ID",
+                    "type": "integer"
+                },
+                "paid_at": {
+                    "description": "转账时间（选填，如 2006-01-02 15:04:05）",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "收款类型 deposit-定金 final-尾款 addon-加选",
+                    "type": "string"
+                },
+                "voucher": {
+                    "description": "转账凭证图片（银行转账类渠道必传）",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientPaymentMethodResp": {
+            "type": "object",
+            "properties": {
+                "account_name": {
+                    "description": "收款账户名称",
+                    "type": "string"
+                },
+                "account_no": {
+                    "description": "收款账号",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "收款方式ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "名称（如「微信收款」「对公转账」）",
+                    "type": "string"
+                },
+                "qrcode": {
+                    "description": "收款二维码",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "wechat/alipay/bank/cash/other",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientPhotographerOption": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "头像地址（可能为空）",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "姓名/昵称（sys_user.nickname）",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientProfileResp": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "头像地址（客户端暂不支持上传，见 H5 D1 决策）",
+                    "type": "string"
+                },
+                "birthday": {
+                    "description": "生日 2006-01-02（空表示未填）",
+                    "type": "string"
+                },
+                "code": {
+                    "description": "客户编号 CU-xxx",
+                    "type": "string"
+                },
+                "gender": {
+                    "description": "性别 male-男 female-女 unknown-未知",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "mobile": {
+                    "description": "手机号（登录凭据：只读展示，换绑走短信验证）",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "姓名",
+                    "type": "string"
+                },
+                "order_count": {
+                    "description": "累计订单数（冗余统计列）",
+                    "type": "integer"
+                },
+                "prefer_scene": {
+                    "description": "常用场景：同上",
+                    "type": "string"
+                },
+                "prefer_style": {
+                    "description": "偏好风格：提交定制需求时自动带入",
+                    "type": "string"
+                },
+                "wechat": {
+                    "description": "微信号",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientProfileUpdateReq": {
+            "type": "object",
+            "properties": {
+                "birthday": {
+                    "description": "生日 2006-01-02（\"\"=清空）",
+                    "type": "string"
+                },
+                "gender": {
+                    "description": "性别 male/female/unknown",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "姓名（可改，不可置空）",
+                    "type": "string"
+                },
+                "prefer_scene": {
+                    "description": "常用场景（\"\"=清空）",
+                    "type": "string"
+                },
+                "prefer_style": {
+                    "description": "偏好风格（\"\"=清空）",
+                    "type": "string"
+                },
+                "wechat": {
+                    "description": "微信号",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientQuoteModifyReq": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "description": "修改意见",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientRefundReq": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "description": "退款原因",
+                    "type": "string"
+                },
+                "reason_label": {
+                    "description": "取消原因分类",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientRescheduleDetailResp": {
+            "type": "object",
+            "properties": {
+                "pay_status": {
+                    "description": "见 RescheduleFee* 常量",
+                    "type": "integer"
+                },
+                "payments": {
+                    "description": "该改期单的调度费收款记录",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OrderPayment"
+                    }
+                },
+                "reschedule": {
+                    "description": "改期单",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.OrderReschedule"
+                        }
+                    ]
+                }
+            }
+        },
+        "contract.ClientReschedulePayReq": {
+            "type": "object",
+            "properties": {
+                "method_id": {
+                    "description": "收款方式ID（选填）",
+                    "type": "integer"
+                },
+                "voucher": {
+                    "description": "支付凭证图片",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientRescheduleReq": {
+            "type": "object",
+            "required": [
+                "new_date",
+                "new_time"
+            ],
+            "properties": {
+                "new_date": {
+                    "description": "新拍摄日期",
+                    "type": "string"
+                },
+                "new_time": {
+                    "description": "新拍摄时段",
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "改期原因说明",
+                    "type": "string"
+                },
+                "reason_label": {
+                    "description": "改期原因分类",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientReviewReq": {
+            "type": "object",
+            "required": [
+                "rating"
+            ],
+            "properties": {
+                "content": {
+                    "description": "评价内容",
+                    "type": "string"
+                },
+                "images": {
+                    "description": "评价图片(逗号分隔)",
+                    "type": "string"
+                },
+                "is_anonymous": {
+                    "description": "是否匿名 0-否 1-是",
+                    "type": "integer"
+                },
+                "rating": {
+                    "description": "评分 1-5",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.ClientSlot": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "description": "是否可约",
+                    "type": "boolean"
+                },
+                "end_time": {
+                    "description": "HH:mm",
+                    "type": "string"
+                },
+                "start_time": {
+                    "description": "HH:mm",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ClientStoreOption": {
+            "type": "object",
+            "properties": {
+                "photographers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contract.ClientPhotographerOption"
+                    }
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "store_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "contract.CompanyUpdateReq": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "公司地址",
+                    "type": "string"
+                },
+                "city": {
+                    "description": "所在城市",
+                    "type": "string"
+                },
+                "contact_name": {
+                    "description": "联系人姓名",
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "description": "联系人电话",
+                    "type": "string"
+                },
+                "intro": {
+                    "description": "工作室简介",
+                    "type": "string"
+                },
+                "logo": {
+                    "description": "公司Logo URL",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "公司名称",
                     "type": "string"
                 }
             }
@@ -2451,6 +13986,345 @@ const docTemplate = `{
                 "wechat": {
                     "description": "微信号",
                     "type": "string"
+                }
+            }
+        },
+        "contract.DashboardOverviewResp": {
+            "type": "object",
+            "properties": {
+                "available_slots": {
+                    "description": "未来 7 天剩余可约时段数",
+                    "type": "integer"
+                },
+                "month_amount": {
+                    "description": "本月确认到账金额",
+                    "type": "number"
+                },
+                "month_deal_rate": {
+                    "description": "本月成交率 % = 本月新增订单 / 本月新增线索",
+                    "type": "number"
+                },
+                "month_leads": {
+                    "description": "—— 工作台扩展聚合（原型）——",
+                    "type": "integer"
+                },
+                "month_orders": {
+                    "description": "本月新增订单数",
+                    "type": "integer"
+                },
+                "new_leads": {
+                    "description": "跟进中线索数",
+                    "type": "integer"
+                },
+                "overdue_leads": {
+                    "description": "逾期未跟进线索数",
+                    "type": "integer"
+                },
+                "pending_deliveries": {
+                    "description": "待交付订单数",
+                    "type": "integer"
+                },
+                "pending_deposit": {
+                    "description": "—— 扩展口径 ——",
+                    "type": "integer"
+                },
+                "pending_payments": {
+                    "description": "待核验收款单数",
+                    "type": "integer"
+                },
+                "pending_retouch": {
+                    "description": "精修中订单数",
+                    "type": "integer"
+                },
+                "today_amount": {
+                    "description": "今日确认到账金额",
+                    "type": "number"
+                },
+                "today_confirmed": {
+                    "description": "今日确认到账金额（同 today_amount）",
+                    "type": "number"
+                },
+                "today_orders": {
+                    "description": "—— 首页四卡片口径 ——",
+                    "type": "integer"
+                },
+                "today_pending": {
+                    "description": "今日申报待核验金额",
+                    "type": "number"
+                },
+                "today_shoots": {
+                    "description": "今日拍摄列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contract.TodayShoot"
+                    }
+                },
+                "todo_items": {
+                    "description": "待办清单（仅 count \u003e 0）",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contract.TodoItem"
+                    }
+                },
+                "unread_notify": {
+                    "description": "当前登录人未读通知数",
+                    "type": "integer"
+                },
+                "upcoming_shoots": {
+                    "description": "未来待拍摄订单数",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.DeliveryCreateReq": {
+            "type": "object",
+            "properties": {
+                "operator_id": {
+                    "description": "负责人（员工ID，0=未指派）",
+                    "type": "integer"
+                },
+                "order_id": {
+                    "description": "关联订单ID（路径参数优先）",
+                    "type": "integer"
+                },
+                "raw_count": {
+                    "description": "原片数量（计划）",
+                    "type": "integer"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "retouch_target": {
+                    "description": "计划精修张数",
+                    "type": "integer"
+                },
+                "select_deadline": {
+                    "description": "选片截止时间（YYYY-MM-DD HH:mm:ss，空=不设）",
+                    "type": "string"
+                },
+                "stage": {
+                    "description": "起始阶段 1-待上传样片 2-客户选片中 3-精修进行中 4-待确认交付（0=默认 1）",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.DeliveryItemReq": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "filename": {
+                    "description": "文件名",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "文件大小（字节）",
+                    "type": "integer"
+                },
+                "url": {
+                    "description": "文件URL",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.DeliverySelectReq": {
+            "type": "object",
+            "properties": {
+                "item_ids": {
+                    "description": "选中的交付项ID列表",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "contract.FeedbackSubmitReq": {
+            "type": "object",
+            "properties": {
+                "contact": {
+                    "description": "联系方式（选填）",
+                    "type": "string"
+                },
+                "content": {
+                    "description": "问题描述（必填，\u003c=1000 字）",
+                    "type": "string"
+                },
+                "images": {
+                    "description": "截图 URL（选填，最多 3 张，服务端截断）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "description": "问题类型 bug-功能异常 advice-改进建议 other-其他（空按 other）",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.FinanceSummaryResp": {
+            "type": "object",
+            "properties": {
+                "deposit_total": {
+                    "description": "区间内定金到账",
+                    "type": "number"
+                },
+                "final_total": {
+                    "description": "区间内尾款+加片到账",
+                    "type": "number"
+                },
+                "month_receivable": {
+                    "description": "—— 前端口径 ——",
+                    "type": "number"
+                },
+                "month_received": {
+                    "description": "本月已确认到账",
+                    "type": "number"
+                },
+                "month_remaining": {
+                    "description": "本月剩余应收",
+                    "type": "number"
+                },
+                "pending_count": {
+                    "description": "待核验笔数（同 pending_verify_count）",
+                    "type": "integer"
+                },
+                "pending_verify_amount": {
+                    "description": "待核验申报金额",
+                    "type": "number"
+                },
+                "pending_verify_count": {
+                    "description": "待核验申报笔数",
+                    "type": "integer"
+                },
+                "refund_total": {
+                    "description": "区间内已退款金额",
+                    "type": "number"
+                },
+                "refunding_amount": {
+                    "description": "退款中金额",
+                    "type": "number"
+                },
+                "refunding_count": {
+                    "description": "退款中笔数",
+                    "type": "integer"
+                },
+                "total_income": {
+                    "description": "—— 扩展口径（保留）——",
+                    "type": "number"
+                }
+            }
+        },
+        "contract.LeadCreateReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "budget_max": {
+                    "description": "预算上限",
+                    "type": "number"
+                },
+                "budget_min": {
+                    "description": "预算下限",
+                    "type": "number"
+                },
+                "mobile": {
+                    "description": "手机号",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "客户姓名",
+                    "type": "string"
+                },
+                "owner_id": {
+                    "description": "负责人ID",
+                    "type": "integer"
+                },
+                "project_type": {
+                    "description": "项目类型",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "期望拍摄日期",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "来源",
+                    "type": "string"
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.LeadFollowReq": {
+            "type": "object",
+            "properties": {
+                "remark": {
+                    "description": "跟进备注",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.LeadUpdateReq": {
+            "type": "object",
+            "properties": {
+                "budget_max": {
+                    "description": "预算上限",
+                    "type": "number"
+                },
+                "budget_min": {
+                    "description": "预算下限",
+                    "type": "number"
+                },
+                "mobile": {
+                    "description": "手机号",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "客户姓名",
+                    "type": "string"
+                },
+                "owner_id": {
+                    "description": "负责人ID",
+                    "type": "integer"
+                },
+                "project_type": {
+                    "description": "项目类型",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "期望拍摄日期",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "来源",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态 1-待回复 2-待报价 3-已报价 4-已成交 5-已流失（0=保持原值）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.LeadStatus"
+                        }
+                    ]
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
                 }
             }
         },
@@ -2744,6 +14618,63 @@ const docTemplate = `{
                 }
             }
         },
+        "contract.PackageReq": {
+            "type": "object",
+            "required": [
+                "base_price",
+                "name"
+            ],
+            "properties": {
+                "addon_unit_price": {
+                    "description": "加选照片单价",
+                    "type": "number"
+                },
+                "base_price": {
+                    "description": "基础价格",
+                    "type": "number"
+                },
+                "category": {
+                    "description": "分类",
+                    "type": "string"
+                },
+                "content_desc": {
+                    "description": "套餐内容描述",
+                    "type": "string"
+                },
+                "cover": {
+                    "description": "封面图URL",
+                    "type": "string"
+                },
+                "deposit_rate": {
+                    "description": "定金比例，**百分数**（30 表示 30%；与 DDL decimal(5,2) DEFAULT 30.00 一致）",
+                    "type": "number"
+                },
+                "name": {
+                    "description": "套餐名称",
+                    "type": "string"
+                },
+                "photos_included": {
+                    "description": "包含精修照片数量",
+                    "type": "integer"
+                },
+                "shoot_hours": {
+                    "description": "拍摄时长（小时）",
+                    "type": "number"
+                },
+                "status": {
+                    "description": "状态 1-草稿 2-已上架 3-已下线（0=保持原值）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.PackageStatus"
+                        }
+                    ]
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
+                }
+            }
+        },
         "contract.PageReq": {
             "type": "object",
             "properties": {
@@ -2794,6 +14725,87 @@ const docTemplate = `{
                 }
             }
         },
+        "contract.PaymentMethodReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "type"
+            ],
+            "properties": {
+                "account_name": {
+                    "description": "账户名称",
+                    "type": "string"
+                },
+                "account_no": {
+                    "description": "账号",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "收款方式名称",
+                    "type": "string"
+                },
+                "qrcode": {
+                    "description": "收款码URL",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: 1启用 0禁用",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "类型: alipay/wechat/bank/cash",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.QuoteCreateReq": {
+            "type": "object",
+            "required": [
+                "package_id"
+            ],
+            "properties": {
+                "addon_price": {
+                    "description": "加选费用",
+                    "type": "number"
+                },
+                "package_id": {
+                    "description": "套餐ID",
+                    "type": "integer"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "description": "拍摄日期",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "报价单标题",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.QuoteStatusReq": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "description": "1-草稿 2-已发送 3-已接受 4-已拒绝 5-已成交",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.QuoteStatus"
+                        }
+                    ]
+                }
+            }
+        },
         "contract.RefundCreateReq": {
             "type": "object",
             "properties": {
@@ -2828,6 +14840,562 @@ const docTemplate = `{
                 },
                 "reason_label": {
                     "description": "改期原因分类",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.ResetPasswordReq": {
+            "type": "object",
+            "required": [
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "description": "新密码",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.RoleCreateReq": {
+            "type": "object",
+            "required": [
+                "code",
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.RoleGrantReq": {
+            "type": "object",
+            "properties": {
+                "data_scope": {
+                    "description": "数据范围 1-全部 2-本门店 3-仅本人",
+                    "type": "integer"
+                },
+                "permissions": {
+                    "description": "权限点集合（全量，覆盖式保存）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "contract.RolePermsResp": {
+            "type": "object",
+            "properties": {
+                "data_scope": {
+                    "type": "integer"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "role_code": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "role_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "contract.RoleUpdateReq": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "角色编码",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "角色名称",
+                    "type": "string"
+                },
+                "remark": {
+                    "description": "备注",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态: 1启用 0禁用",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.StaffBriefConfirmReq": {
+            "type": "object",
+            "required": [
+                "value"
+            ],
+            "properties": {
+                "value": {
+                    "description": "确认内容",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffChangeMobileReq": {
+            "type": "object",
+            "required": [
+                "code",
+                "new_mobile"
+            ],
+            "properties": {
+                "code": {
+                    "description": "短信验证码（发往当前手机号）",
+                    "type": "string"
+                },
+                "new_mobile": {
+                    "description": "新手机号",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffCustomRequestRespondReq": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "description": "响应说明",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffCustomerMobileReq": {
+            "type": "object",
+            "required": [
+                "customer_id",
+                "mobile"
+            ],
+            "properties": {
+                "customer_id": {
+                    "description": "客户ID",
+                    "type": "integer"
+                },
+                "mobile": {
+                    "description": "新手机号",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffFeedbackHandleReq": {
+            "type": "object",
+            "properties": {
+                "remark": {
+                    "description": "处理备注（如「已按要求重修」）",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffLeadMessageReq": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "biz_id": {
+                    "description": "关联业务ID",
+                    "type": "integer"
+                },
+                "channel": {
+                    "description": "渠道 h5/wechat/sms/phone",
+                    "type": "string"
+                },
+                "content": {
+                    "description": "消息内容",
+                    "type": "string"
+                },
+                "msg_type": {
+                    "description": "类型 1-文本 2-追问 3-报价通知 4-作品分享",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.StaffOverview": {
+            "type": "object",
+            "properties": {
+                "pending_confirm": {
+                    "description": "待确认预约",
+                    "type": "integer"
+                },
+                "pending_custom_request": {
+                    "description": "待处理定制需求",
+                    "type": "integer"
+                },
+                "pending_delivery": {
+                    "description": "待交付",
+                    "type": "integer"
+                },
+                "pending_deposit": {
+                    "description": "待收定金",
+                    "type": "integer"
+                },
+                "pending_refund": {
+                    "description": "待审批退款",
+                    "type": "integer"
+                },
+                "pending_reschedule": {
+                    "description": "待审批改期",
+                    "type": "integer"
+                },
+                "pending_shoot": {
+                    "description": "待拍摄",
+                    "type": "integer"
+                },
+                "today_shoot": {
+                    "description": "今日拍摄",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.StaffRescheduleAuditReq": {
+            "type": "object",
+            "properties": {
+                "approved": {
+                    "description": "是否同意",
+                    "type": "boolean"
+                },
+                "remark": {
+                    "description": "审批备注",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffReviewReplyReq": {
+            "type": "object",
+            "required": [
+                "reply"
+            ],
+            "properties": {
+                "reply": {
+                    "description": "回复内容",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffSlotTemplateReq": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "description": "HH:mm",
+                    "type": "string"
+                },
+                "photographer_id": {
+                    "description": "摄影师ID（0=全店通用）",
+                    "type": "integer"
+                },
+                "start_time": {
+                    "description": "HH:mm",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "1-启用 0-停用",
+                    "type": "integer"
+                },
+                "weekday": {
+                    "description": "星期几 0-周日 ... 6-周六",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.StaffStudioSettingReq": {
+            "type": "object",
+            "properties": {
+                "accept_new": {
+                    "description": "接收新预约 0-暂停 1-接收",
+                    "type": "integer"
+                },
+                "confirm_mode": {
+                    "description": "新单确认方式 manual-手动确认 auto-自动确认",
+                    "type": "string"
+                },
+                "cover_url": {
+                    "description": "分享封面图(指针：非 nil 才更新，可传 \"\" 清空)",
+                    "type": "string"
+                },
+                "faq": {
+                    "description": "常见问题(JSON)",
+                    "type": "string"
+                },
+                "homepage_slug": {
+                    "description": "预约主页短链标识",
+                    "type": "string"
+                },
+                "intro": {
+                    "description": "简介",
+                    "type": "string"
+                },
+                "lock_minutes": {
+                    "description": "下单临时锁定时长",
+                    "type": "integer"
+                },
+                "notify_settings": {
+                    "description": "通知提醒开关(JSON，见 model.StudioSetting)",
+                    "type": "string"
+                },
+                "reschedule_fee_rate": {
+                    "description": "改期调度费率",
+                    "type": "number"
+                },
+                "reschedule_free_hours": {
+                    "description": "免费改期阈值",
+                    "type": "integer"
+                },
+                "reschedule_min_hours": {
+                    "description": "不可改期阈值",
+                    "type": "integer"
+                },
+                "retain_days": {
+                    "description": "未选原片保留天数",
+                    "type": "integer"
+                },
+                "select_deadline_hours": {
+                    "description": "选片截止小时",
+                    "type": "integer"
+                },
+                "service_flow": {
+                    "description": "服务流程(JSON)",
+                    "type": "string"
+                },
+                "slogan": {
+                    "description": "宣传语",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StaffStudioSettingResp": {
+            "type": "object",
+            "properties": {
+                "accept_new": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "confirm_mode": {
+                    "description": "ConfirmMode 新单确认方式：manual-手动确认（员工逐单确认档期） / auto-自动确认。",
+                    "type": "string"
+                },
+                "cover_url": {
+                    "description": "CoverURL 分享封面图：预约主页（H5 C01 首页）与分享卡片顶部大图。\n对外物料，须落免鉴权 /media 目录（上传时 public=1），否则未登录浏览者看到空白。",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "faq": {
+                    "type": "string"
+                },
+                "homepage_slug": {
+                    "type": "string"
+                },
+                "homepage_url": {
+                    "description": "HomepageURL 预约主页分享链接，形如\nhttps://slot.app/?slug=lusheng-photography\u0026staff_id=12。\nslug 未配置、或服务端未配 share.h5_base_url 时为空串（前端据此给兜底提示）。\nstaff_id 为分享人（员工）账号 ID，客户从该链接下单时订单即归到这位员工名下；\n取不到员工 ID 时省略该参数，链接退化为只定位租户的普通主页地址。",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intro": {
+                    "type": "string"
+                },
+                "lock_minutes": {
+                    "type": "integer"
+                },
+                "notify_settings": {
+                    "description": "NotifySettings 通知提醒开关（JSON：{\"schedule\":bool,\"order\":bool,\"remind\":bool,\"message\":bool}）。\n存 JSON 串而非 4 个布尔列：开关数量会随产品迭代增减，加一项不必改表。",
+                    "type": "string"
+                },
+                "portfolio_url": {
+                    "description": "PortfolioURL 作品集分享链接，形如\nhttps://slot.app/?slug=lusheng-photography\u0026staff_id=12#/pages/works/index。\n与 HomepageURL 同基址、同租户参数，只把落地页换成 H5 作品集页（画板 C24）。\nH5 用 hash 路由（见 photography-h5/src/manifest.json），故路由写在 # 之后：\nslug / staff_id 必须留在 # 之前，否则 H5 端 utils/slug.js 读 window.location.search\n取不到租户，页面会退化成\"未定位工作室\"。",
+                    "type": "string"
+                },
+                "reschedule_fee_rate": {
+                    "type": "number"
+                },
+                "reschedule_free_hours": {
+                    "type": "integer"
+                },
+                "reschedule_min_hours": {
+                    "type": "integer"
+                },
+                "retain_days": {
+                    "type": "integer"
+                },
+                "select_deadline_hours": {
+                    "type": "integer"
+                },
+                "service_flow": {
+                    "type": "string"
+                },
+                "slogan": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.StoreCreateReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "address": {
+                    "description": "地址",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "门店名称",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "联系电话",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.StoreUpdateReq": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "地址",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "门店名称",
+                    "type": "string"
+                },
+                "phone": {
+                    "description": "联系电话",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "状态: 1启用 0禁用",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.TodayShoot": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "订单编号",
+                    "type": "string"
+                },
+                "customer_name": {
+                    "description": "客户姓名",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "订单ID",
+                    "type": "integer"
+                },
+                "package_name": {
+                    "description": "套餐名称",
+                    "type": "string"
+                },
+                "photographer": {
+                    "description": "摄影师",
+                    "type": "string"
+                },
+                "shoot_address": {
+                    "description": "拍摄地点",
+                    "type": "string"
+                },
+                "shoot_time": {
+                    "description": "拍摄时段",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "订单状态（2-待拍摄 3-拍摄中）",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.TodoItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "description": "待处理数量",
+                    "type": "integer"
+                },
+                "key": {
+                    "description": "唯一标识（前端 v-for key）",
+                    "type": "string"
+                },
+                "label": {
+                    "description": "展示文案",
+                    "type": "string"
+                },
+                "route": {
+                    "description": "点击跳转的前端路由",
+                    "type": "string"
+                },
+                "tone": {
+                    "description": "色调：danger / warning / normal",
+                    "type": "string"
+                }
+            }
+        },
+        "contract.UserCreateReq": {
+            "type": "object",
+            "required": [
+                "password",
+                "role_id",
+                "username"
+            ],
+            "properties": {
+                "mobile": {
+                    "description": "手机号",
+                    "type": "string"
+                },
+                "nickname": {
+                    "description": "昵称",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "密码",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: 1启用 0禁用",
+                    "type": "integer"
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
+                },
+                "username": {
+                    "description": "登录账号",
                     "type": "string"
                 }
             }
@@ -2907,6 +15475,336 @@ const docTemplate = `{
                 }
             }
         },
+        "contract.UserUpdateReq": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "description": "头像URL",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "mobile": {
+                    "description": "手机号",
+                    "type": "string"
+                },
+                "nickname": {
+                    "description": "昵称",
+                    "type": "string"
+                },
+                "role_id": {
+                    "description": "角色ID",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "状态: 1启用 0禁用",
+                    "type": "integer"
+                },
+                "store_id": {
+                    "description": "门店ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.WorkspaceResp": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "description": "公司信息",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.SysCompany"
+                        }
+                    ]
+                },
+                "payment_methods": {
+                    "description": "收款方式列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PaymentMethod"
+                    }
+                },
+                "roles": {
+                    "description": "角色列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.SysRole"
+                    }
+                },
+                "stores": {
+                    "description": "门店列表",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.SysStore"
+                    }
+                }
+            }
+        },
+        "domain.Perm": {
+            "type": "string",
+            "enum": [
+                "dashboard:view",
+                "order:view",
+                "order:create",
+                "order:update",
+                "order:status",
+                "order:cancel",
+                "order:reschedule",
+                "order:reschedule_audit",
+                "customer:view",
+                "customer:create",
+                "customer:update",
+                "customer:delete",
+                "lead:view",
+                "lead:create",
+                "lead:update",
+                "lead:assign",
+                "lead:convert",
+                "lead:delete",
+                "quote:view",
+                "quote:create",
+                "quote:update",
+                "package:view",
+                "package:create",
+                "package:update",
+                "package:publish",
+                "package:delete",
+                "payment:view",
+                "payment:create",
+                "payment:confirm",
+                "payment:delete",
+                "refund:view",
+                "refund:create",
+                "refund:audit",
+                "delivery:view",
+                "delivery:create",
+                "delivery:update",
+                "delivery:delete",
+                "asset:view",
+                "asset:upload",
+                "asset:update",
+                "asset:audit",
+                "asset:delete",
+                "calendar:view",
+                "calendar:update",
+                "finance:view",
+                "finance:export",
+                "settings:view",
+                "settings:update",
+                "user:view",
+                "user:create",
+                "user:update",
+                "user:delete",
+                "user:resetpwd",
+                "role:view",
+                "role:create",
+                "role:update",
+                "role:delete",
+                "role:grant",
+                "store:view",
+                "store:create",
+                "store:update",
+                "store:delete",
+                "log:view",
+                "notification:view",
+                "request:view",
+                "request:handle",
+                "review:view",
+                "review:reply",
+                "device:view",
+                "device:manage"
+            ],
+            "x-enum-varnames": [
+                "PermDashboardView",
+                "PermOrderView",
+                "PermOrderCreate",
+                "PermOrderUpdate",
+                "PermOrderStatus",
+                "PermOrderCancel",
+                "PermOrderReschedule",
+                "PermOrderRescheduleAudit",
+                "PermCustomerView",
+                "PermCustomerCreate",
+                "PermCustomerUpdate",
+                "PermCustomerDelete",
+                "PermLeadView",
+                "PermLeadCreate",
+                "PermLeadUpdate",
+                "PermLeadAssign",
+                "PermLeadConvert",
+                "PermLeadDelete",
+                "PermQuoteView",
+                "PermQuoteCreate",
+                "PermQuoteUpdate",
+                "PermPackageView",
+                "PermPackageCreate",
+                "PermPackageUpdate",
+                "PermPackagePublish",
+                "PermPackageDelete",
+                "PermPaymentView",
+                "PermPaymentCreate",
+                "PermPaymentConfirm",
+                "PermPaymentDelete",
+                "PermRefundView",
+                "PermRefundCreate",
+                "PermRefundAudit",
+                "PermDeliveryView",
+                "PermDeliveryCreate",
+                "PermDeliveryUpdate",
+                "PermDeliveryDelete",
+                "PermAssetView",
+                "PermAssetUpload",
+                "PermAssetUpdate",
+                "PermAssetAudit",
+                "PermAssetDelete",
+                "PermCalendarView",
+                "PermCalendarUpdate",
+                "PermFinanceView",
+                "PermFinanceExport",
+                "PermSettingsView",
+                "PermSettingsUpdate",
+                "PermUserView",
+                "PermUserCreate",
+                "PermUserUpdate",
+                "PermUserDelete",
+                "PermUserResetPwd",
+                "PermRoleView",
+                "PermRoleCreate",
+                "PermRoleUpdate",
+                "PermRoleDelete",
+                "PermRoleGrant",
+                "PermStoreView",
+                "PermStoreCreate",
+                "PermStoreUpdate",
+                "PermStoreDelete",
+                "PermLogView",
+                "PermNotificationView",
+                "PermRequestView",
+                "PermRequestHandle",
+                "PermReviewView",
+                "PermReviewReply",
+                "PermDeviceView",
+                "PermDeviceManage"
+            ]
+        },
+        "domain.PermDesc": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "权限点标识，如 order:view",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.Perm"
+                        }
+                    ]
+                },
+                "label": {
+                    "description": "中文名，如 查看订单",
+                    "type": "string"
+                }
+            }
+        },
+        "domain.PermGroup": {
+            "type": "object",
+            "properties": {
+                "module": {
+                    "description": "模块中文名",
+                    "type": "string"
+                },
+                "perms": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.PermDesc"
+                    }
+                }
+            }
+        },
+        "enum.AssetStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2
+            ],
+            "x-enum-comments": {
+                "AssetStatusDraft": "草稿",
+                "AssetStatusPublished": "已发布"
+            },
+            "x-enum-descriptions": [
+                "草稿",
+                "已发布"
+            ],
+            "x-enum-varnames": [
+                "AssetStatusDraft",
+                "AssetStatusPublished"
+            ]
+        },
+        "enum.BlockStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2
+            ],
+            "x-enum-comments": {
+                "BlockStatusCancelled": "已取消",
+                "BlockStatusLocked": "已锁定"
+            },
+            "x-enum-descriptions": [
+                "已锁定",
+                "已取消"
+            ],
+            "x-enum-varnames": [
+                "BlockStatusLocked",
+                "BlockStatusCancelled"
+            ]
+        },
+        "enum.BriefItemStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "BriefItemConfirmed": "已确认",
+                "BriefItemPending": "待追问",
+                "BriefItemSent": "已发送"
+            },
+            "x-enum-descriptions": [
+                "待追问",
+                "已发送",
+                "已确认"
+            ],
+            "x-enum-varnames": [
+                "BriefItemPending",
+                "BriefItemSent",
+                "BriefItemConfirmed"
+            ]
+        },
+        "enum.CustomRequestStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "CustomRequestClosed": "已关闭",
+                "CustomRequestPending": "待处理",
+                "CustomRequestResponded": "已响应"
+            },
+            "x-enum-descriptions": [
+                "待处理",
+                "已响应",
+                "已关闭"
+            ],
+            "x-enum-varnames": [
+                "CustomRequestPending",
+                "CustomRequestResponded",
+                "CustomRequestClosed"
+            ]
+        },
         "enum.CustomerLevel": {
             "type": "integer",
             "enum": [
@@ -2957,6 +15855,29 @@ const docTemplate = `{
                 "CustomerStatusInactive"
             ]
         },
+        "enum.DeliveryItemKind": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "DeliveryItemKindRetouched": "精修成品",
+                "DeliveryItemKindSample": "样片",
+                "DeliveryItemKindSelected": "已选"
+            },
+            "x-enum-descriptions": [
+                "样片",
+                "已选",
+                "精修成品"
+            ],
+            "x-enum-varnames": [
+                "DeliveryItemKindSample",
+                "DeliveryItemKindSelected",
+                "DeliveryItemKindRetouched"
+            ]
+        },
         "enum.DeliveryStage": {
             "type": "integer",
             "enum": [
@@ -2986,6 +15907,60 @@ const docTemplate = `{
                 "DeliveryStageRetouching",
                 "DeliveryStagePendingConfirm",
                 "DeliveryStageDelivered"
+            ]
+        },
+        "enum.LeadStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "x-enum-comments": {
+                "LeadStatusConfirmed": "待确认/已成交",
+                "LeadStatusLose": "已流失",
+                "LeadStatusPending": "待回复",
+                "LeadStatusQuoted": "已报价",
+                "LeadStatusQuoting": "待报价"
+            },
+            "x-enum-descriptions": [
+                "待回复",
+                "待报价",
+                "已报价",
+                "待确认/已成交",
+                "已流失"
+            ],
+            "x-enum-varnames": [
+                "LeadStatusPending",
+                "LeadStatusQuoting",
+                "LeadStatusQuoted",
+                "LeadStatusConfirmed",
+                "LeadStatusLose"
+            ]
+        },
+        "enum.NotificationType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "NotificationTypeFinance": "财务",
+                "NotificationTypeOrder": "订单",
+                "NotificationTypeSystem": "系统"
+            },
+            "x-enum-descriptions": [
+                "订单",
+                "财务",
+                "系统"
+            ],
+            "x-enum-varnames": [
+                "NotificationTypeOrder",
+                "NotificationTypeFinance",
+                "NotificationTypeSystem"
             ]
         },
         "enum.OrderStatus": {
@@ -3031,6 +16006,29 @@ const docTemplate = `{
                 "OrderStatusCancelled"
             ]
         },
+        "enum.PackageStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "PackageStatusActive": "已上架",
+                "PackageStatusDraft": "草稿",
+                "PackageStatusOffline": "已下线"
+            },
+            "x-enum-descriptions": [
+                "草稿",
+                "已上架",
+                "已下线"
+            ],
+            "x-enum-varnames": [
+                "PackageStatusDraft",
+                "PackageStatusActive",
+                "PackageStatusOffline"
+            ]
+        },
         "enum.PaymentStatus": {
             "type": "integer",
             "enum": [
@@ -3056,6 +16054,37 @@ const docTemplate = `{
                 "PaymentStatusConfirmed",
                 "PaymentStatusUnpaid",
                 "PaymentStatusRefunded"
+            ]
+        },
+        "enum.QuoteStatus": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "x-enum-comments": {
+                "QuoteStatusAccepted": "已接受",
+                "QuoteStatusConverted": "已成交",
+                "QuoteStatusDraft": "草稿",
+                "QuoteStatusRejected": "已拒绝",
+                "QuoteStatusSent": "已发送"
+            },
+            "x-enum-descriptions": [
+                "草稿",
+                "已发送",
+                "已接受",
+                "已拒绝",
+                "已成交"
+            ],
+            "x-enum-varnames": [
+                "QuoteStatusDraft",
+                "QuoteStatusSent",
+                "QuoteStatusAccepted",
+                "QuoteStatusRejected",
+                "QuoteStatusConverted"
             ]
         },
         "enum.RefundStatus": {
@@ -3134,6 +16163,251 @@ const docTemplate = `{
                 "RescheduleStatusRejected",
                 "RescheduleStatusCancelled"
             ]
+        },
+        "enum.UploadType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3
+            ],
+            "x-enum-comments": {
+                "UploadTypeFile": "文件",
+                "UploadTypeImage": "图片",
+                "UploadTypeVideo": "视频"
+            },
+            "x-enum-descriptions": [
+                "图片",
+                "视频",
+                "文件"
+            ],
+            "x-enum-varnames": [
+                "UploadTypeImage",
+                "UploadTypeVideo",
+                "UploadTypeFile"
+            ]
+        },
+        "model.Asset": {
+            "type": "object",
+            "properties": {
+                "authorization": {
+                    "type": "integer"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "cover": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "featured": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "string"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "package_ids": {
+                    "type": "string"
+                },
+                "photographer": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.AssetStatus"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "view_count": {
+                    "type": "integer"
+                },
+                "visibility": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.CalendarBlock": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "photographer": {
+                    "type": "string"
+                },
+                "photographer_id": {
+                    "type": "integer"
+                },
+                "project_type": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.BlockStatus"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "time_range": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.CustomRequest": {
+            "type": "object",
+            "properties": {
+                "budget_max": {
+                    "type": "number"
+                },
+                "budget_min": {
+                    "type": "number"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "expected_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "string"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "photographer": {
+                    "description": "Photographer 摄影师姓名**快照**（同 biz_order.photographer）：列表展示无需回表 join sys_user，\n且员工改名后历史需求仍保留当时的服务摄影师。",
+                    "type": "string"
+                },
+                "photographer_id": {
+                    "description": "PhotographerID 指定摄影师（0 = 未指定）：客户在 H5 定制需求页从「历史服务过的门店/摄影师」\n中选定，或由分享链接 staff_id 带入（h5.go → CustomRequestSubmit）。与 StoreID 同为**归属键**，\n指定摄影师时按该摄影师所属门店落店，PC / 员工端「定制需求」可据此显示与筛选。",
+                    "type": "integer"
+                },
+                "project_type": {
+                    "type": "string"
+                },
+                "response": {
+                    "type": "string"
+                },
+                "response_at": {
+                    "type": "string"
+                },
+                "response_by": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.CustomRequestStatus"
+                },
+                "store_id": {
+                    "description": "StoreID 所属门店（0 = 公共池未归属）：独立接单模式下按店过滤；\nH5 提交页未参数化前新数据落公共池，由员工响应认领",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
         },
         "model.Customer": {
             "type": "object",
@@ -3309,6 +16583,256 @@ const docTemplate = `{
                 },
                 "stage": {
                     "$ref": "#/definitions/enum.DeliveryStage"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.DeliveryItem": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "delivery_id": {
+                    "type": "integer"
+                },
+                "feedback_content": {
+                    "type": "string"
+                },
+                "feedback_priority": {
+                    "type": "string"
+                },
+                "feedback_status": {
+                    "type": "integer"
+                },
+                "feedback_types": {
+                    "type": "string"
+                },
+                "file_type": {
+                    "description": "FileType / Kind 与 DDL 一致为 tinyint（FileType: 1-图片 2-视频 3-文件；\nKind: 1-样片 2-已选 3-精修成品），存字符串会被严格模式拒收。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.UploadType"
+                        }
+                    ]
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "handle_remark": {
+                    "type": "string"
+                },
+                "handled_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_selected": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "$ref": "#/definitions/enum.DeliveryItemKind"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Lead": {
+            "type": "object",
+            "properties": {
+                "budget_max": {
+                    "type": "number"
+                },
+                "budget_min": {
+                    "type": "number"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "follower": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_follow_at": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "next_follow_at": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "project_type": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.LeadStatus"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.LeadBriefItem": {
+            "type": "object",
+            "properties": {
+                "affects_pricing": {
+                    "type": "integer"
+                },
+                "ai_suggestion": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "confirmed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "question": {
+                    "type": "string"
+                },
+                "sent_at": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.BriefItemStatus"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.LeadMessage": {
+            "type": "object",
+            "properties": {
+                "biz_id": {
+                    "type": "integer"
+                },
+                "channel": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "direction": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "msg_type": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"
@@ -3771,6 +17295,1009 @@ const docTemplate = `{
                 }
             }
         },
+        "model.OrderReview": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "string"
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply": {
+                    "type": "string"
+                },
+                "reply_at": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.Package": {
+            "type": "object",
+            "properties": {
+                "addon_unit_price": {
+                    "type": "number"
+                },
+                "base_price": {
+                    "type": "number"
+                },
+                "base_version": {
+                    "type": "integer"
+                },
+                "cancel_policy": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "content_desc": {
+                    "type": "string"
+                },
+                "cover": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "delivery_days": {
+                    "type": "integer"
+                },
+                "deposit_amt": {
+                    "type": "number"
+                },
+                "deposit_rate": {
+                    "type": "number"
+                },
+                "download_days": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "introduction": {
+                    "type": "string"
+                },
+                "location_mode": {
+                    "type": "string"
+                },
+                "locations": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "photos_included": {
+                    "type": "integer"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "raw_count": {
+                    "type": "integer"
+                },
+                "reschedule_policy": {
+                    "type": "string"
+                },
+                "revision_count": {
+                    "type": "integer"
+                },
+                "shoot_hours": {
+                    "type": "number"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.PackageStatus"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "suitable_for": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.PaymentMethod": {
+            "type": "object",
+            "properties": {
+                "account_name": {
+                    "type": "string"
+                },
+                "account_no": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "qrcode": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.Quote": {
+            "type": "object",
+            "properties": {
+                "accept_at": {
+                    "type": "string"
+                },
+                "addon_price": {
+                    "type": "number"
+                },
+                "addons": {
+                    "type": "string"
+                },
+                "base_price": {
+                    "type": "number"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "duration_hours": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lead_id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "location_fee": {
+                    "type": "number"
+                },
+                "location_type": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "package_id": {
+                    "type": "integer"
+                },
+                "package_name": {
+                    "type": "string"
+                },
+                "people_count": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "type": "string"
+                },
+                "shoot_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/enum.QuoteStatus"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_price": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "valid_until": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SlotTemplate": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "photographer_id": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "weekday": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.StudioSetting": {
+            "type": "object",
+            "properties": {
+                "accept_new": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "confirm_mode": {
+                    "description": "ConfirmMode 新单确认方式：manual-手动确认（员工逐单确认档期） / auto-自动确认。",
+                    "type": "string"
+                },
+                "cover_url": {
+                    "description": "CoverURL 分享封面图：预约主页（H5 C01 首页）与分享卡片顶部大图。\n对外物料，须落免鉴权 /media 目录（上传时 public=1），否则未登录浏览者看到空白。",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "faq": {
+                    "type": "string"
+                },
+                "homepage_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intro": {
+                    "type": "string"
+                },
+                "lock_minutes": {
+                    "type": "integer"
+                },
+                "notify_settings": {
+                    "description": "NotifySettings 通知提醒开关（JSON：{\"schedule\":bool,\"order\":bool,\"remind\":bool,\"message\":bool}）。\n存 JSON 串而非 4 个布尔列：开关数量会随产品迭代增减，加一项不必改表。",
+                    "type": "string"
+                },
+                "reschedule_fee_rate": {
+                    "type": "number"
+                },
+                "reschedule_free_hours": {
+                    "type": "integer"
+                },
+                "reschedule_min_hours": {
+                    "type": "integer"
+                },
+                "retain_days": {
+                    "type": "integer"
+                },
+                "select_deadline_hours": {
+                    "type": "integer"
+                },
+                "service_flow": {
+                    "type": "string"
+                },
+                "slogan": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SysCompany": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "contact_name": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "intro": {
+                    "type": "string"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SysNotification": {
+            "type": "object",
+            "properties": {
+                "biz_id": {
+                    "type": "integer"
+                },
+                "biz_type": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_read": {
+                    "type": "integer"
+                },
+                "read_at": {
+                    "type": "string"
+                },
+                "receiver_id": {
+                    "type": "integer"
+                },
+                "receiver_type": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type 与 DDL 一致为 tinyint（1-订单 2-财务 3-系统）：\n历史实现用 string 承载并列的 \"order\"/\"finance\" 字面量，严格模式下每次写通知\n都会被 MySQL 拒收（Incorrect integer value），且失败只 Warnf —— 站内通知实际从未落库。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.NotificationType"
+                        }
+                    ]
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SysOperationLog": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "module": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.SysRole": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "data_scope": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission_count": {
+                    "description": "PermissionCount 已配置的权限点数量。非数据库列（gorm:\"-\"），\n由 ListRoles 聚合 sys_role_permission 后填充，供角色列表展示。",
+                    "type": "integer"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SysStore": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SysUser": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "last_login_ip": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "store_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.UserDevice": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_active_at": {
+                    "type": "string"
+                },
+                "last_ip": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.DeliveryListItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_confirmed_at": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "delivered_at": {
+                    "type": "string"
+                },
+                "extra_confirmed": {
+                    "type": "integer"
+                },
+                "extra_fee": {
+                    "type": "number"
+                },
+                "extra_selected_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "order_code": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "package_name": {
+                    "type": "string"
+                },
+                "raw_count": {
+                    "type": "integer"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "retouch_target": {
+                    "type": "integer"
+                },
+                "retouch_version": {
+                    "type": "integer"
+                },
+                "retouched_count": {
+                    "type": "integer"
+                },
+                "sample_count": {
+                    "type": "integer"
+                },
+                "select_deadline": {
+                    "type": "string"
+                },
+                "selected_at": {
+                    "type": "string"
+                },
+                "selected_count": {
+                    "type": "integer"
+                },
+                "sent_final_at": {
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "type": "string"
+                },
+                "stage": {
+                    "$ref": "#/definitions/enum.DeliveryStage"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.FeedbackListItem": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "delivery_code": {
+                    "type": "string"
+                },
+                "delivery_id": {
+                    "type": "integer"
+                },
+                "feedback_content": {
+                    "type": "string"
+                },
+                "feedback_priority": {
+                    "type": "string"
+                },
+                "feedback_status": {
+                    "type": "integer"
+                },
+                "feedback_types": {
+                    "type": "string"
+                },
+                "file_type": {
+                    "description": "FileType / Kind 与 DDL 一致为 tinyint（FileType: 1-图片 2-视频 3-文件；\nKind: 1-样片 2-已选 3-精修成品），存字符串会被严格模式拒收。",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.UploadType"
+                        }
+                    ]
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "handle_remark": {
+                    "type": "string"
+                },
+                "handled_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_selected": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "$ref": "#/definitions/enum.DeliveryItemKind"
+                },
+                "order_code": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "repository.ReviewListItem": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "customer_id": {
+                    "type": "integer"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "string"
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "order_code": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "package_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply": {
+                    "type": "string"
+                },
+                "reply_at": {
+                    "type": "string"
+                },
+                "shoot_date": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                }
+            }
+        },
         "response.Body": {
             "type": "object",
             "properties": {
@@ -3801,6 +18328,28 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "service.UploadResult": {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string"
+                },
+                "file_type": {
+                    "description": "1-图片 2-视频 3-文件（与 biz_upload.file_type 同口径）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.UploadType"
+                        }
+                    ]
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -3820,7 +18369,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Photography Server API",
-	Description:      "摄影工作室管理系统后端 API。五端挂载：pc（无前缀）/ miniapp（/miniapp）/ h5（/h5）/ wechat 客户区（/wechat）/ 员工端（/wechat/staff）。\n约定：业务接口统一使用 POST + JSON body（含分页 page/page_size、keyword 等），路径参数用 :id / :order_id；统一响应体 response.Body{code,msg,data,trace_id}，列表数据为 response.Page{list,total,page,page_size}。\n鉴权：除登录、健康检查与客户区公开接口（ClientPublic）外，均需在 Authorization 头携带 Bearer <token>（员工 JWT 或客户 JWT）。",
+	Description:      "摄影工作室管理系统后端 API。五端挂载：pc（无前缀）/ miniapp（/miniapp）/ h5（/h5）/ wechat 客户区（/wechat）/ 员工端（/wechat/staff）。\n约定：业务接口统一使用 POST + JSON body（含分页 page/page_size、keyword 等），路径参数用 :id / :order_id；统一响应体 response.Body{code,msg,data,trace_id}，列表数据为 response.Page{list,total,page,page_size}。\n鉴权：除登录、健康检查与客户区公开接口（ClientPublic）外，均需在 Authorization 头携带 Bearer <token>（员工 JWT 或客户 JWT）。\n路径口径：本 spec 的路径即真实后端路径（不含网关前缀 /api）。pc 无前缀；/miniapp 与员工端为同一路由表加前缀；客户区文档以 /h5 为准（/wechat 是同一份路由表的别名挂载）。\n跨端复用：/miniapp 与员工端白名单（staffInclude）复用管理端同一 Handler，因此这些操作在文档中只按 PC 路径（无前缀）列出一条，实际可按对应端前缀直接调用。",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

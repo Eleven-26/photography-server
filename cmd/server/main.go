@@ -37,6 +37,8 @@ import (
 // @description                摄影工作室管理系统后端 API。五端挂载：pc（无前缀）/ miniapp（/miniapp）/ h5（/h5）/ wechat 客户区（/wechat）/ 员工端（/wechat/staff）。
 // @description                约定：业务接口统一使用 POST + JSON body（含分页 page/page_size、keyword 等），路径参数用 :id / :order_id；统一响应体 response.Body{code,msg,data,trace_id}，列表数据为 response.Page{list,total,page,page_size}。
 // @description                鉴权：除登录、健康检查与客户区公开接口（ClientPublic）外，均需在 Authorization 头携带 Bearer <token>（员工 JWT 或客户 JWT）。
+// @description                路径口径：本 spec 的路径即真实后端路径（不含网关前缀 /api）。pc 无前缀；/miniapp 与员工端为同一路由表加前缀；客户区文档以 /h5 为准（/wechat 是同一份路由表的别名挂载）。
+// @description                跨端复用：/miniapp 与员工端白名单（staffInclude）复用管理端同一 Handler，因此这些操作在文档中只按 PC 路径（无前缀）列出一条，实际可按对应端前缀直接调用。
 // @BasePath                   /
 // @securityDefinitions.apikey BearerAuth
 // @in                         header

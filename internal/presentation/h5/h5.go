@@ -95,6 +95,16 @@ func (h *Controller) requireCompany(c *gin.Context) (int64, error) {
 // ---------------------------------------------------------------------
 
 // SmsCode 发送登录验证码
+// @Summary      发送登录验证码
+// @Description  短信发往指定手机号，场景固定为 login；短信通道未接入时验证码只打服务端日志。
+// @Tags         客户区·登录
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{mobile=string}  true  "手机号"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/auth/sms-code [post]
 func (h *Controller) SmsCode(c *gin.Context) {
 	var req struct {
 		Mobile string `json:"mobile" binding:"required"`
@@ -112,6 +122,19 @@ func (h *Controller) SmsCode(c *gin.Context) {
 
 // Login 客户手机号验证码登录（未注册自动建档），openid 为小程序场景透传。
 // 租户定位：body slug（可选）→ query slug / X-Slug 头 → 服务端反查 company_id（#29）
+// @Summary      客户登录
+// @Description  手机号 + 短信验证码登录；**未注册的手机号自动建档客户**（手机号为租户内唯一键）。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Description  校验规则：dev / docker.dev 允许免验证码登录（短信通道未接入），test / prod 及未知 profile 强制校验验证码。
+// @Description  登录成功返回客户令牌，后续请求以 "Bearer <token>" 放入 Authorization 头。
+// @Tags         客户区·登录
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{slug=string,mobile=string,code=string,openid=string}  true  "登录信息（mobile 必填；openid 为小程序场景透传）"
+// @Success      200  {object}  response.Body{data=object{token=string,customer=model.Customer}}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/auth/login [post]
 func (h *Controller) Login(c *gin.Context) {
 	var req struct {
 		Slug   string `json:"slug"` // 预约主页短链标识（也可放 query/头）
@@ -170,6 +193,17 @@ func (h *Controller) loginRequireSmsCode() bool {
 }
 
 // PackageList 套餐列表（已上架）
+// @Summary      套餐列表
+// @Description  预约主页套餐列表，**只返回已上架套餐**。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·套餐
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{page=int,page_size=int,category=string}  true  "查询条件（slug 见说明）"
+// @Success      200  {object}  response.Body{data=response.Page{list=[]model.Package,total=int,page=int,page_size=int}}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/package/list [post]
 func (h *Controller) PackageList(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -186,6 +220,17 @@ func (h *Controller) PackageList(c *gin.Context) {
 }
 
 // PackageDetail 套餐详情
+// @Summary      套餐详情
+// @Description  套餐详情（预约主页点开套餐卡片）。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·套餐
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "套餐ID"
+// @Success      200  {object}  response.Body{data=model.Package}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/package/detail/{id} [post]
 func (h *Controller) PackageDetail(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -206,6 +251,16 @@ func (h *Controller) PackageDetail(c *gin.Context) {
 }
 
 // StudioInfo 工作室预约主页信息
+// @Summary      工作室信息
+// @Description  预约主页展示用的工作室信息（名称 / 简介 / 联系方式 / 分享链接等）。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·工作室
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=model.StudioSetting}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/studio/info [post]
 func (h *Controller) StudioInfo(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -221,6 +276,17 @@ func (h *Controller) StudioInfo(c *gin.Context) {
 }
 
 // SlotList 指定日期可约时段（body: date、photographer_id 可选）
+// @Summary      可约时段
+// @Description  查询指定日期的可约时段；photographer_id 可选，用于只看某位摄影师的空闲时段。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·工作室
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{date=string,photographer_id=int}  true  "查询条件（date 格式 2006-01-02；slug 见说明）"
+// @Success      200  {object}  response.Body{data=[]contract.ClientSlot}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/slot/list [post]
 func (h *Controller) SlotList(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -239,6 +305,18 @@ func (h *Controller) SlotList(c *gin.Context) {
 // CustomRequestSubmit 提交定制需求（游客/登录均可）。
 // 摄影师归属（2026-09-15 补齐）：body.photographer_id（客户在 H5 定制需求页的显式选择）优先，
 // 分享链接的 staff_id 兜底 —— 两者都缺则落门店/公共池，见 service.ClientSubmitCustomRequest。
+// @Summary      提交定制需求
+// @Description  提交定制需求，**游客与登录客户均可**。已登录取令牌内公司，游客按 slug 反查租户。
+// @Description  摄影师归属：body.photographer_id（客户显式选择）优先，分享链接的 staff_id 兜底，两者都缺则落门店/公共池。
+// @Description  ⚠️ 本接口会往 crm_customer 建档（手机号唯一键），公开可调，存在被刷数据的风险。
+// @Tags         客户区·定制需求
+// @Accept       json
+// @Produce      json
+// @Param        req  body  contract.ClientCustomRequestReq  true  "定制需求信息"
+// @Success      200  {object}  response.Body{data=model.CustomRequest}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/custom-request/submit [post]
 func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 	var req contract.ClientCustomRequestReq
 	if err := bind.BindJSON(c, &req); err != nil {
@@ -274,6 +352,18 @@ func (h *Controller) CustomRequestSubmit(c *gin.Context) {
 // BookingSubmit 提交预约单。
 // 分享人归属：链接参数 staff_id（头/body/query 三选一，见 staffFrom）随预约一并落到订单，
 // 客户从谁的预约主页进来下单，订单就算谁的。
+// @Summary      提交预约单
+// @Description  客户提交预约单。分享人归属：链接参数 staff_id 随预约落到订单（biz_order.photographer_id）。
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        req  body  contract.ClientBookingReq  true  "预约信息"
+// @Success      200  {object}  response.Body{data=model.Order}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/submit [post]
 func (h *Controller) BookingSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	var req contract.ClientBookingReq
@@ -290,6 +380,18 @@ func (h *Controller) BookingSubmit(c *gin.Context) {
 }
 
 // BookingConfirm 确认预约单
+// @Summary      确认预约单
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/confirm/{id} [post]
 func (h *Controller) BookingConfirm(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -305,6 +407,20 @@ func (h *Controller) BookingConfirm(c *gin.Context) {
 }
 
 // BookingCancel 取消预约单
+// @Summary      取消预约单
+// @Description  取消本人的预约单并记录原因；body 可为空（reason 可选）。
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                   true  "订单ID"
+// @Param        req  body  object{reason=string} false  "取消原因（可省略）"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/cancel/{id} [post]
 func (h *Controller) BookingCancel(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -324,6 +440,18 @@ func (h *Controller) BookingCancel(c *gin.Context) {
 }
 
 // OrderList 我的订单
+// @Summary      我的订单
+// @Description  分页查询当前客户名下订单，可按状态过滤（归属由令牌内 customer_id 锁定）。
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{page=int,page_size=int,status=string}  true  "查询条件"
+// @Success      200  {object}  response.Body{data=response.Page{list=[]model.Order,total=int,page=int,page_size=int}}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/list [post]
 func (h *Controller) OrderList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	page, pageSize := bind.Pager(c)
@@ -336,6 +464,18 @@ func (h *Controller) OrderList(c *gin.Context) {
 }
 
 // OrderDetail 订单详情
+// @Summary      订单详情
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=contract.ClientOrderDetail}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/detail/{id} [post]
 func (h *Controller) OrderDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -352,6 +492,19 @@ func (h *Controller) OrderDetail(c *gin.Context) {
 }
 
 // OrderPrepRead 客户确认已读「拍前准备清单」（写 biz_order.prep_read_at，幂等）
+// @Summary      拍前准备已读
+// @Description  客户确认已读「拍前准备清单」，写 biz_order.prep_read_at；**幂等**。
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/prep/read/{id} [post]
 func (h *Controller) OrderPrepRead(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -367,6 +520,19 @@ func (h *Controller) OrderPrepRead(c *gin.Context) {
 }
 
 // RescheduleApply 申请改期
+// @Summary      申请改期
+// @Description  客户发起改期申请（apply_source=2）。
+// @Tags         客户区·改期
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int                         true  "订单ID"
+// @Param        req       body  contract.ClientRescheduleReq true  "改期信息"
+// @Success      200  {object}  response.Body{data=model.OrderReschedule}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/reschedule/apply/{order_id} [post]
 func (h *Controller) RescheduleApply(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -388,6 +554,18 @@ func (h *Controller) RescheduleApply(c *gin.Context) {
 }
 
 // RescheduleCancel 撤回改期申请
+// @Summary      撤回改期申请
+// @Tags         客户区·改期
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "改期单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/reschedule/cancel/{id} [post]
 func (h *Controller) RescheduleCancel(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -403,6 +581,18 @@ func (h *Controller) RescheduleCancel(c *gin.Context) {
 }
 
 // RescheduleList 我的订单改期单列表（改期进度页；不分页，逐单明细集合）
+// @Summary      我的改期单列表
+// @Description  返回某订单下的改期单（改期进度页；**不分页**，逐单明细集合）。
+// @Tags         客户区·改期
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=[]model.OrderReschedule}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/reschedule/list/{order_id} [post]
 func (h *Controller) RescheduleList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -419,6 +609,19 @@ func (h *Controller) RescheduleList(c *gin.Context) {
 }
 
 // RefundApply 申请退款
+// @Summary      申请退款
+// @Description  客户对订单发起退款申请；金额为空时按退款规则自动计算。
+// @Tags         客户区·退款
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int                     true  "订单ID"
+// @Param        req       body  contract.ClientRefundReq true  "退款请求"
+// @Success      200  {object}  response.Body{data=model.OrderRefund}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/refund/apply/{order_id} [post]
 func (h *Controller) RefundApply(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -440,6 +643,18 @@ func (h *Controller) RefundApply(c *gin.Context) {
 }
 
 // RefundList 我的订单退款记录（退款进度页 C21；不分页，逐单明细集合）
+// @Summary      我的退款记录
+// @Description  返回某订单下的退款记录（退款进度页；**不分页**）。
+// @Tags         客户区·退款
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=[]model.OrderRefund}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/refund/list/{order_id} [post]
 func (h *Controller) RefundList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -456,6 +671,19 @@ func (h *Controller) RefundList(c *gin.Context) {
 }
 
 // RefundConfirm 客户确认收到退款（写 customer_confirm_at，与员工端审批闭环；幂等）
+// @Summary      确认收到退款
+// @Description  客户确认收到退款，写 customer_confirm_at，与员工端审批闭环；**幂等**。
+// @Tags         客户区·退款
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "退款单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/refund/confirm/{id} [post]
 func (h *Controller) RefundConfirm(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -471,6 +699,18 @@ func (h *Controller) RefundConfirm(c *gin.Context) {
 }
 
 // PaymentList 我的订单收款记录（支付页展示登记状态）
+// @Summary      我的收款记录
+// @Description  返回某订单的收款记录（支付页展示登记状态；**不分页**）。
+// @Tags         客户区·收款
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=[]model.OrderPayment}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/payment/list/{order_id} [post]
 func (h *Controller) PaymentList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -488,6 +728,18 @@ func (h *Controller) PaymentList(c *gin.Context) {
 
 // PaymentMark 客户登记转账（「我已完成转账，通知摄影师」）。
 // 资金不经平台：仅落 status=1 待核验记录，到账确认仍在员工端 /payment/confirm/:id。
+// @Summary      登记转账
+// @Description  客户登记「我已完成转账，通知摄影师」。资金不经平台：仅落一条待核验记录，到账确认仍在员工端 /payment/confirm/{id}。
+// @Tags         客户区·收款
+// @Accept       json
+// @Produce      json
+// @Param        req  body  contract.ClientPaymentMarkReq  true  "转账登记（含 order_id）"
+// @Success      200  {object}  response.Body{data=model.OrderPayment}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/pay/mark [post]
 func (h *Controller) PaymentMark(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	var req contract.ClientPaymentMarkReq
@@ -504,6 +756,16 @@ func (h *Controller) PaymentMark(c *gin.Context) {
 }
 
 // PaymentMethods 客户可见的收款方式（只出启用项，供支付页展示收款码/账号）
+// @Summary      收款方式列表
+// @Description  客户可见的收款方式，**只返回启用项**，供支付页展示收款码/账号。
+// @Tags         客户区·收款
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=[]contract.ClientPaymentMethodResp}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/payment-method/list [post]
 func (h *Controller) PaymentMethods(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	list, err := h.Svc.ClientPaymentMethods(c.Request.Context(), cu)
@@ -515,6 +777,18 @@ func (h *Controller) PaymentMethods(c *gin.Context) {
 }
 
 // ReviewCreate 评价订单
+// @Summary      评价订单
+// @Tags         客户区·评价
+// @Accept       json
+// @Produce      json
+// @Param        order_id  path  int                     true  "订单ID"
+// @Param        req       body  contract.ClientReviewReq true  "评价内容"
+// @Success      200  {object}  response.Body{data=model.OrderReview}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/review/create/{order_id} [post]
 func (h *Controller) ReviewCreate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	orderID, err := bind.PathID(c, "order_id")
@@ -536,6 +810,16 @@ func (h *Controller) ReviewCreate(c *gin.Context) {
 }
 
 // ReviewList 我的评价（客户中心 → 我的评价，只读；不分页的业务集合，同改期/退款列表口径）
+// @Summary      我的评价
+// @Description  客户中心 → 我的评价，只读；按令牌内 customer_id 锁定归属（**不分页**，同改期/退款列表口径）。
+// @Tags         客户区·评价
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=[]repository.ReviewListItem}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/review/list [post]
 func (h *Controller) ReviewList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	list, err := h.Svc.ClientReviews(c.Request.Context(), cu)
@@ -547,6 +831,16 @@ func (h *Controller) ReviewList(c *gin.Context) {
 }
 
 // CustomerProfile 我的资料（客户中心 → 个人信息）
+// @Summary      我的资料
+// @Description  客户中心 → 个人信息。
+// @Tags         客户区·我的
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=contract.ClientProfileResp}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/customer/profile [post]
 func (h *Controller) CustomerProfile(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	p, err := h.Svc.ClientProfile(c.Request.Context(), cu)
@@ -561,6 +855,19 @@ func (h *Controller) CustomerProfile(c *gin.Context) {
 // 这里刻意用**严格** BindJSON（而非别处可选 body 的 `_ = c.ShouldBindJSON`）：
 // 请求体畸形时必须报错——若静默当成「没有字段要改」，会返回成功但什么都没保存，
 // 客户端显示「已保存」而库里没变，正是最难排查的一类假故障（同封面保存那次的教训）。
+// @Summary      修改我的资料
+// @Description  客户自助修改资料，**只接受字段白名单**（remark / tags / level / source / status 属工作室内部信息，不可改）。
+// @Description  请求体畸形时直接报错，不静默当「无字段要改」——避免返回成功但库里没变。
+// @Tags         客户区·我的
+// @Accept       json
+// @Produce      json
+// @Param        req  body  contract.ClientProfileUpdateReq  true  "资料字段（白名单）"
+// @Success      200  {object}  response.Body{data=contract.ClientProfileResp}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/customer/profile/update [post]
 func (h *Controller) CustomerProfileUpdate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	var req contract.ClientProfileUpdateReq
@@ -581,6 +888,17 @@ func (h *Controller) CustomerProfileUpdate(c *gin.Context) {
 // 候选 = 该客户**曾下过单或提过定制需求**的门店与摄影师，外加本次分享链接带入的分享人
 // （见 service.ClientPhotographerOptions）。无候选（新客户且非分享进入）时返回空数组，
 // 前端不展示选择器，需求仍可提交、由工作室后续指派。
+// @Summary      门店/摄影师候选
+// @Description  定制需求页「选择门店 → 选择摄影师」的候选 = 该客户曾下过单或提过需求的门店与摄影师，外加分享链接的分享人。
+// @Description  无候选（新客户且非分享进入）时返回空数组，前端不展示选择器，需求仍可提交。
+// @Tags         客户区·我的
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=[]contract.ClientStoreOption}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/customer/photographer-options [post]
 func (h *Controller) PhotographerOptions(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	opts, err := h.Svc.ClientPhotographerOptions(c.Request.Context(), cu, staffFrom(c))
@@ -592,6 +910,19 @@ func (h *Controller) PhotographerOptions(c *gin.Context) {
 }
 
 // DeliveryDetail 交付单与明细（选片页/成片页）。:id 为 **order_id**（与 PC 端同语义）。
+// @Summary      交付单与明细
+// @Description  选片页 / 成片页数据源。⚠️ 本接口的 :id 是 **order_id**（与 PC 端同语义）。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=object{delivery=model.Delivery,items=[]model.DeliveryItem}}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/detail/{id} [post]
 func (h *Controller) DeliveryDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -609,6 +940,18 @@ func (h *Controller) DeliveryDetail(c *gin.Context) {
 
 // DeliveryItems 交付文件明细（按订单反查）。:id 为 **order_id**。
 // 与 /delivery/detail/:id 数据同源，供「文件管理」tab 直接取列表；未建交付单返回空列表。
+// @Summary      交付文件明细
+// @Description  按订单反查交付文件明细，供「文件管理」tab 直接取列表；未建交付单返回空列表。⚠️ :id 是 **order_id**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "订单ID"
+// @Success      200  {object}  response.Body{data=[]model.DeliveryItem}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/items/{id} [post]
 func (h *Controller) DeliveryItems(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -625,6 +968,20 @@ func (h *Controller) DeliveryItems(c *gin.Context) {
 }
 
 // SelectPhotos 提交选片
+// @Summary      提交选片
+// @Description  ⚠️ 本接口的 :id 是**交付单 ID**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                      true  "交付单ID"
+// @Param        req  body  object{item_ids=[]int64} true  "选中的文件 ID 列表"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/select/{id} [post]
 func (h *Controller) SelectPhotos(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -647,6 +1004,19 @@ func (h *Controller) SelectPhotos(c *gin.Context) {
 }
 
 // ConfirmExtra 确认加片费用
+// @Summary      确认加片费用
+// @Description  ⚠️ 本接口的 :id 是**交付单 ID**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "交付单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/confirm-extra/{id} [post]
 func (h *Controller) ConfirmExtra(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -662,6 +1032,19 @@ func (h *Controller) ConfirmExtra(c *gin.Context) {
 }
 
 // ConfirmDelivery 确认成片
+// @Summary      确认成片
+// @Description  ⚠️ 本接口的 :id 是**交付单 ID**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "交付单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/confirm/{id} [post]
 func (h *Controller) ConfirmDelivery(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -677,6 +1060,20 @@ func (h *Controller) ConfirmDelivery(c *gin.Context) {
 }
 
 // FeedbackSubmit 提交精修反馈
+// @Summary      提交精修反馈
+// @Description  ⚠️ 本接口的 :item_id 是**交付文件 ID**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        item_id  path  int                       true  "交付文件ID"
+// @Param        req      body  contract.ClientFeedbackReq true  "反馈内容"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/feedback/{item_id} [post]
 func (h *Controller) FeedbackSubmit(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	itemID, err := bind.PathID(c, "item_id")
@@ -697,6 +1094,18 @@ func (h *Controller) FeedbackSubmit(c *gin.Context) {
 }
 
 // CustomRequestList 我的定制需求
+// @Summary      我的定制需求
+// @Description  客户本人提交过的定制需求历史（分页）。
+// @Tags         客户区·定制需求
+// @Accept       json
+// @Produce      json
+// @Param        req  body  contract.PageReq  true  "分页参数（page / page_size）"
+// @Success      200  {object}  response.Body{data=response.Page{list=[]model.CustomRequest,total=int,page=int,page_size=int}}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/custom-request/list [post]
 func (h *Controller) CustomRequestList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	page, pageSize := bind.Pager(c)
@@ -713,6 +1122,17 @@ func (h *Controller) CustomRequestList(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // AssetList 公开作品列表（预约主页作品集）
+// @Summary      公开作品列表
+// @Description  预约主页作品集，**只出「已发布 + 公开」的作品**。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·作品集
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{page=int,page_size=int,category=string,featured=string}  true  "查询条件（featured=1 只看精选；slug 见说明）"
+// @Success      200  {object}  response.Body{data=response.Page{list=[]model.Asset,total=int,page=int,page_size=int}}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/asset/list [post]
 func (h *Controller) AssetList(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -730,6 +1150,17 @@ func (h *Controller) AssetList(c *gin.Context) {
 }
 
 // AssetDetail 公开作品详情（浏览数 +1）
+// @Summary      公开作品详情
+// @Description  作品详情，附带浏览数 +1。
+// @Description  租户定位：body.slug（也可放 query slug / X-Slug 头）；服务端按 slug 反查 company_id，**不接受客户端直传 company_id**。
+// @Tags         客户区·作品集
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "作品ID"
+// @Success      200  {object}  response.Body{data=model.Asset}
+// @Failure      400  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Router       /h5/asset/detail/{id} [post]
 func (h *Controller) AssetDetail(c *gin.Context) {
 	companyID, err := h.requireCompany(c)
 	if err != nil {
@@ -754,6 +1185,16 @@ func (h *Controller) AssetDetail(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // QuoteList 我的报价单列表（含明细字段，前端按 id 取单条即可）
+// @Summary      我的报价单列表
+// @Description  返回本人的报价单（含明细字段，前端按 id 取单条即可）。
+// @Tags         客户区·报价
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=[]model.Quote}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/quote/list [post]
 func (h *Controller) QuoteList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	list, err := h.Svc.ClientQuotes(c.Request.Context(), cu)
@@ -765,6 +1206,19 @@ func (h *Controller) QuoteList(c *gin.Context) {
 }
 
 // QuoteDetail 单张报价详情（报价详情页，按 id 直取；归属校验含线索兜底）
+// @Summary      报价详情
+// @Description  单张报价详情，按 id 直取；归属校验含线索兜底。
+// @Tags         客户区·报价
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "报价单ID"
+// @Success      200  {object}  response.Body{data=model.Quote}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/quote/detail/{id} [post]
 func (h *Controller) QuoteDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -781,6 +1235,18 @@ func (h *Controller) QuoteDetail(c *gin.Context) {
 }
 
 // QuoteAccept 接受报价
+// @Summary      接受报价
+// @Tags         客户区·报价
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "报价单ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/quote/accept/{id} [post]
 func (h *Controller) QuoteAccept(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -796,6 +1262,19 @@ func (h *Controller) QuoteAccept(c *gin.Context) {
 }
 
 // QuoteModify 对报价提出修改意见
+// @Summary      对报价提修改意见
+// @Tags         客户区·报价
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                          true  "报价单ID"
+// @Param        req  body  contract.ClientQuoteModifyReq true  "修改意见"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/quote/modify/{id} [post]
 func (h *Controller) QuoteModify(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -820,6 +1299,19 @@ func (h *Controller) QuoteModify(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // RescheduleDetail 改期单详情 + 调度费支付状态
+// @Summary      改期单详情
+// @Description  改期单详情，含调度费支付状态。
+// @Tags         客户区·改期
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "改期单ID"
+// @Success      200  {object}  response.Body{data=contract.ClientRescheduleDetailResp}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/reschedule/detail/{id} [post]
 func (h *Controller) RescheduleDetail(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -836,6 +1328,19 @@ func (h *Controller) RescheduleDetail(c *gin.Context) {
 }
 
 // ReschedulePay 提交改期调度费支付凭证
+// @Summary      提交调度费凭证
+// @Description  提交改期调度费的支付凭证（资金不经平台，走「上传凭证 → 工作室核验」）。
+// @Tags         客户区·改期
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                               true  "改期单ID"
+// @Param        req  body  contract.ClientReschedulePayReq    true  "支付凭证"
+// @Success      200  {object}  response.Body{data=model.OrderPayment}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/reschedule/pay/{id} [post]
 func (h *Controller) ReschedulePay(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -857,6 +1362,20 @@ func (h *Controller) ReschedulePay(c *gin.Context) {
 }
 
 // ExtraQuote 加片费试算（body 可为空：按当前已选张数试算）
+// @Summary      加片费试算
+// @Description  按已选张数试算加片费；**body 可为空**（缺省按当前已选张数试算）。⚠️ :id 是**交付单 ID**。
+// @Tags         客户区·交付
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                            true  "交付单ID"
+// @Param        req  body  contract.ClientExtraQuoteReq    false  "试算参数（可省略）"
+// @Success      200  {object}  response.Body{data=contract.ClientExtraQuoteResp}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/delivery/extra-quote/{id} [post]
 func (h *Controller) ExtraQuote(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -875,6 +1394,20 @@ func (h *Controller) ExtraQuote(c *gin.Context) {
 }
 
 // OrderRequirementUpdate 客户修改拍摄需求（仅待定金/待拍摄，白名单字段）
+// @Summary      修改拍摄需求
+// @Description  客户修改拍摄需求，**仅待定金 / 待拍摄状态可改，且只接受白名单字段**。
+// @Tags         客户区·订单
+// @Accept       json
+// @Produce      json
+// @Param        id   path  int                                  true  "订单ID"
+// @Param        req  body  contract.ClientOrderRequirementReq    true  "需求字段（白名单）"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/order/requirement/update/{id} [post]
 func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -899,6 +1432,18 @@ func (h *Controller) OrderRequirementUpdate(c *gin.Context) {
 // ---------------------------------------------------------------------
 
 // NotificationList 我的通知列表（body: unread=1 只看未读）
+// @Summary      我的通知列表
+// @Description  客户本人的站内通知（分页）；unread=1 只看未读。
+// @Tags         客户区·通知
+// @Accept       json
+// @Produce      json
+// @Param        req  body  object{page=int,page_size=int,unread=string}  true  "查询条件（unread=1 只看未读）"
+// @Success      200  {object}  response.Body{data=response.Page{list=[]model.SysNotification,total=int,page=int,page_size=int}}
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/notification/list [post]
 func (h *Controller) NotificationList(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	page, pageSize := bind.Pager(c)
@@ -911,6 +1456,16 @@ func (h *Controller) NotificationList(c *gin.Context) {
 }
 
 // NotificationUnreadCount 未读通知数（铃铛红点）
+// @Summary      未读通知数
+// @Description  铃铛红点用。
+// @Tags         客户区·通知
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body{data=object{count=int}}
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/notification/unread-count [post]
 func (h *Controller) NotificationUnreadCount(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	count, err := h.Svc.UnreadClientNotificationCount(c.Request.Context(), cu)
@@ -922,6 +1477,18 @@ func (h *Controller) NotificationUnreadCount(c *gin.Context) {
 }
 
 // NotificationRead 标记单条已读
+// @Summary      标记通知已读
+// @Tags         客户区·通知
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "通知ID"
+// @Success      200  {object}  response.Body
+// @Failure      400  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      404  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/notification/read/{id} [post]
 func (h *Controller) NotificationRead(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	id, err := bind.PathID(c, "id")
@@ -937,6 +1504,15 @@ func (h *Controller) NotificationRead(c *gin.Context) {
 }
 
 // NotificationReadAll 全部标记已读
+// @Summary      全部标记已读
+// @Tags         客户区·通知
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  response.Body
+// @Failure      401  {object}  response.Body
+// @Failure      500  {object}  response.Body
+// @Security     BearerAuth
+// @Router       /h5/notification/read-all [post]
 func (h *Controller) NotificationReadAll(c *gin.Context) {
 	cu := middleware.GetClientUser(c)
 	if err := h.Svc.MarkAllClientNotificationsRead(c.Request.Context(), cu); err != nil {
