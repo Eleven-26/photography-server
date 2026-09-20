@@ -32,6 +32,16 @@ import (
 	"photography-server/internal/service"
 )
 
+// @title                      Photography Server API
+// @version                    1.0
+// @description                摄影工作室管理系统后端 API。五端挂载：pc（无前缀）/ miniapp（/miniapp）/ h5（/h5）/ wechat 客户区（/wechat）/ 员工端（/wechat/staff）。
+// @description                约定：业务接口统一使用 POST + JSON body（含分页 page/page_size、keyword 等），路径参数用 :id / :order_id；统一响应体 response.Body{code,msg,data,trace_id}，列表数据为 response.Page{list,total,page,page_size}。
+// @description                鉴权：除登录、健康检查与客户区公开接口（ClientPublic）外，均需在 Authorization 头携带 Bearer <token>（员工 JWT 或客户 JWT）。
+// @BasePath                   /
+// @securityDefinitions.apikey BearerAuth
+// @in                         header
+// @name                       Authorization
+// @description                先调用登录接口获取 token，再以 "Bearer <token>" 形式放入 Authorization 头
 func main() {
 	var configPath string
 	var profile string

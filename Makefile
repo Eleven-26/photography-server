@@ -1,4 +1,4 @@
-.PHONY: run run-dev build test tidy docker-up docker-up-wait docker-up-debug docker-ps docker-logs-init docker-logs-backend docker-down docker-build
+.PHONY: run run-dev build test tidy docs swag docker-up docker-up-wait docker-up-debug docker-ps docker-logs-init docker-logs-backend docker-down docker-build
 
 # Go 构建标签：本地开发默认带 debug（编译基础设施调试接口 /test/redis|nats|es|mongo|jaeger
 # 与 presentation/controller/test.go）；构建"纯净二进制"（等价生产镜像）用：make build GO_TAGS=
@@ -27,6 +27,19 @@ test:
 
 tidy:
 	go mod tidy
+
+# ===== Swagger 接口文档（Swaggo）=====
+# 前置：安装 swag CLI（版本与 go.mod 中 github.com/swaggo/swag 对齐）
+#   go install github.com/swaggo/swag/cmd/swag@v1.16.6
+# 生成物：docs/swagger/ 下的 docs.go / swagger.json / swagger.yaml（package swagger，随代码入库，供 go build 引用）
+# 访问：启动服务后打开 /swagger/index.html（仅 dev/test/docker.dev 注册，prod 不暴露）
+#   —— 见 internal/router/router.go 的 debugProfile 白名单
+# --parseInternal：解析 internal/ 下的本地 Go 类型（contract/model/response 等）
+# 外部类型无法解析时在根目录 .swaggo 里 replace（如 soft_delete.DeletedAt）
+docs: swag
+
+swag:
+	swag init -g cmd/server/main.go -o docs/swagger --parseInternal --outputTypes go,json,yaml
 
 docker-build:
 	docker compose build

@@ -1,0 +1,4 @@
+// Swaggo 全局类型覆盖（swag init 默认读取仓库根目录的 .swaggo）。
+// 说明：本仓 Go 模型统一内嵌 model.Base，其中软删除字段类型来自外部包
+// gorm.io/plugin/soft_delete.DeletedAt，Swaggo 无法自行解析，这里映射为 integer。
+replace soft_delete.DeletedAt integer

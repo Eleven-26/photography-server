@@ -1,0 +1,2476 @@
+basePath: /
+definitions:
+  contract.AuditReq:
+    properties:
+      approved:
+        description: 审批结论 true-通过 false-驳回
+        type: boolean
+      remark:
+        description: 审批备注
+        type: string
+    type: object
+  contract.ChangePasswordReq:
+    properties:
+      new_password:
+        description: 新密码
+        type: string
+      old_password:
+        description: 原密码
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  contract.CustomerCreateReq:
+    properties:
+      allow_notifications:
+        description: AllowNotifications 用指针：创建时不传默认允许(1)，显式传 0 表示不允许。
+        type: integer
+      avatar:
+        description: 头像URL
+        type: string
+      birthday:
+        description: 生日
+        type: string
+      gender:
+        description: '性别: male/female/unknown'
+        type: string
+      level:
+        allOf:
+        - $ref: '#/definitions/enum.CustomerLevel'
+        description: 客户等级 1-普通 2-黄金 3-铂金 4-钻石
+      mobile:
+        description: 手机号
+        type: string
+      name:
+        description: 客户姓名
+        type: string
+      prefer_scene:
+        description: 常用场景
+        type: string
+      prefer_style:
+        description: 偏好风格
+        type: string
+      remark:
+        description: 备注
+        type: string
+      source:
+        description: 来源
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/enum.CustomerStatus'
+        description: 状态 1-潜在 2-活跃 3-流失
+      store_id:
+        description: 门店ID
+        type: integer
+      tags:
+        description: 标签，逗号分隔
+        type: string
+      wechat:
+        description: 微信号
+        type: string
+    required:
+    - name
+    type: object
+  contract.CustomerListReq:
+    properties:
+      keyword:
+        description: 姓名/手机号关键字
+        type: string
+      page:
+        description: 页码，默认 1
+        type: integer
+      page_size:
+        description: 每页条数，默认 20，上限 200
+        type: integer
+    type: object
+  contract.CustomerStatsResp:
+    properties:
+      active:
+        description: 活跃数（status=2）
+        type: integer
+      gold_up:
+        description: 黄金及以上等级数
+        type: integer
+      inactive:
+        description: 非活跃数（status=3）
+        type: integer
+      new_this_month:
+        description: 本月新增
+        type: integer
+      potential:
+        description: 潜在客户数（status=1）
+        type: integer
+      repurchase_count:
+        description: —— 复购口径（原型「复购客户 / 复购率」）——
+        type: integer
+      repurchase_rate:
+        description: 复购率 %（分母为有过下单的客户）
+        type: number
+      total:
+        description: 总数
+        type: integer
+    type: object
+  contract.CustomerUpdateReq:
+    properties:
+      allow_notifications:
+        description: |-
+          AllowNotifications 用指针：nil 表示未传（保持原值），显式 0 表示关闭通知。
+          若用值类型，「关闭通知」会被零值语义吞掉而静默回退（同 Asset.featured 的历史缺陷）。
+        type: integer
+      avatar:
+        description: 头像URL
+        type: string
+      birthday:
+        description: 生日
+        type: string
+      gender:
+        description: '性别: male/female/unknown'
+        type: string
+      id:
+        description: 客户ID（body 主键）
+        type: integer
+      level:
+        allOf:
+        - $ref: '#/definitions/enum.CustomerLevel'
+        description: 客户等级 1-普通 2-黄金 3-铂金 4-钻石
+      mobile:
+        description: 手机号
+        type: string
+      name:
+        description: 客户姓名
+        type: string
+      prefer_scene:
+        description: 常用场景
+        type: string
+      prefer_style:
+        description: 偏好风格
+        type: string
+      remark:
+        description: 备注
+        type: string
+      source:
+        description: 来源
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/enum.CustomerStatus'
+        description: 状态 1-潜在 2-活跃 3-流失
+      store_id:
+        description: 门店ID
+        type: integer
+      tags:
+        description: 标签，逗号分隔
+        type: string
+      wechat:
+        description: 微信号
+        type: string
+    type: object
+  contract.LoginReq:
+    properties:
+      password:
+        description: 密码
+        type: string
+      username:
+        description: 用户名
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  contract.LoginResp:
+    properties:
+      token:
+        description: JWT Token
+        type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/contract.UserInfoVO'
+        description: 用户信息（含角色与权限）
+    type: object
+  contract.OrderAddonCreateReq:
+    properties:
+      category:
+        description: 分类 makeup-妆造 urgency-时效 service-服务 retouch-精修
+        type: string
+      confirmed:
+        description: 客户是否确认 0-待确认 1-已确认
+        type: integer
+      name:
+        description: 加项名称
+        type: string
+      order_id:
+        description: 订单ID（body 主键）
+        type: integer
+      price:
+        description: 单价
+        type: number
+      qty:
+        description: 数量（<=0 按 1 计）
+        type: integer
+      remark:
+        description: 备注
+        type: string
+    required:
+    - name
+    type: object
+  contract.OrderAddonUpdateReq:
+    properties:
+      category:
+        description: 分类 makeup-妆造 urgency-时效 service-服务 retouch-精修
+        type: string
+      confirmed:
+        description: 客户是否确认 0-待确认 1-已确认
+        type: integer
+      id:
+        description: 加项ID（body 主键）
+        type: integer
+      name:
+        description: 加项名称
+        type: string
+      price:
+        description: 单价
+        type: number
+      qty:
+        description: 数量（<=0 按 1 计）
+        type: integer
+      remark:
+        description: 备注
+        type: string
+    required:
+    - name
+    type: object
+  contract.OrderCancelReq:
+    properties:
+      reason:
+        description: 取消原因
+        type: string
+    type: object
+  contract.OrderCreateReq:
+    properties:
+      addon_amount:
+        description: 加选金额
+        type: number
+      customer_id:
+        description: 客户ID
+        type: integer
+      lead_id:
+        description: 线索ID（从线索转化时传）
+        type: integer
+      owner_id:
+        description: 负责人ID
+        type: integer
+      package_id:
+        description: 套餐ID
+        type: integer
+      photographer:
+        description: 摄影师姓名
+        type: string
+      photographer_id:
+        description: 摄影师ID
+        type: integer
+      quote_id:
+        description: 报价单ID
+        type: integer
+      remark:
+        description: 备注
+        type: string
+      shoot_address:
+        description: 拍摄地址
+        type: string
+      shoot_date:
+        description: 拍摄日期
+        type: string
+      shoot_time:
+        description: 拍摄时段
+        type: string
+    required:
+    - package_id
+    type: object
+  contract.OrderDetail:
+    properties:
+      allowed_transitions:
+        description: |-
+          AllowedTransitions 当前状态允许流转到的目标状态（领域状态机输出）。
+          前端据此渲染「阶段推进」按钮，避免在客户端重复实现状态机导致规则漂移。
+        items:
+          type: integer
+        type: array
+      delivery:
+        allOf:
+        - $ref: '#/definitions/model.Delivery'
+        description: 交付信息（未创建交付单时为 null）
+      logs:
+        description: 操作日志
+        items:
+          $ref: '#/definitions/model.OrderLog'
+        type: array
+      order:
+        allOf:
+        - $ref: '#/definitions/model.Order'
+        description: 订单信息
+      payments:
+        description: 收款记录
+        items:
+          $ref: '#/definitions/model.OrderPayment'
+        type: array
+      refunds:
+        description: 退款记录
+        items:
+          $ref: '#/definitions/model.OrderRefund'
+        type: array
+    type: object
+  contract.OrderListReq:
+    properties:
+      customer_id:
+        description: 客户ID过滤
+        type: integer
+      page:
+        description: 页码，默认 1
+        type: integer
+      page_size:
+        description: 每页条数，默认 20，上限 200
+        type: integer
+      status:
+        description: 订单状态过滤
+        type: string
+    type: object
+  contract.OrderStatusReq:
+    properties:
+      content:
+        description: 状态变更说明
+        type: string
+      status:
+        description: 目标状态
+        type: integer
+    required:
+    - status
+    type: object
+  contract.OrderUpdateReq:
+    properties:
+      id:
+        description: 订单ID（body 主键）
+        type: integer
+      photographer:
+        description: 摄影师姓名
+        type: string
+      photographer_id:
+        description: 摄影师ID
+        type: integer
+      remark:
+        description: 备注
+        type: string
+      shoot_address:
+        description: 拍摄地址
+        type: string
+      shoot_date:
+        description: 拍摄日期
+        type: string
+      shoot_time:
+        description: 拍摄时段
+        type: string
+    type: object
+  contract.PageReq:
+    properties:
+      page:
+        description: 页码，默认 1
+        type: integer
+      page_size:
+        description: 每页条数，默认 20，上限 200
+        type: integer
+    type: object
+  contract.PaymentCreateReq:
+    properties:
+      amount:
+        description: 金额
+        type: number
+      method_id:
+        description: 收款方式ID
+        type: integer
+      order_id:
+        description: 订单ID（body 主键）
+        type: integer
+      paid_at:
+        description: 付款时间
+        type: string
+      remark:
+        description: 备注
+        type: string
+      type:
+        description: '类型: deposit-定金, final-尾款, addon-加选'
+        type: string
+      voucher:
+        description: 凭证URL
+        type: string
+    required:
+    - amount
+    - type
+    type: object
+  contract.RefundCreateReq:
+    properties:
+      amount:
+        description: 退款金额，为空时按规则自动计算
+        type: number
+      reason:
+        description: 退款原因
+        type: string
+    type: object
+  contract.RescheduleApplyReq:
+    properties:
+      new_date:
+        description: 新拍摄日期
+        type: string
+      new_time:
+        description: 新拍摄时段
+        type: string
+      reason:
+        description: 改期原因说明
+        type: string
+      reason_label:
+        description: 改期原因分类
+        type: string
+    required:
+    - new_date
+    - new_time
+    type: object
+  contract.UserInfoVO:
+    properties:
+      avatar:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      data_scope:
+        description: 数据范围 1-全部 2-本门店 3-仅本人
+        type: integer
+      deleted:
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      last_login_ip:
+        type: string
+      mobile:
+        type: string
+      nickname:
+        type: string
+      permissions:
+        description: 权限点集合（admin 角色为全量）
+        items:
+          type: string
+        type: array
+      role_code:
+        description: 角色编码 admin/manager/photographer/sales
+        type: string
+      role_id:
+        type: integer
+      role_name:
+        description: 角色名称
+        type: string
+      status:
+        type: integer
+      store_id:
+        type: integer
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+      username:
+        type: string
+    type: object
+  enum.CustomerLevel:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-comments:
+      CustomerLevelDiamond: 钻石
+      CustomerLevelGold: 黄金
+      CustomerLevelNormal: 普通
+      CustomerLevelPlatinum: 铂金
+    x-enum-descriptions:
+    - 普通
+    - 黄金
+    - 铂金
+    - 钻石
+    x-enum-varnames:
+    - CustomerLevelNormal
+    - CustomerLevelGold
+    - CustomerLevelPlatinum
+    - CustomerLevelDiamond
+  enum.CustomerStatus:
+    enum:
+    - 1
+    - 2
+    - 3
+    type: integer
+    x-enum-comments:
+      CustomerStatusActive: 活跃
+      CustomerStatusInactive: 流失/沉睡
+      CustomerStatusPotential: 潜在
+    x-enum-descriptions:
+    - 潜在
+    - 活跃
+    - 流失/沉睡
+    x-enum-varnames:
+    - CustomerStatusPotential
+    - CustomerStatusActive
+    - CustomerStatusInactive
+  enum.DeliveryStage:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    type: integer
+    x-enum-comments:
+      DeliveryStageDelivered: 已交付
+      DeliveryStagePendingConfirm: 待确认交付
+      DeliveryStagePendingSamples: 待上传样片
+      DeliveryStageRetouching: 精修进行中
+      DeliveryStageSelecting: 客户选片中
+    x-enum-descriptions:
+    - 待上传样片
+    - 客户选片中
+    - 精修进行中
+    - 待确认交付
+    - 已交付
+    x-enum-varnames:
+    - DeliveryStagePendingSamples
+    - DeliveryStageSelecting
+    - DeliveryStageRetouching
+    - DeliveryStagePendingConfirm
+    - DeliveryStageDelivered
+  enum.OrderStatus:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type: integer
+    x-enum-comments:
+      OrderStatusCancelled: 已取消
+      OrderStatusCompleted: 已完成
+      OrderStatusPendingConfirm: 待确认（客户 H5/小程序 预约，待摄影师确认）
+      OrderStatusPendingDelivery: 待交付
+      OrderStatusPendingDeposit: 待定金
+      OrderStatusPendingShoot: 待拍摄
+      OrderStatusRetouching: 精修中
+      OrderStatusShooting: 拍摄中
+    x-enum-descriptions:
+    - 待确认（客户 H5/小程序 预约，待摄影师确认）
+    - 待定金
+    - 待拍摄
+    - 拍摄中
+    - 精修中
+    - 待交付
+    - 已完成
+    - 已取消
+    x-enum-varnames:
+    - OrderStatusPendingConfirm
+    - OrderStatusPendingDeposit
+    - OrderStatusPendingShoot
+    - OrderStatusShooting
+    - OrderStatusRetouching
+    - OrderStatusPendingDelivery
+    - OrderStatusCompleted
+    - OrderStatusCancelled
+  enum.PaymentStatus:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-comments:
+      PaymentStatusConfirmed: 已确认
+      PaymentStatusPending: 待核验
+      PaymentStatusRefunded: 已退款
+      PaymentStatusUnpaid: 待支付
+    x-enum-descriptions:
+    - 待核验
+    - 已确认
+    - 待支付
+    - 已退款
+    x-enum-varnames:
+    - PaymentStatusPending
+    - PaymentStatusConfirmed
+    - PaymentStatusUnpaid
+    - PaymentStatusRefunded
+  enum.RefundStatus:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-comments:
+      RefundStatusApplying: 申请中
+      RefundStatusApproved: 已通过
+      RefundStatusDone: 已退款
+      RefundStatusRejected: 已驳回
+    x-enum-descriptions:
+    - 申请中
+    - 已通过
+    - 已退款
+    - 已驳回
+    x-enum-varnames:
+    - RefundStatusApplying
+    - RefundStatusApproved
+    - RefundStatusDone
+    - RefundStatusRejected
+  enum.RescheduleFeeType:
+    enum:
+    - 1
+    - 2
+    - 3
+    type: integer
+    x-enum-comments:
+      RescheduleFeeCharged: 收调度费
+      RescheduleFeeForbidden: 不可改期
+      RescheduleFeeFree: 免费
+    x-enum-descriptions:
+    - 免费
+    - 收调度费
+    - 不可改期
+    x-enum-varnames:
+    - RescheduleFeeFree
+    - RescheduleFeeCharged
+    - RescheduleFeeForbidden
+  enum.RescheduleStatus:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-comments:
+      RescheduleStatusApproved: 已同意
+      RescheduleStatusCancelled: 已取消
+      RescheduleStatusPending: 待确认
+      RescheduleStatusRejected: 已拒绝
+    x-enum-descriptions:
+    - 待确认
+    - 已同意
+    - 已拒绝
+    - 已取消
+    x-enum-varnames:
+    - RescheduleStatusPending
+    - RescheduleStatusApproved
+    - RescheduleStatusRejected
+    - RescheduleStatusCancelled
+  model.Customer:
+    properties:
+      allow_notifications:
+        description: —— 客户偏好与通知许可（原型「客户档案 · 客户偏好」区块）——
+        type: integer
+      avatar:
+        type: string
+      birthday:
+        type: string
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      deleted:
+        type: integer
+      gender:
+        type: string
+      id:
+        type: integer
+      is_verified:
+        type: integer
+      level:
+        $ref: '#/definitions/enum.CustomerLevel'
+      mobile:
+        type: string
+      name:
+        type: string
+      openid:
+        type: string
+      order_count:
+        type: integer
+      prefer_scene:
+        type: string
+      prefer_style:
+        type: string
+      remark:
+        type: string
+      satisfaction:
+        description: |-
+          Satisfaction 客户满意度：该客户订单评价的评分均分（保留一位小数，0=暂无评价）。
+          非持久化列（gorm:"-"），仅在客户详情查询时计算填充，避免与真实评价两套数据打架。
+        type: number
+      source:
+        type: string
+      status:
+        $ref: '#/definitions/enum.CustomerStatus'
+      store_id:
+        type: integer
+      tags:
+        type: string
+      total_amount:
+        type: number
+      unionid:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+      wechat:
+        type: string
+    type: object
+  model.Delivery:
+    properties:
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      customer_confirmed_at:
+        type: string
+      customer_id:
+        type: integer
+      customer_name:
+        type: string
+      deleted:
+        type: integer
+      delivered_at:
+        type: string
+      extra_confirmed:
+        type: integer
+      extra_fee:
+        type: number
+      extra_selected_count:
+        type: integer
+      id:
+        type: integer
+      operator_id:
+        type: integer
+      order_id:
+        type: integer
+      raw_count:
+        type: integer
+      remark:
+        type: string
+      retouch_target:
+        type: integer
+      retouch_version:
+        type: integer
+      retouched_count:
+        type: integer
+      sample_count:
+        type: integer
+      select_deadline:
+        type: string
+      selected_at:
+        type: string
+      selected_count:
+        type: integer
+      sent_final_at:
+        type: string
+      stage:
+        $ref: '#/definitions/enum.DeliveryStage'
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  model.Order:
+    properties:
+      addon_amount:
+        type: number
+      archived_at:
+        type: string
+      base_price:
+        type: number
+      cancel_reason:
+        type: string
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      customer_id:
+        type: integer
+      customer_mobile:
+        type: string
+      customer_name:
+        type: string
+      deleted:
+        type: integer
+      delivery_expire_at:
+        type: string
+      deposit_amt:
+        type: number
+      final_amt:
+        type: number
+      finished_at:
+        type: string
+      id:
+        type: integer
+      is_archived:
+        type: integer
+      lead_id:
+        type: integer
+      owner_id:
+        type: integer
+      package_id:
+        type: integer
+      package_name:
+        type: string
+      package_version:
+        type: integer
+      paid_amt:
+        type: number
+      payment_status:
+        $ref: '#/definitions/enum.PaymentStatus'
+      people_count:
+        type: string
+      photographer:
+        type: string
+      photographer_id:
+        type: integer
+      prep_content:
+        type: string
+      prep_read_at:
+        type: string
+      quote_id:
+        type: integer
+      refund_amt:
+        type: number
+      remark:
+        type: string
+      select_deadline:
+        type: string
+      shoot_address:
+        type: string
+      shoot_date:
+        type: string
+      shoot_style:
+        type: string
+      shoot_time:
+        type: string
+      source_type:
+        type: integer
+      status:
+        $ref: '#/definitions/enum.OrderStatus'
+      store_id:
+        type: integer
+      total_amt:
+        type: number
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  model.OrderAddon:
+    properties:
+      amount:
+        type: number
+      category:
+        type: string
+      company_id:
+        type: integer
+      confirmed:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      deleted:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      order_id:
+        type: integer
+      price:
+        type: number
+      qty:
+        type: integer
+      remark:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  model.OrderLog:
+    properties:
+      action:
+        type: string
+      company_id:
+        type: integer
+      content:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      deleted:
+        type: integer
+      from_status:
+        type: integer
+      id:
+        type: integer
+      operator_id:
+        type: integer
+      operator_name:
+        type: string
+      order_id:
+        type: integer
+      to_status:
+        type: integer
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  model.OrderPayment:
+    properties:
+      amount:
+        type: number
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      customer_id:
+        type: integer
+      deleted:
+        type: integer
+      id:
+        type: integer
+      method_id:
+        type: integer
+      method_name:
+        type: string
+      operator_id:
+        type: integer
+      operator_name:
+        type: string
+      order_id:
+        type: integer
+      paid_at:
+        type: string
+      remark:
+        type: string
+      status:
+        $ref: '#/definitions/enum.PaymentStatus'
+      type:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+      voucher:
+        type: string
+    type: object
+  model.OrderRefund:
+    properties:
+      amount:
+        type: number
+      apply_by:
+        type: integer
+      apply_name:
+        type: string
+      apply_source:
+        type: integer
+      audit_at:
+        type: string
+      audit_by:
+        type: integer
+      audit_remark:
+        type: string
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      customer_confirm_at:
+        type: string
+      customer_id:
+        type: integer
+      deleted:
+        type: integer
+      id:
+        type: integer
+      order_id:
+        type: integer
+      reason:
+        type: string
+      reason_label:
+        type: string
+      refund_at:
+        type: string
+      refund_rule:
+        type: string
+      status:
+        $ref: '#/definitions/enum.RefundStatus'
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+      voucher:
+        type: string
+    type: object
+  model.OrderReschedule:
+    properties:
+      apply_source:
+        type: integer
+      audit_at:
+        type: string
+      audit_by:
+        type: integer
+      audit_name:
+        type: string
+      audit_remark:
+        type: string
+      code:
+        type: string
+      company_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      customer_id:
+        type: integer
+      deleted:
+        type: integer
+      fee_amount:
+        type: number
+      fee_type:
+        $ref: '#/definitions/enum.RescheduleFeeType'
+      id:
+        type: integer
+      new_date:
+        type: string
+      new_time:
+        type: string
+      order_id:
+        type: integer
+      original_date:
+        type: string
+      original_time:
+        type: string
+      reason:
+        type: string
+      reason_label:
+        type: string
+      status:
+        $ref: '#/definitions/enum.RescheduleStatus'
+      updated_at:
+        type: string
+      updated_by:
+        type: integer
+    type: object
+  response.Body:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+      trace_id:
+        description: 当前请求链路 trace_id，便于前端按链路反馈问题
+        type: string
+    type: object
+  response.Page:
+    properties:
+      list: {}
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: |-
+    摄影工作室管理系统后端 API。五端挂载：pc（无前缀）/ miniapp（/miniapp）/ h5（/h5）/ wechat 客户区（/wechat）/ 员工端（/wechat/staff）。
+    约定：业务接口统一使用 POST + JSON body（含分页 page/page_size、keyword 等），路径参数用 :id / :order_id；统一响应体 response.Body{code,msg,data,trace_id}，列表数据为 response.Page{list,total,page,page_size}。
+    鉴权：除登录、健康检查与客户区公开接口（ClientPublic）外，均需在 Authorization 头携带 Bearer <token>（员工 JWT 或客户 JWT）。
+  title: Photography Server API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 员工账号密码登录（pc / miniapp 管理端共用），成功后返回 JWT 与用户信息（含角色、权限点、数据范围）；连续失败会触发账号锁定。
+      parameters:
+      - description: 登录请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.LoginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/contract.LoginResp'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      summary: 账号密码登录
+      tags:
+      - 认证
+  /customer/create:
+    post:
+      consumes:
+      - application/json
+      description: 创建客户档案；手机号在租户内唯一，重复会返回冲突。
+      parameters:
+      - description: 客户信息
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.CustomerCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Customer'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 新建客户
+      tags:
+      - 客户
+  /customer/delete/{id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 客户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 删除客户
+      tags:
+      - 客户
+  /customer/detail/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 按 ID 查询客户档案。
+      parameters:
+      - description: 客户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Customer'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 客户详情
+      tags:
+      - 客户
+  /customer/list:
+    post:
+      consumes:
+      - application/json
+      description: 分页查询客户，支持 keyword 模糊匹配姓名/手机号。
+      parameters:
+      - description: 查询条件
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.CustomerListReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/response.Page'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Customer'
+                        type: array
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+                      total:
+                        type: integer
+                    type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 客户列表
+      tags:
+      - 客户
+  /customer/orders/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 分页返回指定客户名下的订单列表。
+      parameters:
+      - description: 客户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 分页参数
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.PageReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/response.Page'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Order'
+                        type: array
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+                      total:
+                        type: integer
+                    type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 客户名下订单
+      tags:
+      - 客户
+  /customer/stats:
+    post:
+      consumes:
+      - application/json
+      description: 客户总量、状态分布、复购等看板指标。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/contract.CustomerStatsResp'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 客户统计
+      tags:
+      - 客户
+  /customer/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新客户档案；body.id 为主键。
+      parameters:
+      - description: 客户信息（含 id）
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.CustomerUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 更新客户
+      tags:
+      - 客户
+  /order/addon/create:
+    post:
+      consumes:
+      - application/json
+      description: 新增加项并在同一事务内重算订单金额；body.order_id 为订单主键。
+      parameters:
+      - description: 加项信息（含 order_id）
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderAddonCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OrderAddon'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 新建订单加项
+      tags:
+      - 订单加项
+  /order/addon/delete/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 删除加项并在同一事务内重算订单金额。
+      parameters:
+      - description: 加项ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 删除订单加项
+      tags:
+      - 订单加项
+  /order/addon/list/{order_id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OrderAddon'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单加项列表
+      tags:
+      - 订单加项
+  /order/addon/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新加项并在同一事务内重算订单金额；body.id 为加项主键。
+      parameters:
+      - description: 加项信息（含 id）
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderAddonUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OrderAddon'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 更新订单加项
+      tags:
+      - 订单加项
+  /order/cancel/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 取消订单并记录原因；当前状态不允许取消时返回业务错误。
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 取消原因
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderCancelReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 取消订单
+      tags:
+      - 订单
+  /order/create:
+    post:
+      consumes:
+      - application/json
+      description: 创建订单；客户与线索二选一（customer_id / lead_id），套餐必填。
+      parameters:
+      - description: 订单信息
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Order'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 创建订单
+      tags:
+      - 订单
+  /order/detail/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 返回订单及其收款、退款、日志、交付与可流转状态。
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/contract.OrderDetail'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单详情
+      tags:
+      - 订单
+  /order/list:
+    post:
+      consumes:
+      - application/json
+      description: 分页查询订单，可按状态、客户过滤。
+      parameters:
+      - description: 查询条件
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderListReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/response.Page'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/model.Order'
+                        type: array
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+                      total:
+                        type: integer
+                    type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单列表
+      tags:
+      - 订单
+  /order/logs/{id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OrderLog'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单操作日志
+      tags:
+      - 订单
+  /order/reschedule/apply/{order_id}:
+    post:
+      consumes:
+      - application/json
+      description: 管理端代客户发起改期申请（改期统一走改期单链路，不直接改订单拍摄日期）。
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      - description: 改期请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.RescheduleApplyReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OrderReschedule'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 发起改期
+      tags:
+      - 改期
+  /order/reschedule/audit/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 审批改期申请；approved 为 true 通过、false 驳回，缺省返回参数错误。
+      parameters:
+      - description: 改期单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 审批请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.AuditReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 改期审批
+      tags:
+      - 改期
+  /order/reschedule/list/{order_id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OrderReschedule'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单改期单列表
+      tags:
+      - 改期
+  /order/status/{id}:
+    post:
+      consumes:
+      - application/json
+      description: '按状态机流转订单状态，body: {status, content}。'
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 状态流转请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderStatusReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单状态流转
+      tags:
+      - 订单
+  /order/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新订单拍摄信息；body.id 为主键。
+      parameters:
+      - description: 订单信息（含 id）
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.OrderUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 更新订单
+      tags:
+      - 订单
+  /payment/confirm/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 核验到账，将收款置为已确认。
+      parameters:
+      - description: 收款记录ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 核验收款
+      tags:
+      - 收款
+  /payment/create:
+    post:
+      consumes:
+      - application/json
+      description: 登记订单收款（资金不经平台，仅登记）；body.order_id 为订单主键。
+      parameters:
+      - description: 收款信息（含 order_id）
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.PaymentCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OrderPayment'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 登记收款
+      tags:
+      - 收款
+  /payment/delete/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 删除未确认的收款记录；已确认的收款需走退款流程。
+      parameters:
+      - description: 收款记录ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 删除收款
+      tags:
+      - 收款
+  /payment/list/{order_id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OrderPayment'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单收款列表
+      tags:
+      - 收款
+  /refund/apply/{order_id}:
+    post:
+      consumes:
+      - application/json
+      description: 对指定订单发起退款；金额为空时按退款规则自动计算。
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      - description: 退款请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.RefundCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OrderRefund'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 申请退款
+      tags:
+      - 退款
+  /refund/audit/{id}:
+    post:
+      consumes:
+      - application/json
+      description: 审批退款；approved 为 true 通过、false 驳回，缺省返回参数错误。
+      parameters:
+      - description: 退款单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 审批请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.AuditReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 退款审批
+      tags:
+      - 退款
+  /refund/list/{order_id}:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 订单ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.OrderRefund'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 订单退款列表
+      tags:
+      - 退款
+  /user/change-password:
+    post:
+      consumes:
+      - application/json
+      description: 校验原密码后修改当前登录员工密码。
+      parameters:
+      - description: 修改密码请求
+        in: body
+        name: req
+        required: true
+        schema:
+          $ref: '#/definitions/contract.ChangePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 修改密码
+      tags:
+      - 认证
+  /user/logout:
+    post:
+      consumes:
+      - application/json
+      description: 将当前令牌 jti 加入黑名单，使令牌立即失效（替代旧的无状态 JWT 仅返回成功）。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Body'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 登出
+      tags:
+      - 认证
+  /user/profile:
+    post:
+      consumes:
+      - application/json
+      description: 返回登录员工的资料、角色、权限点与数据范围，供前端做按钮级 / 路由级权限判定。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Body'
+            - properties:
+                data:
+                  $ref: '#/definitions/contract.UserInfoVO'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Body'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Body'
+      security:
+      - BearerAuth: []
+      summary: 当前登录用户信息
+      tags:
+      - 认证
+securityDefinitions:
+  BearerAuth:
+    description: 先调用登录接口获取 token，再以 "Bearer <token>" 形式放入 Authorization 头
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

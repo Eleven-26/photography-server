@@ -27,7 +27,9 @@ type CustomerCreateReq struct {
 
 // CustomerUpdateReq 更新客户
 // level/status 为 int 枚举，传 0 表示未指定、保持库中原值。
+// ID 为主键（handler 经 bind.BodyID 读取），纳入结构体以便 Swagger 完整描述 body。
 type CustomerUpdateReq struct {
+	ID       int64               `json:"id"`       // 客户ID（body 主键）
 	StoreID  int64               `json:"store_id"` // 门店ID
 	Name     string              `json:"name"`     // 客户姓名
 	Mobile   string              `json:"mobile"`   // 手机号
@@ -62,4 +64,13 @@ type CustomerStatsResp struct {
 	// —— 复购口径（原型「复购客户 / 复购率」）——
 	RepurchaseCount int64   `json:"repurchase_count"` // 复购客户数（下单 ≥ 2 次）
 	RepurchaseRate  float64 `json:"repurchase_rate"`  // 复购率 %（分母为有过下单的客户）
+}
+
+// CustomerListReq 客户列表查询（body：分页 + 关键字）。
+//
+// 仅用于 Swagger 文档：handler 通过 params 中间件从 JSON body 读取 page/page_size/keyword。
+type CustomerListReq struct {
+	Page     int    `json:"page"`      // 页码，默认 1
+	PageSize int    `json:"page_size"` // 每页条数，默认 20，上限 200
+	Keyword  string `json:"keyword"`   // 姓名/手机号关键字
 }

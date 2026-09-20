@@ -4,7 +4,10 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
+	_ "photography-server/docs/swagger"
 	"photography-server/internal/app"
 	"photography-server/internal/config"
 	"photography-server/internal/middleware"
@@ -113,5 +116,21 @@ func New(cfg *config.Config, svc *service.Service, mw *middleware.Middlewares, a
 	//      都不注册（旧实现按 mode!="release" 黑名单判断，mode 为空即等于非 release → 生产误配会全量暴露，是 P0 隐患）。
 	registerDebugRoutes(api, ctl, cfg.App.Profile)
 
+	// Swagger UI（API 文档）：仅非生产环境开放，与调试路由共用 profile 白名单（dev/test/docker.dev）。
+	registerSwagger(engine, cfg.App.Profile)
+
 	return engine
+}
+
+// registerSwagger 注册 Swagger UI（API 文档）路由。
+//
+// 由 `make swag`（swag init）从各 handler 的 swag 注释生成 docs/swagger 后，
+// 启动服务访问 /swagger/index.html 即可查看。与 /test/* 调试路由共用 profile 白名单：
+// 仅 dev/test/docker.dev 注册，prod 不注册——避免把完整内部接口清单暴露到公网。
+// 抽成独立函数便于护栏测试（swagger_test.go）不构造完整依赖即可断言开关语义。
+func registerSwagger(engine *gin.Engine, profile string) {
+	if !debugProfile(profile) {
+		return
+	}
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

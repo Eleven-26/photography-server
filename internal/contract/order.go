@@ -22,6 +22,7 @@ type OrderCreateReq struct {
 
 // OrderUpdateReq 更新订单
 type OrderUpdateReq struct {
+	ID             int64  `json:"id"`              // 订单ID（body 主键）
 	ShootDate      string `json:"shoot_date"`      // 拍摄日期
 	ShootTime      string `json:"shoot_time"`      // 拍摄时段
 	ShootAddress   string `json:"shoot_address"`   // 拍摄地址
@@ -69,6 +70,7 @@ type OrderDetail struct {
 
 // PaymentCreateReq 创建收款
 type PaymentCreateReq struct {
+	OrderID  int64   `json:"order_id"`                  // 订单ID（body 主键）
 	Type     string  `json:"type" binding:"required"`   // 类型: deposit-定金, final-尾款, addon-加选
 	Amount   float64 `json:"amount" binding:"required"` // 金额
 	MethodID int64   `json:"method_id"`                 // 收款方式ID
@@ -81,4 +83,38 @@ type PaymentCreateReq struct {
 type RefundCreateReq struct {
 	Reason string  `json:"reason"` // 退款原因
 	Amount float64 `json:"amount"` // 退款金额，为空时按规则自动计算
+}
+
+// OrderListReq 订单列表查询（body：分页 + 过滤）。
+//
+// 仅用于 Swagger 文档：handler 通过 params 中间件从 JSON body 读取这些字段。
+type OrderListReq struct {
+	Page       int    `json:"page"`        // 页码，默认 1
+	PageSize   int    `json:"page_size"`   // 每页条数，默认 20，上限 200
+	Status     string `json:"status"`      // 订单状态过滤
+	CustomerID int64  `json:"customer_id"` // 客户ID过滤
+}
+
+// OrderCancelReq 取消订单请求
+type OrderCancelReq struct {
+	Reason string `json:"reason"` // 取消原因
+}
+
+// AuditReq 审批类请求（退款审批 / 改期审批共用）。
+// approved 用指针：区分「未传」与「驳回(false)」；为 nil 时返回参数错误。
+type AuditReq struct {
+	Approved *bool  `json:"approved"` // 审批结论 true-通过 false-驳回
+	Remark   string `json:"remark"`   // 审批备注
+}
+
+// OrderAddonCreateReq 创建订单加项请求（order_id 与加项明细同 body）
+type OrderAddonCreateReq struct {
+	OrderID int64 `json:"order_id"` // 订单ID（body 主键）
+	OrderAddonReq
+}
+
+// OrderAddonUpdateReq 更新订单加项请求（id 与加项明细同 body）
+type OrderAddonUpdateReq struct {
+	ID int64 `json:"id"` // 加项ID（body 主键）
+	OrderAddonReq
 }

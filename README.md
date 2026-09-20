@@ -279,6 +279,27 @@ location /api/ {
   客户区 ClientPublic / ClientAuthed）+ `internal/router/endpoints.go`（端装配）；
   各接口所需权限点见 `docs/rbac/权限点手册.md`
 
+### Swagger 接口文档（Swaggo，仅 dev/test/docker.dev 注册）
+
+接口文档由 `swag` 扫描各 handler 上的 Swaggo 注释生成，产物在 `docs/swagger/`
+（`docs.go` / `swagger.json` / `swagger.yaml`，随代码入库，`go build` 直接引用）：
+
+```bash
+# 安装 swag CLI（版本与 go.mod 中 github.com/swaggo/swag 对齐）
+go install github.com/swaggo/swag/cmd/swag@v1.16.6
+# 生成 / 更新文档（两个目标等价）
+make swag          # make docs
+```
+
+启动服务后访问 `http://localhost:8080/swagger/index.html`。约定：
+
+- 仅 `profile ∈ {dev,test,docker.dev}` 注册，与 `/test/*` 调试路由共用白名单（`internal/router/router.go`），**prod 不暴露**；
+- 文档总览（标题/版本/鉴权方案）来自 `cmd/server/main.go` 顶部注释；每条接口的 `@Summary/@Tags/@Param/@Success/@Router` 写在对应 handler 上；
+- 请求体：本仓接口参数一律从 JSON body 取，故每个接口在 Swagger 中只声明**一个 body 参数**（符合 OpenAPI 2.0 单 body 限制）；
+- 统一响应体 `response.Body{code,msg,data,trace_id}`，列表 `response.Page{list,total,page,page_size}`；鉴权点右上角 **Authorize** 填 `Bearer <token>`；
+- 类型解析只扫本仓 `internal/`（`--parseInternal`）；外部类型无法解析时在根目录 `.swaggo` 里 `replace`（如 `soft_delete.DeletedAt`）。
+- **当前样板**：认证 / 客户 / 订单（含收款、退款、加项、改期），共 32 个接口；其余接口按同一规范增量补注释，重跑 `make swag` 即自动收录。
+
 ### 调试接口（`/test/*`，仅 dev/test 注册）
 
 用于验证各基础设施连通性：直连基础设施单例、不挂业务鉴权；路由仅在非 `release` 模式注册，生产自动下线。
