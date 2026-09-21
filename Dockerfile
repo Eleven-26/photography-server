@@ -10,7 +10,6 @@ ENV GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 GOFLAGS=-mod=mod
 # 默认 false —— 纯 OTel / Jaeger 版：不注入，保留的 OTel 埋点代码照常工作。
 # 注意：注入构建会强制 -a 全量 rebuild（编译时间明显变长）；agent 版本需与 go.mod 依赖一致，
 # 且 build/agent/ 下存在 skywalking-go-agent-${SW_AGENT_VERSION}-linux-amd64（从官方 bin.tgz 解压即可；
-# 该二进制已 gitignore，目录由 .gitkeep 占位，缺失时注入分支会直接报文件不存在）。
 # Go 构建标签（--build-arg 传入）：留空（默认）= 产出不含基础设施调试接口
 # （/test/redis|nats|es|mongo|jaeger，源码见 internal/presentation/controller/test.go 的 debug 标签）；
 # 需要容器内调试时传 GO_BUILD_TAGS=debug（compose 由 .env 的 GO_BUILD_TAGS 透传）。
