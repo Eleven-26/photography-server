@@ -37,6 +37,7 @@ logs/
 .DS_Store
 Thumbs.db
 .workbuddy
+.dsh
 
 # 配置主密钥（KEK）本地文件，绝不能提交
 secrets/
