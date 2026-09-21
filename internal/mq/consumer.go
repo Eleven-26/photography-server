@@ -18,6 +18,29 @@ import (
 	"photography-server/internal/pkg/logger"
 )
 
+// 消费并发模型（2026-09-21 核实 nats.go v1.53.1 源码后整理）：
+//
+// nats.go 对**每个订阅只创建一个** waitForMsgs goroutine 并串行回调；Chan 订阅由读循环
+// 直接投递、无独立 goroutine。故 goroutine 数上界 = 订阅数，与消息峰值无关 —— 不存在
+// 「每条消息起一个 goroutine 导致爆炸」。峰值下的真实风险是：
+//
+//	· 单订阅串行 → 队头阻塞（同主题慢消息拖住整条主题，但不同主题互不影响）；
+//	· 订阅 pending 队列（默认 65536 条 / 64MB）写满后由库报 SlowConsumer 并**丢弃**消息。
+//
+// 因此这里**不引入全局 worker pool**：并发 >1 会破坏同主题消息顺序，而订单状态流转、
+// 支付回调都依赖顺序。需要提吞吐时应按业务键（如 order_id）分片，而非无脑加并发。
+// 本文件在峰值下的加固点：JetStream MaxAckPending 服务端限流 + Pull 持续拉取 + panic 就地兜住。
+const (
+	// pullBatchSize 单次 Fetch 条数；配合 MaxAckPending，避免一次拉入过多在途消息。
+	pullBatchSize = 32
+	// maxAckPending JetStream 在途未确认上限：服务端据此限速，消费端内存有界。
+	maxAckPending = 64
+	// pullMaxWait Fetch 空队列等待；到点返回以便检查停机信号。
+	pullMaxWait = 500 * time.Millisecond
+	// pullErrorBackoff Fetch 失败后的退避，避免错误风暴空转。
+	pullErrorBackoff = 1 * time.Second
+)
+
 // natsHandler 业务消息处理器：ctx 为续接链路后的上下文（从消息 Header 抽取的父 span 派生），
 // 业务内所有 SQL（repository 已 ctx 贯穿 WithContext）自动挂到同一 trace。
 type natsHandler func(ctx context.Context, msg *nats.Msg)
@@ -126,7 +149,7 @@ func (c *Consumer) Stop() {
 
 // subscribe 非持久化订阅，失败返回 error（由 Start 汇总上报）
 func (c *Consumer) subscribe(subject string, handler natsHandler) error {
-	sub, err := c.nc.Subscribe(subject, c.traced(subject, handler))
+	sub, err := c.nc.Subscribe(subject, c.traced(subject, handler, false))
 	if err != nil {
 		logger.Errorf("nats subscribe [%s] failed: %v", subject, err)
 		return fmt.Errorf("subscribe %s: %w", subject, err)
@@ -143,12 +166,13 @@ func (c *Consumer) jsSubscribe(subject string, handler natsHandler) error {
 		return nil
 	}
 	durable := durableName(subject)
-	sub, err := c.js.Subscribe(subject, c.traced(subject, handler),
+	sub, err := c.js.Subscribe(subject, c.traced(subject, handler, true),
 		nats.Durable(durable),
 		nats.ManualAck(),
 		nats.DeliverAll(),
 		nats.MaxDeliver(3),
 		nats.AckWait(30*time.Second),
+		nats.MaxAckPending(maxAckPending),
 	)
 	if err != nil {
 		logger.Errorf("jetStream push subscribe [%s] failed: %v", subject, err)
@@ -170,50 +194,55 @@ func (c *Consumer) jsPullSubscribe(subject string, handler natsHandler) error {
 		nats.DeliverAll(),
 		nats.MaxDeliver(3),
 		nats.AckWait(30*time.Second),
+		nats.MaxAckPending(maxAckPending),
 	)
 	if err != nil {
 		logger.Errorf("jetStream pull subscribe [%s] failed: %v", subject, err)
 		return fmt.Errorf("js pull subscribe %s: %w", subject, err)
 	}
-	c.pullSubs = append(c.pullSubs, &pullSub{sub: sub, handler: c.traced(subject, handler)})
+	c.pullSubs = append(c.pullSubs, &pullSub{sub: sub, handler: c.traced(subject, handler, true)})
 	logger.Infof("jetStream pull subscribed: %s (durable: %s)", subject, durable)
 	return nil
 }
 
-// startPullLoop 启动 Pull 消费循环（每秒拉取一次）
+// startPullLoop 启动 Pull 消费循环：每个 Pull 订阅一个独立 goroutine。
+//
+// 旧实现是全局 1s ticker（每主题每秒最多 10 条），吞吐被人为压死且在途不可控；
+// 现由 Fetch 阻塞驱动**持续拉取**，处理不过来时 MaxAckPending 在服务端限流，消费端内存有界。
+// 批内仍顺序处理，保留同主题消息顺序（订单/支付类主题依赖顺序）。
 func (c *Consumer) startPullLoop() {
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
+	for _, ps := range c.pullSubs {
+		c.wg.Add(1)
+		go c.pullLoop(ps)
+	}
+}
 
-		for {
+// pullLoop 单个 Pull 订阅的消费循环（顺序处理，保留顺序语义）
+func (c *Consumer) pullLoop(ps *pullSub) {
+	defer c.wg.Done()
+	for {
+		select {
+		case <-c.stopCh:
+			return
+		default:
+		}
+
+		msgs, err := ps.sub.Fetch(pullBatchSize, nats.MaxWait(pullMaxWait))
+		if err != nil {
+			if errors.Is(err, nats.ErrTimeout) {
+				continue // 空队列属正常，回到循环顶检查停机信号
+			}
 			select {
 			case <-c.stopCh:
 				return
-			case <-ticker.C:
-				for _, ps := range c.pullSubs {
-					c.fetchMessages(ps)
-				}
+			case <-time.After(pullErrorBackoff):
 			}
+			logger.Errorf("pull fetch [%s] failed: %v", ps.sub.Subject, err)
+			continue
 		}
-	}()
-}
-
-// fetchMessages 拉取并处理一批消息
-func (c *Consumer) fetchMessages(ps *pullSub) {
-	msgs, err := ps.sub.Fetch(10, nats.MaxWait(500*time.Millisecond))
-	if err != nil {
-		// 超时是正常的，说明没有新消息
-		if err == nats.ErrTimeout {
-			return
+		for _, msg := range msgs {
+			ps.handler(msg)
 		}
-		logger.Errorf("pull fetch [%s] failed: %v", ps.sub.Subject, err)
-		return
-	}
-	for _, msg := range msgs {
-		ps.handler(msg)
 	}
 }
 
@@ -229,14 +258,20 @@ func durableName(subject string) string {
 // 追踪未启用时原样调用业务 handler，零开销。
 // 注意：SkyWalking-go（native）通道的消息 Header 无 OTel traceparent（agent 未注入），
 // 该通道下 MQ 透传需按 sw8 header 格式手动接入，为 P1 待办。
-func (c *Consumer) traced(subject string, handler natsHandler) nats.MsgHandler {
+func (c *Consumer) traced(subject string, handler natsHandler, jetStream bool) nats.MsgHandler {
 	return func(msg *nats.Msg) {
+		start := time.Now()
 		tr := c.tracer
 		if tr == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					c.onPanic(subject, msg, jetStream, r)
+				}
+				logger.Infof("[nats:%s] done, cost=%dms", subject, time.Since(start).Milliseconds())
+			}()
 			handler(context.Background(), msg)
 			return
 		}
-		start := time.Now()
 		parent := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
 		ctx, span := tr.Start(parent, "nats."+subject,
 			trace.WithAttributes(
@@ -251,14 +286,26 @@ func (c *Consumer) traced(subject string, handler natsHandler) nats.MsgHandler {
 			if r := recover(); r != nil {
 				span.RecordError(fmt.Errorf("handler panic: %v", r))
 				span.SetStatus(codes.Error, "handler panic")
-				span.End()
-				logger.Errorf("[nats:%s] panic, trace=%s, err=%v", subject, tid, r)
-				panic(r) // 交还 nats 库 recover，不吞异常
+				c.onPanic(subject, msg, jetStream, r)
 			}
 			span.End()
 			logger.Infof("[nats:%s] done, trace=%s, cost=%dms", subject, tid, time.Since(start).Milliseconds())
 		}()
 		handler(ctx, msg)
+	}
+}
+
+// onPanic 统一处理 handler panic。
+//
+// 旧实现 recover 后**重新 panic**，会把 nats 的 waitForMsgs / Fetch goroutine 打崩 ——
+// 单条坏消息即可导致整个服务重启，且 JetStream 消息因未 ack 被反复重投。
+// 现改为就地兜住并记录；JetStream 消息额外 Nak，按 MaxDeliver(3) 重投。
+func (c *Consumer) onPanic(subject string, msg *nats.Msg, jetStream bool, r interface{}) {
+	logger.Errorf("[nats:%s] handler panic recovered: %v", subject, r)
+	if jetStream && msg != nil && msg.Reply != "" {
+		if err := msg.Nak(); err != nil {
+			logger.Warnf("[nats:%s] nak after panic failed: %v", subject, err)
+		}
 	}
 }
 
