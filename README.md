@@ -33,9 +33,11 @@ photography-server
 │       ├── photography-server-docker.dev.yaml
 │       └── photography-server-prod.yaml
 ├── docs
+│   ├── 架构                # 跨仓架构基线（目录地图 / 架构图 / 结构审视 / 面试要点）
 │   ├── rbac                # RBAC 手册（权限点清单 / 运维手册）
 │   ├── sql                 # DDL / DML 建库脚本 + 增量链（按文件名日期升序执行）
-│   └── 容器化部署-2026-09-13.md  # 多端部署说明（三前端 + 后端 + 基础设施）
+│   ├── swagger             # Swaggo 接口文档生成物（docs.go / swagger.json / swagger.yaml）
+│   └── 部署                # 容器化部署方案与流程
 ├── internal
 │   ├── app                 # 依赖容器 / 组合根（业务包只依赖它暴露的字段，不 import infrastructure）
 │   ├── common              # 通用常量（响应码 / 分页 / 上传）
@@ -65,13 +67,17 @@ photography-server
 │   ├── repository          # 数据访问层（WithTx 事务透传 + company_id 租户过滤）
 │   ├── router              # 路由装配（端声明 + 中间件 + 静态资源挂载）
 │   └── service             # 业务服务层（只经 repository/domain 访问数据，不直连基础设施）
-├── scripts                 # 运维脚本（Nacos 模板发布等）
+├── scripts                 # 运维脚本（Nacos 初始化与模板发布）
+├── build/agent             # SkyWalking Go agent 二进制（离线构建需要，有意入库）
 ├── uploads                 # 上传文件目录（运行时生成；/uploads 需令牌，/uploads/media 公开）
 ├── Dockerfile
 ├── docker-compose.yml
-├── Makefile
+├── Makefile                # run / build / test / swag（生成接口文档）等
+├── .swaggo                 # Swaggo 全局类型覆盖（生成接口文档用）
 └── .env.example            # 环境变量模板（复制为 .env 使用）
 ```
+
+> 跨仓（四仓）架构基线见 [`docs/架构/`](./docs/架构/README.md)：目录地图、系统架构图、结构审视与整改、面试要点。
 
 ### 分层与依赖方向
 
