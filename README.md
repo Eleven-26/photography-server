@@ -195,9 +195,7 @@ HTTP 入口（方便新增字段时在线生成密文，**只加密不解密**�
 ⚠️ **生产部署前置条件**：`prod` 模板里有 `ENCv1` 密文，**部署环境必须先配置 KEK**（`APP_CONFIG_SECRET_FILE` 或 `APP_CONFIG_SECRET`），否则服务启动 fail-fast。应急可直接用 `APP_MONGODB_URI` 等 env 覆盖（env 优先级最高）。
 
 ## docker-compose 部署
-```
-参考文档：./docs/docker-compose部署流程.md
-```
+参考文档：[`docker-compose部署流程`](./docs/部署/docker-compose部署流程.md)
 
 ### 链路追踪（两通道各自独立）
 
