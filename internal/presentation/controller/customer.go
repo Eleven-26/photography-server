@@ -35,6 +35,8 @@ func (h *Controller) CustomerList(c *gin.Context) {
 	response.PageOK(c, list, total, page, pageSize)
 }
 
+// CustomerDetail 客户详情
+//
 // @Summary      客户详情
 // @Description  按 ID 查询客户档案。
 // @Tags         客户
@@ -63,6 +65,7 @@ func (h *Controller) CustomerDetail(c *gin.Context) {
 	response.OK(c, detail)
 }
 
+// CustomerCreate 新建客户
 // @Summary      新建客户
 // @Description  创建客户档案；手机号在租户内唯一，重复会返回冲突。
 // @Tags         客户
@@ -91,6 +94,7 @@ func (h *Controller) CustomerCreate(c *gin.Context) {
 	response.OK(c, customer)
 }
 
+// CustomerUpdate 更新客户
 // @Summary      更新客户
 // @Description  更新客户档案；body.id 为主键。
 // @Tags         客户
@@ -123,6 +127,7 @@ func (h *Controller) CustomerUpdate(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// CustomerDelete 删除客户
 // @Summary      删除客户
 // @Tags         客户
 // @Accept       json
@@ -149,6 +154,7 @@ func (h *Controller) CustomerDelete(c *gin.Context) {
 	response.OKNil(c)
 }
 
+// CustomerStats 客户统计
 // @Summary      客户统计
 // @Description  客户总量、状态分布、复购等看板指标。
 // @Tags         客户
